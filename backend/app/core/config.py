@@ -8,7 +8,7 @@ class Settings:
     API_V1_STR: str = "/api/v1"
     
     # Database - PostgreSQL Required
-    DATABASE_URL: str = os.getenv("DATABASE_URL")
+    DATABASE_URL: str = (os.getenv("DATABASE_URL") or "").strip()
     
     # Validate DATABASE_URL is set
     if not DATABASE_URL:
