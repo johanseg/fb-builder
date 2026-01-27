@@ -2,6 +2,9 @@
 builder = "NIXPACKS"
 buildCommand = "npm install && npm run build"
 
+[build.environment]
+NIXPACKS_NODE_VERSION = "20"
+
 [deploy]
 startCommand = "sh -c 'npm run preview -- --host 0.0.0.0 --port ${PORT:-3000}'"
 healthcheckPath = "/"
