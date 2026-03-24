@@ -60,7 +60,7 @@ flowchart TB
         direction TB
         MW["Middleware Stack<br/>CORS · Security Headers · Rate Limiting · Proxy"]
 
-        subgraph ROUTES["15 API Routers (/api/v1)"]
+        subgraph ROUTES["20 API Routers (/api/v1)"]
             R1["auth · users"]
             R2["brands · products · profiles"]
             R3["research · brand-scrapes"]
@@ -68,6 +68,8 @@ flowchart TB
             R5["copy-generation · ad-remix"]
             R6["facebook · uploads"]
             R7["dashboard · prompts · ad-styles"]
+            R8["modular-generation · ad-modules · naming"]
+            R9["performance · personas"]
         end
 
         subgraph SERVICES["Service Layer"]
@@ -77,6 +79,7 @@ flowchart TB
             S4["BrandScraperService"]
             S5["SchedulerService"]
             S6["RateLimiter"]
+            S7["AgentOrchestrator<br/>5 AI Agents"]
         end
 
         subgraph SECURITY["Auth & Security"]
@@ -110,6 +113,8 @@ flowchart TB
     R5 --> GEMINI
     R5 --> FALAI
     R6 --> R2
+    R8 --> S7
+    S7 --> GEMINI
     ROUTES --> PG
 ```
 
@@ -153,7 +158,7 @@ flowchart TB
 │  │  • Store ad images  │   │  • Filter by country │   │     POSTGRESQL      │    │
 │  │  • Store scraped    │   │  • Page-level search │   │     (Railway)       │    │
 │  │    brand media      │   │  • Dedup via SHA256  │   │                     │    │
-│  │  • Video storage    │   │                      │   │  23 SQLAlchemy      │    │
+│  │  • Video storage    │   │                      │   │  24 SQLAlchemy      │    │
 │  │                     │   │  Fallback:           │   │  models             │    │
 │  │  Fallback: local    │   │  Chromium scraper    │   │                     │    │
 │  │  /uploads dir       │   │  when API returns    │   │  Shared by frontend │    │
@@ -253,7 +258,7 @@ sequenceDiagram
 
 ---
 
-## Database Schema (23 Models)
+## Database Schema (24 Models)
 
 ```mermaid
 erDiagram
@@ -264,6 +269,9 @@ erDiagram
     Brand ||--o{ Product : "has"
     Brand }o--o{ CustomerProfile : "targets"
     Brand ||--o{ GeneratedAd : "generates"
+    Brand ||--o{ AIPersona : "has"
+
+    Product ||--o{ AdModule : "has"
 
     WinningAd ||--o{ GeneratedAd : "template for"
 
@@ -276,6 +284,26 @@ erDiagram
     FacebookPage }o--o| Vertical : "in vertical"
 
     BrandScrape ||--o{ BrandScrapedAd : "scraped"
+
+    AdModule {
+        string id PK
+        string product_id FK
+        string module_type
+        text content
+        json generation_metadata
+        int performance_score
+        json tags
+    }
+
+    AIPersona {
+        string id PK
+        string brand_id FK
+        string name
+        text description
+        json visual_characteristics
+        text voice_guidelines
+        string base_image_url
+    }
 
     User {
         int id PK
@@ -293,6 +321,7 @@ erDiagram
         string primary_color
         string secondary_color
         string voice
+        float break_even_roas
     }
 
     Product {
@@ -302,6 +331,12 @@ erDiagram
         string description
         json product_shots
         string default_url
+        json pain_points
+        json desired_outcomes
+        json root_causes
+        json proof_points
+        json differentiators
+        json risk_reversals
     }
 
     WinningAd {
@@ -323,6 +358,8 @@ erDiagram
         string cta
         string image_url
         string ad_bundle_id
+        string bundle_code
+        string parent_ad_id FK
     }
 
     FacebookCampaign {
@@ -408,7 +445,8 @@ App.jsx
         ├── BRAND MANAGEMENT
         │   ├── /brands          Brands ──────────── CRUD, color coding, grid/list view
         │   ├── /products        Products ────────── Flat catalog, search/filter
-        │   └── /profiles        CustomerProfiles ── Audience segments, brand linking
+        │   ├── /profiles        CustomerProfiles ── Audience segments, brand linking
+        │   └── /personas        AIPersonas ──────── Custom AI personas per brand
         │
         ├── COMPETITOR RESEARCH
         │   ├── /research        Research ────────── Search Facebook Ads Library
@@ -427,6 +465,12 @@ App.jsx
         │   ├── /ad-remix        AdRemix ──────────── Deconstruct → Blueprint → Reconstruct
         │   └── /generated-ads   GeneratedAds ─────── Browse, filter, export created ads
         │
+        ├── SCRIPT FACTORY (Modular Creative Strategist)
+        │   ├── /modular-ads         ModularAds ──────── Modular Matrix generator
+        │   │                          4-block taxonomy: Intro → Bridge → Core → CTA
+        │   │                          Micro-Movie mode with 12 emotional avatars
+        │   └── /ad-modules-library  AdModulesLibrary ── Browse, filter, manage ad modules
+        │
         ├── CAMPAIGN MANAGEMENT
         │   └── /facebook-campaigns  FacebookCampaigns ── 6-step wizard:
         │                              1. Select Ad Account
@@ -437,7 +481,8 @@ App.jsx
         │                              6. Review & Launch
         │
         ├── ANALYTICS
-        │   └── /reporting       Reporting ────────── Performance stats, trends, charts
+        │   └── /reporting       Reporting ────────── Performance Intelligence + Kill Rule
+        │                          CSV import → Fit Score (0-5) → KILL/SCALE flags
         │
         └── ADMIN
             ├── /settings        Settings ─────────── Ad styles, prompts, general config
@@ -544,6 +589,78 @@ Step 6: Review & Launch ───► POST /facebook/ads
                               Ads go live on Facebook/Instagram
 ```
 
+### 5. Modular Creative Strategist System
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                      MODULAR CREATIVE STRATEGIST                                 │
+│              4-Block Taxonomy for Facebook Video Ad Scripts                       │
+├──────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐                │
+│  │   INTRO    │  │   BRIDGE   │  │    CORE    │  │    CTA     │                │
+│  │  0 – 7 s   │─►│  7 – 20 s  │─►│ 20 – 40 s  │─►│ 40 – 50 s  │                │
+│  │            │  │            │  │            │  │            │                │
+│  │ Hook Types:│  │ Types:     │  │ Pathways:  │  │ Styles:    │                │
+│  │ • Pain     │  │ • Mechanism│  │ • Logic    │  │ • Risk Rev │                │
+│  │ • Curiosity│  │ • Analogy  │  │ • Social   │  │ • Scarcity │                │
+│  │ • Shock    │  │ • Story    │  │   Proof    │  │ • Future   │                │
+│  │ • Benefit  │  │ • Data     │  │ • Demo     │  │   Pace     │                │
+│  └────────────┘  └────────────┘  └────────────┘  └────────────┘                │
+│                                                                                  │
+│  NAMING CONVENTION                                                               │
+│  ─────────────────                                                               │
+│  I-PAIN-Q-03_B-MEC-A_C-LOGIC_CTA-RISKREV-01                                    │
+│  │  │    │  │   │  │    │          │                                             │
+│  │  Hook Format ID  Bridge Core    CTA style                                    │
+│  Intro       type   type   pathway                                               │
+│                                                                                  │
+├──────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│  5 SPECIALIZED AI AGENTS (Gemini)                                                │
+│  ─────────────────────────────────                                               │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐              │
+│  │ IntroAgent  │ │ BridgeAgent │ │  CoreAgent  │ │  CtaAgent   │              │
+│  │ Hook types  │ │ Connects    │ │ Persuasion  │ │ Close       │              │
+│  │ & formats   │ │ hook→core   │ │ pathways    │ │ techniques  │              │
+│  └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘              │
+│                  ┌─────────────────────────┐                                     │
+│                  │    MicroMovieAgent      │                                     │
+│                  │  12 emotional avatars    │                                     │
+│                  │  30-60s short stories    │                                     │
+│                  │  Product at 40-50% mark  │                                     │
+│                  └─────────────────────────┘                                     │
+│                                                                                  │
+│  All agents orchestrated by AgentOrchestrator                                    │
+│  Product Brief required: pain_points, desired_outcomes, root_causes,             │
+│  proof_points, differentiators, risk_reversals                                   │
+│                                                                                  │
+├──────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│  PERFORMANCE SCORING & KILL RULE                                                 │
+│  ────────────────────────────────                                                │
+│  CSV Import ──► Parse Ad Names ──► Match UUID fragments to AdModules            │
+│                                                                                  │
+│  Fit Score (0-5) based on deepest funnel event:                                  │
+│    5: AddPaymentInfo  │  4: InitiateCheckout  │  3: AddToCart                   │
+│    2: Contact         │  1: Lead              │  0: CompleteRegistration         │
+│                                                                                  │
+│  Kill Rule (7-day):                                                              │
+│    Score ≤ 1 + spend > threshold  →  KILL  (replace chunk)                      │
+│    Score ≥ 4 + spend > threshold  →  SCALE (keep as control)                    │
+│    Threshold = Brand.break_even_roas (default $50)                               │
+│                                                                                  │
+├──────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│  PDCA EXPORT                                                                     │
+│  ───────────                                                                     │
+│  Cartesian product of all modules for a product (Intro × Bridge × Core × CTA)  │
+│  Grouped by Bridge type into Ad Groups (AG-Mechanism, AG-Analogy, etc.)         │
+│  Capped at 5000 combinations — CSV-ready payload for campaign upload             │
+│                                                                                  │
+└──────────────────────────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ## Backend Middleware & Security Stack
@@ -630,7 +747,7 @@ Incoming Request
 
 ---
 
-## API Endpoint Map (15 Routers, 60+ Endpoints)
+## API Endpoint Map (20 Routers, 75+ Endpoints)
 
 ```
 /api/v1/
@@ -731,10 +848,35 @@ Incoming Request
 │   ├── PUT    /{id}            Update prompt
 │   └── DELETE /{id}            Delete prompt
 │
-└── ad-styles/
-    ├── GET    /                List styles (filter by category)
-    ├── GET    /{id}            Get style
-    ├── POST   /                Create style
-    ├── PUT    /{id}            Update style
-    └── DELETE /{id}            Delete style
+├── ad-styles/
+│   ├── GET    /                List styles (filter by category)
+│   ├── GET    /{id}            Get style
+│   ├── POST   /                Create style
+│   ├── PUT    /{id}            Update style
+│   └── DELETE /{id}            Delete style
+│
+├── modular-generation/
+│   ├── POST /generate          Generate modular script blocks
+│   └── POST /iterate           Generate variations of winning module
+│
+├── ad-modules/
+│   ├── GET    /                List modules (filter by product_id)
+│   ├── POST   /                Create module
+│   ├── GET    /{id}            Get module
+│   ├── PUT    /{id}            Update module
+│   └── DELETE /{id}            Delete module
+│
+├── naming/
+│   ├── POST /assemble          Combine 4 modules → bundle code
+│   └── GET  /export-combinations/{product_id}  PDCA export
+│
+├── performance/
+│   ├── POST /import            Import Facebook CSV performance data
+│   └── GET  /kill-rule         Get kill/scale flags
+│
+└── personas/
+    ├── GET    /                List personas (filter by brand_id)
+    ├── POST   /                Create persona
+    ├── PUT    /{id}            Update persona
+    └── DELETE /{id}            Delete persona
 ```

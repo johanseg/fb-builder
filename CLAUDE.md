@@ -69,10 +69,11 @@ railway service logs --service <name>       # view logs
 
 ### Backend (`backend/app/`)
 
-- **Entry**: `main.py` — FastAPI app, CORS setup, security headers, rate limiting, registers 15 routers under `/api/v1/`
-- **Models**: `models.py` — single file with ~20 SQLAlchemy models
-- **Routes**: `api/v1/` — auth, users, brands, products, research, generated_ads, templates, facebook, uploads, dashboard, copy_generation, profiles, ad_remix, prompts, ad_styles
-- **Services**: `services/` — facebook_service.py (Marketing API via `facebook-business` SDK), research_service.py, ad_remix_service.py (Gemini Vision), brand_scraper.py, scraper.py
+- **Entry**: `main.py` — FastAPI app, CORS setup, security headers, rate limiting, registers 20 routers under `/api/v1/`
+- **Models**: `models.py` — single file with ~24 SQLAlchemy models (including AdModule, AIPersona)
+- **Routes**: `api/v1/` — auth, users, brands, products, research, generated_ads, templates, facebook, uploads, dashboard, copy_generation, profiles, ad_remix, prompts, ad_styles, modular_generation, ad_modules, naming, performance, personas
+- **Services**: `services/` — facebook_service.py, research_service.py, ad_remix_service.py (Gemini Vision), brand_scraper.py, scraper.py
+- **AI Agents**: `services/agents/` — 5 specialized Gemini agents (IntroAgent, BridgeAgent, CoreAgent, CtaAgent, MicroMovieAgent) coordinated by AgentOrchestrator. Prompts stored as `.md` in `services/agents/prompts/`
 - **Auth**: JWT access tokens (30min) + refresh tokens (7 days, stored in DB). `core/security.py` handles token creation, `core/deps.py` provides `get_current_active_user` dependency
 - **RBAC**: User → Roles → Permissions. Predefined roles: admin, manager, editor, viewer
 - **Config**: `core/config.py` — validates PostgreSQL, reads all env vars
@@ -85,14 +86,17 @@ railway service logs --service <name>       # view logs
   - `BrandContext` — selected brand shared across pages
   - `CampaignContext` — campaign management state
   - `ToastContext` — `useToast()` → `showSuccess/showError/showWarning/showInfo`
-- **Pages**: `pages/` — Dashboard, Brands, Products, Research, BrandScrapes, CreateAds, ImageAds, VideoAds, GeneratedAds, WinningAds, AdRemix, FacebookCampaigns, UserManagement, Login, Register, Settings
+- **Pages**: `pages/` — Dashboard, Brands, Products, Research, BrandScrapes, CreateAds, ImageAds, VideoAds, ModularAds, AdModulesLibrary, AIPersonas, GeneratedAds, WinningAds, AdRemix, Reporting, FacebookCampaigns, UserManagement, Login, Register, Settings
 - **API pattern**: All backend calls use `authFetch()` from AuthContext, which injects Bearer token and handles refresh
 
 ### Key Database Relationships
 
-- **Brand** → Products (1:M), CustomerProfiles (M:M), GeneratedAds (1:M)
+- **Brand** → Products (1:M), CustomerProfiles (M:M), GeneratedAds (1:M), AIPersonas (1:M). Has `break_even_roas` for configurable kill rule threshold.
+- **Product** → AdModules (1:M). Has brief fields: `pain_points`, `desired_outcomes`, `root_causes`, `proof_points`, `differentiators`, `risk_reversals` (all JSON arrays).
+- **AdModule** — individual script block (intro/bridge/core/cta/micro_movie) with `content`, `generation_metadata`, `performance_score`, `tags`. Belongs to Product.
+- **AIPersona** — virtual actor profile with `voice_guidelines`, `visual_characteristics`, `base_image_url`. Belongs to Brand.
+- **GeneratedAd** — links brand_id, product_id, template_id; grouped by `ad_bundle_id`. Has `bundle_code` (modular naming code) and `parent_ad_id` (for winner iterations).
 - **WinningAd** — template with `blueprint_json` for ad remix deconstruction
-- **GeneratedAd** — links brand_id, product_id, template_id; grouped by `ad_bundle_id`
 - **FacebookCampaign** → FacebookAdSet → FacebookAd (mirrors FB API hierarchy, synced via `fb_*_id` fields)
 - **User** → Roles (M:M) → Permissions (M:M); `is_superuser` bypasses all checks
 - **SavedSearch** → ScrapedAd; FacebookPage; Vertical (research/scraping system)
