@@ -27,9 +27,14 @@ jobs:
     steps:
       - name: Check backend health
         run: |
-          echo "Checking backend health..."
+          BACKEND_URL="${{ vars.BACKEND_URL }}"
+          if [ -z "$BACKEND_URL" ]; then
+            echo "::error::BACKEND_URL variable is not set."
+            exit 1
+          fi
+          echo "Checking backend health at $BACKEND_URL..."
           for i in {1..10}; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${{ vars.BACKEND_URL }}/api/v1/docs)
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BACKEND_URL/api/v1/docs" || echo "000")
             if [ "$STATUS" = "200" ]; then
               echo "Backend is healthy (HTTP 200)"
               exit 0
