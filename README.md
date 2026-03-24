@@ -26,7 +26,7 @@
 
 <p align="center">
   Created by <strong>Johan Garcia</strong><br>
-  <a href="https://johangarcia.com">johangarcia.com</a> • <a href="https://a4d.com">A4D.com</a><br>
+  <a href="https://johangarcia.com">johangarcia.com</a> • <a href="https://digitaloptimizer.agency">digitaloptimizer.agency</a><br>
   <a href="https://t.me/johanseg">Telegram</a> • <a href="mailto:info@johangarcia.com">info@johangarcia.com</a>
 </p>
 
