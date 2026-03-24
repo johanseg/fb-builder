@@ -25,9 +25,9 @@
 </p>
 
 <p align="center">
-  Created by <strong>Jason Akatiff</strong><br>
-  <a href="https://iscale.com">iSCALE.com</a> • <a href="https://a4d.com">A4D.com</a><br>
-  <a href="https://t.me/jasonakatiff">Telegram</a> • <a href="mailto:jason@jasonakatiff.com">jason@jasonakatiff.com</a>
+  Created by <strong>Johan Garcia</strong><br>
+  <a href="https://johangarcia.com">johangarcia.com</a> • <a href="https://a4d.com">A4D.com</a><br>
+  <a href="https://t.me/johanseg">Telegram</a> • <a href="mailto:info@johangarcia.com">info@johangarcia.com</a>
 </p>
 
 ---
