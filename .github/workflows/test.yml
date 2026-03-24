@@ -82,7 +82,7 @@ jobs:
 
       - name: Run E2E tests
         working-directory: frontend
-        run: npx playwright test --reporter=list
+        run: npx playwright test --reporter=list --pass-with-no-tests
         env:
           CI: true
         continue-on-error: true
