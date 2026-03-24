@@ -52,7 +52,7 @@ const Register = () => {
                             <UserPlus className="w-8 h-8 text-white" />
                         </div>
                         <h1 className="text-2xl font-bold text-white">Create Account</h1>
-                        <p className="text-gray-400 mt-2">Sign up to get started</p>
+                        <p className="text-muted-foreground mt-2">Sign up to get started</p>
                     </div>
 
                     {/* Form */}
@@ -64,7 +64,7 @@ const Register = () => {
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <User className="h-5 w-5 text-gray-500" />
+                                    <User className="h-5 w-5 text-muted-foreground" />
                                 </div>
                                 <input
                                     id="name"
@@ -85,7 +85,7 @@ const Register = () => {
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Mail className="h-5 w-5 text-gray-500" />
+                                    <Mail className="h-5 w-5 text-muted-foreground" />
                                 </div>
                                 <input
                                     id="email"
@@ -107,7 +107,7 @@ const Register = () => {
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Lock className="h-5 w-5 text-gray-500" />
+                                    <Lock className="h-5 w-5 text-muted-foreground" />
                                 </div>
                                 <input
                                     id="password"
@@ -122,7 +122,7 @@ const Register = () => {
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-300"
+                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted-foreground hover:text-gray-300"
                                 >
                                     {showPassword ? (
                                         <EyeOff className="h-5 w-5" />
@@ -140,7 +140,7 @@ const Register = () => {
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Lock className="h-5 w-5 text-gray-500" />
+                                    <Lock className="h-5 w-5 text-muted-foreground" />
                                 </div>
                                 <input
                                     id="confirmPassword"
@@ -180,7 +180,7 @@ const Register = () => {
 
                     {/* Login Link */}
                     <div className="mt-6 text-center">
-                        <p className="text-gray-400">
+                        <p className="text-muted-foreground">
                             Already have an account?{' '}
                             <Link to="/login" className="text-green-500 hover:text-green-400 font-medium">
                                 Sign in

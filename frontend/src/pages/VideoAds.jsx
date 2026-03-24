@@ -71,17 +71,17 @@ export default function VideoAds() {
         <div className="max-w-5xl mx-auto">
             {/* Header */}
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+                <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
                     <Video size={32} className="text-amber-600" />
                     Create Video Ads
                 </h1>
-                <p className="text-gray-600 mt-1">Generate engaging video ads from your product assets</p>
+                <p className="text-muted-foreground mt-1">Generate engaging video ads from your product assets</p>
             </div>
 
             {/* Progress Steps */}
-            <div className="mb-8 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="mb-8 bg-card rounded-xl shadow-sm border border-border p-6">
                 <div className="flex items-center justify-between relative">
-                    <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-full h-1 bg-gray-200 -z-10"></div>
+                    <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-full h-1 bg-muted -z-10"></div>
                     {steps.map((step) => {
                         const Icon = step.icon;
                         const isActive = step.id === currentStep;
@@ -98,19 +98,19 @@ export default function VideoAds() {
                         return (
                             <div
                                 key={step.id}
-                                className={`flex flex-col items-center bg-white px-2 ${isClickable ? 'cursor-pointer group' : 'cursor-not-allowed opacity-60'}`}
+                                className={`flex flex-col items-center bg-card px-2 ${isClickable ? 'cursor-pointer group' : 'cursor-not-allowed opacity-60'}`}
                                 onClick={() => isClickable && handleStepClick(step.id)}
                             >
                                 <div
                                     className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 transition-all ${isActive ? 'bg-amber-600 text-white scale-110 shadow-md' :
                                         isCompleted ? 'bg-green-500 text-white group-hover:bg-green-600' :
-                                            'bg-gray-200 text-gray-500 group-hover:bg-gray-300'
+                                            'bg-muted text-muted-foreground group-hover:bg-gray-300'
                                         }`}
                                 >
                                     {isCompleted ? <Check size={20} /> : <Icon size={20} />}
                                 </div>
                                 <span className={`text-xs font-medium transition-colors ${isActive ? 'text-amber-600' :
-                                    isClickable ? 'text-gray-500 group-hover:text-gray-700' : 'text-gray-400'
+                                    isClickable ? 'text-muted-foreground group-hover:text-foreground' : 'text-muted-foreground'
                                     }`}>
                                     {step.name}
                                 </span>
@@ -121,7 +121,7 @@ export default function VideoAds() {
             </div>
 
             {/* Step Content */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 min-h-[500px] relative">
+            <div className="bg-card rounded-xl shadow-sm border border-border p-8 min-h-[500px] relative">
                 {/* Step 1: Brand Selection */}
                 {currentStep === 1 && (
                     <BrandSelectionStep
@@ -167,8 +167,8 @@ export default function VideoAds() {
                         <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6">
                             <Video className="text-amber-600" size={32} />
                         </div>
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">Select Video Style</h3>
-                        <p className="text-gray-600 mb-6">Video templates coming soon!</p>
+                        <h3 className="text-xl font-bold text-foreground mb-2">Select Video Style</h3>
+                        <p className="text-muted-foreground mb-6">Video templates coming soon!</p>
                     </div>
                 )}
 
@@ -178,8 +178,8 @@ export default function VideoAds() {
                         <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6">
                             <Sparkles className="text-amber-600" size={32} />
                         </div>
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">Generate Video</h3>
-                        <p className="text-gray-600 mb-6">Video generation capabilities coming soon!</p>
+                        <h3 className="text-xl font-bold text-foreground mb-2">Generate Video</h3>
+                        <p className="text-muted-foreground mb-6">Video generation capabilities coming soon!</p>
                     </div>
                 )}
             </div>
@@ -190,8 +190,8 @@ export default function VideoAds() {
                     onClick={prevStep}
                     disabled={currentStep === 1}
                     className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors ${currentStep === 1
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        ? 'bg-secondary text-muted-foreground cursor-not-allowed'
+                        : 'bg-secondary text-foreground hover:bg-muted'
                         }`}
                 >
                     <ChevronLeft size={20} />

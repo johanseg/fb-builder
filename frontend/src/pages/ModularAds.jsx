@@ -65,11 +65,11 @@ export default function ModularAds() {
         <div className="max-w-7xl mx-auto space-y-6">
             <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+                    <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
                         <Grid3X3 className="text-purple-600" size={32} />
                         Modular Script Factory
                     </h1>
-                    <p className="text-gray-600 mt-2">Generate high-volume script variations using knowledge-driven agents.</p>
+                    <p className="text-muted-foreground mt-2">Generate high-volume script variations using knowledge-driven agents.</p>
                 </div>
                 {activeProduct && generationType === 'matrix' && (
                     <button 
@@ -120,14 +120,14 @@ export default function ModularAds() {
                 )}
             </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 md:p-8">
-                <h2 className="text-xl font-bold text-gray-900 mb-6 border-b border-gray-100 pb-4">1. Select Product Knowledge Base</h2>
+            <div className="bg-card rounded-2xl shadow-sm border border-border p-6 md:p-8">
+                <h2 className="text-xl font-bold text-foreground mb-6 border-b border-border pb-4">1. Select Product Knowledge Base</h2>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Brand</label>
+                        <label className="block text-sm font-medium text-foreground mb-1">Brand</label>
                         <select 
-                            className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500"
+                            className="w-full p-3 border border-border rounded-xl focus:ring-2 focus:ring-purple-500"
                             value={selectedBrand} 
                             onChange={e => { setSelectedBrand(e.target.value); setSelectedProduct(''); }}
                         >
@@ -139,9 +139,9 @@ export default function ModularAds() {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Product</label>
+                        <label className="block text-sm font-medium text-foreground mb-1">Product</label>
                         <select 
-                            className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
+                            className="w-full p-3 border border-border rounded-xl focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
                             value={selectedProduct} 
                             onChange={e => setSelectedProduct(e.target.value)}
                             disabled={!selectedBrand}
@@ -151,34 +151,34 @@ export default function ModularAds() {
                                 <option key={p.id} value={p.id}>{p.name}</option>
                             ))}
                         </select>
-                        <p className="text-xs text-gray-500 mt-2">Note: The product MUST have a completed Product Brief.</p>
+                        <p className="text-xs text-muted-foreground mt-2">Note: The product MUST have a completed Product Brief.</p>
                     </div>
                 </div>
 
                 {activeProduct && (
                     <>
-                        <h2 className="text-xl font-bold text-gray-900 mb-6 border-b border-gray-100 pb-4">2. Generation Mode</h2>
+                        <h2 className="text-xl font-bold text-foreground mb-6 border-b border-border pb-4">2. Generation Mode</h2>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                             <button
                                 onClick={() => setGenerationType('matrix')}
-                                className={`p-6 rounded-xl border-2 text-left transition-all ${generationType === 'matrix' ? 'border-purple-600 bg-purple-50' : 'border-gray-200 hover:border-purple-300'}`}
+                                className={`p-6 rounded-xl border-2 text-left transition-all ${generationType === 'matrix' ? 'border-purple-600 bg-purple-50' : 'border-border hover:border-purple-300'}`}
                             >
                                 <div className="flex items-center gap-3 mb-2">
-                                    <Grid3X3 className={generationType === 'matrix' ? 'text-purple-600' : 'text-gray-500'} />
-                                    <h3 className={`font-bold ${generationType === 'matrix' ? 'text-purple-900' : 'text-gray-700'}`}>Modular Blocks Mode</h3>
+                                    <Grid3X3 className={generationType === 'matrix' ? 'text-purple-600' : 'text-muted-foreground'} />
+                                    <h3 className={`font-bold ${generationType === 'matrix' ? 'text-purple-900' : 'text-foreground'}`}>Modular Blocks Mode</h3>
                                 </div>
-                                <p className="text-sm text-gray-600">Generate isolated Intros, Bridges, Cores, and CTAs to build custom combinations.</p>
+                                <p className="text-sm text-muted-foreground">Generate isolated Intros, Bridges, Cores, and CTAs to build custom combinations.</p>
                             </button>
 
                             <button
                                 onClick={() => setGenerationType('micro_movie')}
-                                className={`p-6 rounded-xl border-2 text-left transition-all ${generationType === 'micro_movie' ? 'border-purple-600 bg-purple-50' : 'border-gray-200 hover:border-purple-300'}`}
+                                className={`p-6 rounded-xl border-2 text-left transition-all ${generationType === 'micro_movie' ? 'border-purple-600 bg-purple-50' : 'border-border hover:border-purple-300'}`}
                             >
                                 <div className="flex items-center gap-3 mb-2">
-                                    <Video className={generationType === 'micro_movie' ? 'text-purple-600' : 'text-gray-500'} />
-                                    <h3 className={`font-bold ${generationType === 'micro_movie' ? 'text-purple-900' : 'text-gray-700'}`}>Micro-Movie Mode</h3>
+                                    <Video className={generationType === 'micro_movie' ? 'text-purple-600' : 'text-muted-foreground'} />
+                                    <h3 className={`font-bold ${generationType === 'micro_movie' ? 'text-purple-900' : 'text-foreground'}`}>Micro-Movie Mode</h3>
                                 </div>
-                                <p className="text-sm text-gray-600">Generates 30-60s emotional storytelling scripts using avatar models.</p>
+                                <p className="text-sm text-muted-foreground">Generates 30-60s emotional storytelling scripts using avatar models.</p>
                             </button>
                         </div>
                     </>
@@ -190,14 +190,14 @@ export default function ModularAds() {
             )}
 
             {activeProduct && generationType === 'micro_movie' && (
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 md:p-8 space-y-6">
+                <div className="bg-card rounded-2xl shadow-sm border border-border p-6 md:p-8 space-y-6">
                     <div className="flex justify-between items-center">
                         <div className="flex items-center gap-4">
-                            <h2 className="text-xl font-bold text-gray-900">Micro-Movie Scripts</h2>
+                            <h2 className="text-xl font-bold text-foreground">Micro-Movie Scripts</h2>
                             <select 
                                 value={avatarType} 
                                 onChange={e => setAvatarType(e.target.value)}
-                                className="p-2 border border-gray-300 rounded-lg text-sm focus:ring-purple-500 max-w-[300px]"
+                                className="p-2 border border-border rounded-lg text-sm focus:ring-purple-500 max-w-[300px]"
                             >
                                 <option value="">Mixed Diverse Avatars</option>
                                 <optgroup label="Custom AI Personas">
@@ -228,7 +228,7 @@ export default function ModularAds() {
                             {microMovies.map((m) => (
                                 <div key={m.id} className="bg-slate-50 p-6 rounded-xl shadow-sm border border-slate-200">
                                     <h3 className="font-bold text-lg mb-2 text-purple-900">Avatar: {m.generation_metadata?.avatar_type || 'Custom'}</h3>
-                                    <div className="prose prose-sm"><pre className="whitespace-pre-wrap font-sans text-gray-700">{m.content}</pre></div>
+                                    <div className="prose prose-sm"><pre className="whitespace-pre-wrap font-sans text-foreground">{m.content}</pre></div>
                                 </div>
                             ))}
                         </div>

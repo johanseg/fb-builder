@@ -48,11 +48,11 @@ export default function Dashboard() {
         <div className="max-w-7xl mx-auto">
             {/* Header */}
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+                <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
                     <LayoutDashboard size={32} className="text-amber-600" />
                     Dashboard
                 </h1>
-                <p className="text-gray-600 mt-2">Welcome to your Ad Builder workspace</p>
+                <p className="text-muted-foreground mt-2">Welcome to your Ad Builder workspace</p>
             </div>
 
             {/* Stats Grid */}
@@ -60,14 +60,14 @@ export default function Dashboard() {
                 {stats.map((stat, index) => {
                     const Icon = stat.icon;
                     return (
-                        <div key={index} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div key={index} className="bg-card rounded-xl shadow-sm border border-border p-6">
                             <div className="flex items-center justify-between mb-4">
                                 <div className={`${stat.color} w-12 h-12 rounded-lg flex items-center justify-center`}>
                                     <Icon className="text-white" size={24} />
                                 </div>
                             </div>
-                            <div className="text-3xl font-bold text-gray-900 mb-1">{stat.value}</div>
-                            <div className="text-sm text-gray-600">{stat.label}</div>
+                            <div className="text-3xl font-bold text-foreground mb-1">{stat.value}</div>
+                            <div className="text-sm text-muted-foreground">{stat.label}</div>
                         </div>
                     );
                 })}
@@ -75,7 +75,7 @@ export default function Dashboard() {
 
             {/* Quick Actions */}
             <div className="mb-8">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">Quick Actions</h2>
+                <h2 className="text-xl font-bold text-foreground mb-4">Quick Actions</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {quickActions.map((action, index) => {
                         const Icon = action.icon;
@@ -83,13 +83,13 @@ export default function Dashboard() {
                             <Link
                                 key={index}
                                 to={action.path}
-                                className="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-all"
+                                className="group bg-card rounded-xl shadow-sm border border-border p-6 hover:shadow-lg transition-all"
                             >
                                 <div className={`bg-gradient-to-r ${action.color} w-14 h-14 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
                                     <Icon className="text-white" size={28} />
                                 </div>
-                                <h3 className="text-lg font-bold text-gray-900 mb-2">{action.label}</h3>
-                                <p className="text-sm text-gray-600">{action.description}</p>
+                                <h3 className="text-lg font-bold text-foreground mb-2">{action.label}</h3>
+                                <p className="text-sm text-muted-foreground">{action.description}</p>
                             </Link>
                         );
                     })}
@@ -97,10 +97,10 @@ export default function Dashboard() {
             </div>
 
             {/* Recent Activity */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">Recent Activity</h2>
-                <div className="text-center py-12 text-gray-500">
-                    <Zap size={48} className="mx-auto mb-4 text-gray-400" />
+            <div className="bg-card rounded-xl shadow-sm border border-border p-6">
+                <h2 className="text-xl font-bold text-foreground mb-4">Recent Activity</h2>
+                <div className="text-center py-12 text-muted-foreground">
+                    <Zap size={48} className="mx-auto mb-4 text-muted-foreground" />
                     <p>No recent activity yet</p>
                     <p className="text-sm mt-2">Start creating ads to see your activity here</p>
                 </div>

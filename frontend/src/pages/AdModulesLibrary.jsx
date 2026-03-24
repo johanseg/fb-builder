@@ -65,18 +65,18 @@ export default function AdModulesLibrary() {
         <div className="max-w-7xl mx-auto space-y-6">
             <div className="flex justify-between items-start">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                    <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
                         <Library className="text-purple-600" /> Ad Modules Library
                     </h1>
-                    <p className="text-gray-500 text-sm mt-1">Browse, filter, and manage all saved modular script blocks.</p>
+                    <p className="text-muted-foreground text-sm mt-1">Browse, filter, and manage all saved modular script blocks.</p>
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <Filter size={16} className="text-gray-400" />
+                    <Filter size={16} className="text-muted-foreground" />
                     <select
                         value={selectedProductId}
                         onChange={e => setSelectedProductId(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+                        className="px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"
                     >
                         <option value="">All Products</option>
                         {products.map(p => (
@@ -87,20 +87,20 @@ export default function AdModulesLibrary() {
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
+            <div className="flex gap-1 bg-secondary p-1 rounded-xl">
                 {MODULE_TABS.map(tab => (
                     <button
                         key={tab.key}
                         onClick={() => setActiveTab(tab.key)}
                         className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-bold transition-colors ${
                             activeTab === tab.key
-                                ? `bg-white text-${tab.color}-700 shadow-sm`
-                                : 'text-gray-500 hover:text-gray-700'
+                                ? `bg-card text-${tab.color}-700 shadow-sm`
+                                : 'text-muted-foreground hover:text-foreground'
                         }`}
                     >
                         {tab.label}
                         <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${
-                            activeTab === tab.key ? `bg-${tab.color}-100 text-${tab.color}-700` : 'bg-gray-200 text-gray-500'
+                            activeTab === tab.key ? `bg-${tab.color}-100 text-${tab.color}-700` : 'bg-muted text-muted-foreground'
                         }`}>
                             {modules.filter(m => m.module_type === tab.key).length}
                         </span>
@@ -112,10 +112,10 @@ export default function AdModulesLibrary() {
             {loading ? (
                 <div className="flex justify-center py-16"><Loader className="animate-spin text-purple-600" size={32} /></div>
             ) : filtered.length === 0 ? (
-                <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
+                <div className="bg-card rounded-2xl border border-border p-12 text-center">
                     <Library className="mx-auto text-gray-300 mb-4" size={48} />
-                    <h3 className="text-lg font-bold text-gray-900 mb-2">No {currentTab?.label?.toLowerCase()} found</h3>
-                    <p className="text-gray-500">Generate modules from the Modular Matrix page to populate this library.</p>
+                    <h3 className="text-lg font-bold text-foreground mb-2">No {currentTab?.label?.toLowerCase()} found</h3>
+                    <p className="text-muted-foreground">Generate modules from the Modular Matrix page to populate this library.</p>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -125,7 +125,7 @@ export default function AdModulesLibrary() {
                         const score = mod.performance_score;
 
                         return (
-                            <div key={mod.id} className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition-shadow group relative">
+                            <div key={mod.id} className="bg-card rounded-xl border border-border p-5 hover:shadow-md transition-shadow group relative">
                                 <div className="flex items-start justify-between mb-3">
                                     <div className="flex items-center gap-2">
                                         <span className={`text-xs font-bold px-2 py-1 rounded bg-${currentTab?.color}-100 text-${currentTab?.color}-700 uppercase`}>
@@ -133,7 +133,7 @@ export default function AdModulesLibrary() {
                                         </span>
                                         {score > 0 && (
                                             <span className={`text-xs font-bold px-2 py-1 rounded flex items-center gap-1 ${
-                                                score >= 4 ? 'bg-emerald-100 text-emerald-700' : score <= 1 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
+                                                score >= 4 ? 'bg-emerald-100 text-emerald-700' : score <= 1 ? 'bg-red-100 text-red-700' : 'bg-secondary text-muted-foreground'
                                             }`}>
                                                 <Star size={12} /> {score}/5
                                             </span>
@@ -141,17 +141,17 @@ export default function AdModulesLibrary() {
                                     </div>
                                     <button
                                         onClick={() => setDeleteTarget(mod)}
-                                        className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        className="p-1.5 text-muted-foreground hover:text-red-600 rounded-lg hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
                                     >
                                         <Trash2 size={14} />
                                     </button>
                                 </div>
 
-                                <p className="text-sm text-gray-800 line-clamp-4 whitespace-pre-wrap bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                <p className="text-sm text-foreground line-clamp-4 whitespace-pre-wrap bg-secondary p-3 rounded-lg border border-border">
                                     {mod.content}
                                 </p>
 
-                                <div className="flex items-center justify-between mt-3 text-xs text-gray-400">
+                                <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
                                     <span>ID: {mod.id.substring(0, 8)}</span>
                                     <span>{new Date(mod.created_at).toLocaleDateString()}</span>
                                 </div>
@@ -164,12 +164,12 @@ export default function AdModulesLibrary() {
             {/* Delete Confirmation Modal */}
             {deleteTarget && (
                 <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl p-6 shadow-2xl max-w-sm w-full">
-                        <h2 className="text-lg font-bold text-gray-900 mb-2">Delete Module</h2>
-                        <p className="text-sm text-gray-600 mb-1">Are you sure you want to delete this <strong>{deleteTarget.module_type}</strong> module?</p>
-                        <p className="text-xs text-gray-400 mb-6 line-clamp-2">{deleteTarget.content}</p>
+                    <div className="bg-card rounded-2xl p-6 shadow-2xl max-w-sm w-full">
+                        <h2 className="text-lg font-bold text-foreground mb-2">Delete Module</h2>
+                        <p className="text-sm text-muted-foreground mb-1">Are you sure you want to delete this <strong>{deleteTarget.module_type}</strong> module?</p>
+                        <p className="text-xs text-muted-foreground mb-6 line-clamp-2">{deleteTarget.content}</p>
                         <div className="flex justify-end gap-3">
-                            <button onClick={() => setDeleteTarget(null)} className="px-4 py-2 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200">Cancel</button>
+                            <button onClick={() => setDeleteTarget(null)} className="px-4 py-2 bg-secondary text-foreground font-bold rounded-xl hover:bg-muted">Cancel</button>
                             <button onClick={() => handleDelete(deleteTarget.id)} className="px-4 py-2 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700">Delete</button>
                         </div>
                     </div>

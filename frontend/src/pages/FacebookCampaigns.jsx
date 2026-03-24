@@ -53,18 +53,18 @@ const FacebookCampaignWizard = () => {
             <div className="max-w-6xl mx-auto space-y-8">
                 {/* Header */}
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+                    <h1 className="text-3xl font-bold text-foreground mb-2 flex items-center gap-3">
                         <Megaphone size={32} className="text-amber-600" />
                         Facebook Campaigns
                     </h1>
-                    <p className="text-gray-600">Create and manage your Facebook ad campaigns</p>
+                    <p className="text-muted-foreground">Create and manage your Facebook ad campaigns</p>
                 </div>
 
                 {/* Wizard Steps */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="bg-card rounded-xl shadow-sm border border-border p-6">
                     <div className="flex justify-between items-center mb-8 relative">
                         {/* Progress Bar Background */}
-                        <div className="absolute top-1/2 left-0 w-full h-1 bg-gray-100 -z-10 rounded-full" />
+                        <div className="absolute top-1/2 left-0 w-full h-1 bg-secondary -z-10 rounded-full" />
 
                         {/* Progress Bar Fill */}
                         <div
@@ -77,11 +77,11 @@ const FacebookCampaignWizard = () => {
                             const isCurrent = step.id === currentStep;
 
                             return (
-                                <div key={step.id} className="flex flex-col items-center gap-2 bg-white px-2">
+                                <div key={step.id} className="flex flex-col items-center gap-2 bg-card px-2">
                                     <div
                                         className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${isCompleted || isCurrent
                                             ? 'bg-amber-600 text-white shadow-md scale-110'
-                                            : 'bg-gray-100 text-gray-400'
+                                            : 'bg-secondary text-muted-foreground'
                                             }`}
                                     >
                                         {isCompleted ? (
@@ -91,7 +91,7 @@ const FacebookCampaignWizard = () => {
                                         )}
                                     </div>
                                     <span
-                                        className={`text-sm font-medium transition-colors duration-300 ${isCurrent ? 'text-amber-900' : 'text-gray-500'
+                                        className={`text-sm font-medium transition-colors duration-300 ${isCurrent ? 'text-foreground' : 'text-muted-foreground'
                                             }`}
                                     >
                                         {step.label}
@@ -148,7 +148,7 @@ const FacebookCampaignWizard = () => {
                             <div className="text-center py-12">
                                 <CheckCircle2 className="mx-auto mb-4 text-amber-500" size={64} />
                                 <h2 className="text-3xl font-bold mb-4">Campaign Ready to Launch!</h2>
-                                <p className="text-gray-600 mb-8">
+                                <p className="text-muted-foreground mb-8">
                                     Review your settings and launch your Facebook ad campaign.
                                 </p>
                             </div>

@@ -82,13 +82,13 @@ export default function Reporting() {
 
     return (
         <div className="max-w-7xl mx-auto space-y-8">
-            <div className="flex justify-between items-center bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-gray-200">
+            <div className="flex justify-between items-center bg-card p-6 md:p-8 rounded-2xl shadow-sm border border-border">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+                    <h1 className="text-3xl font-bold text-foreground mb-2 flex items-center gap-3">
                         <BarChart size={32} className="text-purple-600" />
                         Performance Intelligence
                     </h1>
-                    <p className="text-gray-600">Train the system on real results to identify winning variables.</p>
+                    <p className="text-muted-foreground">Train the system on real results to identify winning variables.</p>
                 </div>
                 
                 <div className="flex flex-col items-end">
@@ -97,7 +97,7 @@ export default function Reporting() {
                         {uploading ? 'Processing File...' : 'Import Facebook CSV'}
                         <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} disabled={uploading} />
                     </label>
-                    <p className="text-xs text-gray-500 mt-2">Exports must contain `Ad Name`, `Amount spent (USD)`, and standard funnel events.</p>
+                    <p className="text-xs text-muted-foreground mt-2">Exports must contain `Ad Name`, `Amount spent (USD)`, and standard funnel events.</p>
                 </div>
             </div>
 
@@ -113,24 +113,24 @@ export default function Reporting() {
                         </h2>
                         
                         {winners.length === 0 ? (
-                            <div className="text-center py-10 bg-white/50 rounded-xl border border-emerald-100 text-emerald-700">
+                            <div className="text-center py-10 bg-card/50 rounded-xl border border-emerald-100 text-emerald-700">
                                 No scalable modules found yet. Keep testing!
                             </div>
                         ) : (
                             <div className="space-y-4">
                                 {winners.map(flag => (
-                                    <div key={flag.module_id} className="bg-white rounded-xl p-5 shadow-sm border border-emerald-200">
+                                    <div key={flag.module_id} className="bg-card rounded-xl p-5 shadow-sm border border-emerald-200">
                                         <div className="flex justify-between items-start mb-3">
                                             <div>
                                                 <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-1 rounded uppercase mr-2">{flag.module_type}</span>
-                                                <span className="text-sm font-mono text-gray-500">ID: {flag.module_id.substring(0,8)}</span>
+                                                <span className="text-sm font-mono text-muted-foreground">ID: {flag.module_id.substring(0,8)}</span>
                                             </div>
                                             <div className="text-right">
                                                 <div className="text-emerald-600 font-bold flex items-center justify-end gap-1"><ArrowUpRight size={16}/> Score: {flag.score}</div>
-                                                <div className="text-xs text-gray-500">Spend: ${flag.spend.toFixed(2)}</div>
+                                                <div className="text-xs text-muted-foreground">Spend: ${flag.spend.toFixed(2)}</div>
                                             </div>
                                         </div>
-                                        <div className="text-gray-800 text-sm bg-gray-50 p-3 rounded border border-gray-100 mb-3 whitespace-pre-wrap">
+                                        <div className="text-foreground text-sm bg-secondary p-3 rounded border border-border mb-3 whitespace-pre-wrap">
                                             {flag.content}
                                         </div>
                                         <div className="flex justify-between items-center text-sm">
@@ -160,24 +160,24 @@ export default function Reporting() {
                         </h2>
                         
                         {losers.length === 0 ? (
-                            <div className="text-center py-10 bg-white/50 rounded-xl border border-red-100 text-red-700">
+                            <div className="text-center py-10 bg-card/50 rounded-xl border border-red-100 text-red-700">
                                 No underperforming modules flagged.
                             </div>
                         ) : (
                             <div className="space-y-4">
                                 {losers.map(flag => (
-                                    <div key={flag.module_id} className="bg-white rounded-xl p-5 shadow-sm border border-red-200">
+                                    <div key={flag.module_id} className="bg-card rounded-xl p-5 shadow-sm border border-red-200">
                                         <div className="flex justify-between items-start mb-3">
                                             <div>
                                                 <span className="bg-red-100 text-red-800 text-xs font-bold px-2 py-1 rounded uppercase mr-2">{flag.module_type}</span>
-                                                <span className="text-sm font-mono text-gray-500">ID: {flag.module_id.substring(0,8)}</span>
+                                                <span className="text-sm font-mono text-muted-foreground">ID: {flag.module_id.substring(0,8)}</span>
                                             </div>
                                             <div className="text-right">
                                                 <div className="text-red-600 font-bold flex items-center justify-end gap-1"><ArrowDownRight size={16}/> Score: {flag.score}</div>
-                                                <div className="text-xs text-gray-500">Spend: ${flag.spend.toFixed(2)}</div>
+                                                <div className="text-xs text-muted-foreground">Spend: ${flag.spend.toFixed(2)}</div>
                                             </div>
                                         </div>
-                                        <div className="text-gray-800 text-sm bg-gray-50 p-3 rounded border border-gray-100 mb-3 whitespace-pre-wrap">
+                                        <div className="text-foreground text-sm bg-secondary p-3 rounded border border-border mb-3 whitespace-pre-wrap">
                                             {flag.content}
                                         </div>
                                         <div className="flex justify-between items-center text-sm">

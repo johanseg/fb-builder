@@ -272,25 +272,25 @@ export default function GeneratedAds() {
             {/* Header */}
             <div className="mb-8 flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+                    <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
                         <Image size={32} className="text-amber-600" />
                         Generated Ads
                     </h1>
-                    <p className="text-gray-600 mt-1">View and manage all your AI-generated ad creatives</p>
+                    <p className="text-muted-foreground mt-1">View and manage all your AI-generated ad creatives</p>
                 </div>
 
                 {/* View Toggle */}
-                <div className="flex items-center bg-white border border-gray-200 rounded-lg p-1 shadow-sm">
+                <div className="flex items-center bg-card border border-border rounded-lg p-1 shadow-sm">
                     <button
                         onClick={() => handleViewModeChange('list')}
-                        className={`p-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-purple-100 text-purple-600' : 'text-gray-400 hover:text-gray-600'}`}
+                        className={`p-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-purple-100 text-purple-600' : 'text-muted-foreground hover:text-muted-foreground'}`}
                         title="List View"
                     >
                         <List size={20} />
                     </button>
                     <button
                         onClick={() => handleViewModeChange('grid')}
-                        className={`p-2 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-purple-100 text-purple-600' : 'text-gray-400 hover:text-gray-600'}`}
+                        className={`p-2 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-purple-100 text-purple-600' : 'text-muted-foreground hover:text-muted-foreground'}`}
                         title="Grid View"
                     >
                         <LayoutGrid size={20} />
@@ -299,27 +299,27 @@ export default function GeneratedAds() {
             </div>
 
             {/* Filters and Actions */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+            <div className="bg-card rounded-xl shadow-sm border border-border p-6 mb-6">
                 <div className="flex flex-col md:flex-row gap-4 mb-4">
                     {/* Search */}
                     <div className="flex-1 relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={20} />
                         <input
                             type="text"
                             placeholder="Search ads..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                            className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
                         />
                     </div>
 
                     {/* Brand Filter */}
                     <div className="relative">
-                        <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                        <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={20} />
                         <select
                             value={selectedBrand}
                             onChange={(e) => setSelectedBrand(e.target.value)}
-                            className="pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent appearance-none bg-white"
+                            className="pl-10 pr-8 py-2 border border-border rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent appearance-none bg-card"
                         >
                             <option value="">All Brands</option>
                             {brands.map(brand => (
@@ -346,7 +346,7 @@ export default function GeneratedAds() {
                             </button>
                             <button
                                 onClick={() => setSelectedBundles(new Set())}
-                                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm font-medium"
+                                className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-gray-300 transition-colors text-sm font-medium"
                             >
                                 Clear Selection
                             </button>
@@ -360,11 +360,11 @@ export default function GeneratedAds() {
                 loading ? (
                     <div className="text-center py-12">
                         <div className="w-16 h-16 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto"></div>
-                        <p className="text-gray-600 mt-4">Loading ads...</p>
+                        <p className="text-muted-foreground mt-4">Loading ads...</p>
                     </div>
                 ) : filteredBundles.length === 0 ? (
-                    <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-200">
-                        <p className="text-gray-600">No ads found. Generate some ads to get started!</p>
+                    <div className="text-center py-12 bg-card rounded-xl shadow-sm border border-border">
+                        <p className="text-muted-foreground">No ads found. Generate some ads to get started!</p>
                     </div>
                 ) : viewMode === 'grid' ? (
                     // GRID VIEW
@@ -380,7 +380,7 @@ export default function GeneratedAds() {
                                 <div
                                     key={bundleId}
                                     onClick={() => openModal(bundle)}
-                                    className={`bg-white rounded-xl shadow-sm border-2 transition-all hover:shadow-lg cursor-pointer overflow-hidden ${isSelected ? 'border-purple-600 ring-2 ring-purple-200' : 'border-gray-200 hover:border-purple-300'
+                                    className={`bg-card rounded-xl shadow-sm border-2 transition-all hover:shadow-lg cursor-pointer overflow-hidden ${isSelected ? 'border-purple-600 ring-2 ring-purple-200' : 'border-border hover:border-purple-300'
                                         }`}
                                 >
                                     {/* Media with overlays */}
@@ -413,12 +413,12 @@ export default function GeneratedAds() {
                                         {/* Select Checkbox */}
                                         <button
                                             onClick={(e) => toggleSelectBundle(bundleId, e)}
-                                            className="absolute top-3 left-3 p-2 bg-white/90 backdrop-blur-sm rounded-lg shadow-md hover:bg-white transition-colors"
+                                            className="absolute top-3 left-3 p-2 bg-card/90 backdrop-blur-sm rounded-lg shadow-md hover:bg-card transition-colors"
                                         >
                                             {isSelected ? (
                                                 <CheckSquare className="text-purple-600" size={20} />
                                             ) : (
-                                                <Square className="text-gray-400" size={20} />
+                                                <Square className="text-muted-foreground" size={20} />
                                             )}
                                         </button>
 
@@ -442,14 +442,14 @@ export default function GeneratedAds() {
                     </div>
                 ) : (
                     // LIST VIEW
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
                         <table className="w-full text-left">
-                            <thead className="bg-gray-50 border-b border-gray-200">
+                            <thead className="bg-secondary border-b border-border">
                                 <tr>
                                     <th className="px-6 py-3 w-12">
                                         <button
                                             onClick={toggleSelectAll}
-                                            className="text-gray-400 hover:text-gray-600"
+                                            className="text-muted-foreground hover:text-muted-foreground"
                                         >
                                             {selectedBundles.size === filteredBundles.length && filteredBundles.length > 0 ? (
                                                 <CheckSquare size={20} className="text-amber-600" />
@@ -458,11 +458,11 @@ export default function GeneratedAds() {
                                             )}
                                         </button>
                                     </th>
-                                    <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Ad Creative</th>
-                                    <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Headline</th>
-                                    <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Body</th>
-                                    <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                                    <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider text-right">Actions</th>
+                                    <th className="px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Ad Creative</th>
+                                    <th className="px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Headline</th>
+                                    <th className="px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Body</th>
+                                    <th className="px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Created</th>
+                                    <th className="px-6 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200">
@@ -476,12 +476,12 @@ export default function GeneratedAds() {
                                         <tr
                                             key={bundleId}
                                             onClick={() => openModal(bundle)}
-                                            className={`hover:bg-gray-50 cursor-pointer transition-colors ${isSelected ? 'bg-amber-50' : ''}`}
+                                            className={`hover:bg-secondary cursor-pointer transition-colors ${isSelected ? 'bg-amber-50' : ''}`}
                                         >
                                             <td className="px-6 py-4">
                                                 <button
                                                     onClick={(e) => toggleSelectBundle(bundleId, e)}
-                                                    className="text-gray-400 hover:text-gray-600"
+                                                    className="text-muted-foreground hover:text-muted-foreground"
                                                 >
                                                     {isSelected ? (
                                                         <CheckSquare size={20} className="text-amber-600" />
@@ -492,7 +492,7 @@ export default function GeneratedAds() {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="h-12 w-12 rounded-lg overflow-hidden bg-gray-100 border border-gray-200 flex-shrink-0 relative">
+                                                    <div className="h-12 w-12 rounded-lg overflow-hidden bg-secondary border border-border flex-shrink-0 relative">
                                                         {isVideo ? (
                                                             <>
                                                                 <video
@@ -513,19 +513,19 @@ export default function GeneratedAds() {
                                                             />
                                                         )}
                                                     </div>
-                                                    <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                                                    <span className="text-xs font-medium text-muted-foreground bg-secondary px-2 py-1 rounded-full">
                                                         {bundle.length} Size{bundle.length > 1 ? 's' : ''}
                                                     </span>
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
-                                                <p className="text-sm font-medium text-gray-900 line-clamp-1">{mainAd.headline || 'Untitled Ad'}</p>
+                                                <p className="text-sm font-medium text-foreground line-clamp-1">{mainAd.headline || 'Untitled Ad'}</p>
                                             </td>
                                             <td className="px-6 py-4 max-w-xs">
-                                                <p className="text-sm text-gray-500 line-clamp-1">{mainAd.body}</p>
+                                                <p className="text-sm text-muted-foreground line-clamp-1">{mainAd.body}</p>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className="text-sm text-gray-500">{new Date(mainAd.created_at).toLocaleDateString()}</span>
+                                                <span className="text-sm text-muted-foreground">{new Date(mainAd.created_at).toLocaleDateString()}</span>
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex items-center justify-end gap-2">
@@ -534,14 +534,14 @@ export default function GeneratedAds() {
                                                             e.stopPropagation();
                                                             openModal(bundle);
                                                         }}
-                                                        className="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                                                        className="p-2 text-muted-foreground hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
                                                         title="View Details"
                                                     >
                                                         <ExternalLink size={18} />
                                                     </button>
                                                     <button
                                                         onClick={(e) => handleDelete(bundleId, e)}
-                                                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                        className="p-2 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                                         title="Delete Bundle"
                                                     >
                                                         <Trash2 size={18} />
@@ -563,7 +563,7 @@ export default function GeneratedAds() {
                     <div className="mt-6 flex justify-center">
                         <button
                             onClick={toggleSelectAll}
-                            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                            className="flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-lg hover:bg-secondary transition-colors text-sm font-medium"
                         >
                             {selectedBundles.size === filteredBundles.length ? (
                                 <>
@@ -572,7 +572,7 @@ export default function GeneratedAds() {
                                 </>
                             ) : (
                                 <>
-                                    <Square className="text-gray-400" size={16} />
+                                    <Square className="text-muted-foreground" size={16} />
                                     Select All ({filteredBundles.length})
                                 </>
                             )}
@@ -589,17 +589,17 @@ export default function GeneratedAds() {
                         onClick={() => setSelectedBundleId(null)}
                     >
                         <div
-                            className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto"
+                            className="bg-card rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto"
                             onClick={(e) => e.stopPropagation()}
                         >
                             {/* Modal Header */}
-                            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
-                                <h3 className="text-xl font-bold text-gray-900">Ad Bundle Details</h3>
+                            <div className="sticky top-0 bg-card border-b border-border px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
+                                <h3 className="text-xl font-bold text-foreground">Ad Bundle Details</h3>
                                 <button
                                     onClick={() => setSelectedBundleId(null)}
-                                    className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+                                    className="w-8 h-8 rounded-full hover:bg-secondary flex items-center justify-center transition-colors"
                                 >
-                                    <span className="text-2xl text-gray-500">×</span>
+                                    <span className="text-2xl text-muted-foreground">×</span>
                                 </button>
                             </div>
 
@@ -609,7 +609,7 @@ export default function GeneratedAds() {
                                     {/* Media Preview Section */}
                                     <div className="space-y-4">
                                         {/* Main Media */}
-                                        <div className="bg-gray-100 rounded-xl overflow-hidden aspect-square flex items-center justify-center relative">
+                                        <div className="bg-secondary rounded-xl overflow-hidden aspect-square flex items-center justify-center relative">
                                             {imgError ? (
                                                 <div className="p-8 text-center text-red-500 bg-red-50">
                                                     <p className="font-bold mb-2">Failed to load media</p>
@@ -640,7 +640,7 @@ export default function GeneratedAds() {
                                         {/* Bundle Thumbnails */}
                                         {currentBundle.length > 1 && (
                                             <div>
-                                                <p className="text-sm font-medium text-gray-700 mb-2">Available Sizes:</p>
+                                                <p className="text-sm font-medium text-foreground mb-2">Available Sizes:</p>
                                                 <div className="flex gap-2 overflow-x-auto pb-2">
                                                     {currentBundle.map((ad, idx) => {
                                                         const isAdVideo = ad.media_type === 'video';
@@ -653,7 +653,7 @@ export default function GeneratedAds() {
                                                                 }}
                                                                 className={`relative w-20 h-20 rounded-lg overflow-hidden border-2 transition-all flex-shrink-0 ${viewedImage.id === ad.id
                                                                     ? 'border-amber-600 ring-2 ring-amber-200'
-                                                                    : 'border-gray-200 hover:border-amber-300'
+                                                                    : 'border-border hover:border-amber-300'
                                                                     }`}
                                                             >
                                                                 {isAdVideo ? (
@@ -690,18 +690,18 @@ export default function GeneratedAds() {
                                     <div className="space-y-6">
                                         {/* Ad Copy */}
                                         <div className="bg-amber-50 p-5 rounded-xl border border-amber-200">
-                                            <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                            <h4 className="font-bold text-foreground mb-4 flex items-center gap-2">
                                                 <FileText size={20} className="text-amber-600" />
                                                 Ad Copy
                                             </h4>
                                             <div className="space-y-3">
                                                 <div>
                                                     <label className="text-xs font-medium text-amber-700 uppercase">Headline</label>
-                                                    <p className="font-bold text-gray-900 mt-1">{viewedImage.headline}</p>
+                                                    <p className="font-bold text-foreground mt-1">{viewedImage.headline}</p>
                                                 </div>
                                                 <div>
                                                     <label className="text-xs font-medium text-amber-700 uppercase">Body Text</label>
-                                                    <p className="text-gray-700 text-sm whitespace-pre-line mt-1">{viewedImage.body}</p>
+                                                    <p className="text-foreground text-sm whitespace-pre-line mt-1">{viewedImage.body}</p>
                                                 </div>
                                                 <div>
                                                     <label className="text-xs font-medium text-amber-700 uppercase">Call to Action</label>
@@ -715,36 +715,36 @@ export default function GeneratedAds() {
                                         </div>
 
                                         {/* Media Details */}
-                                        <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
-                                            <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                        <div className="bg-secondary p-5 rounded-xl border border-border">
+                                            <h4 className="font-bold text-foreground mb-4 flex items-center gap-2">
                                                 {viewedImage.media_type === 'video' ? (
                                                     <Film size={20} className="text-purple-600" />
                                                 ) : (
-                                                    <Image size={20} className="text-gray-600" />
+                                                    <Image size={20} className="text-muted-foreground" />
                                                 )}
                                                 {viewedImage.media_type === 'video' ? 'Video Details' : 'Image Details'}
                                             </h4>
                                             <div className="space-y-2 text-sm">
                                                 <div className="flex justify-between">
-                                                    <span className="text-gray-500">Type:</span>
-                                                    <span className="font-medium text-gray-900 capitalize">{viewedImage.media_type || 'image'}</span>
+                                                    <span className="text-muted-foreground">Type:</span>
+                                                    <span className="font-medium text-foreground capitalize">{viewedImage.media_type || 'image'}</span>
                                                 </div>
                                                 <div className="flex justify-between">
-                                                    <span className="text-gray-500">Size:</span>
-                                                    <span className="font-medium text-gray-900">{viewedImage.size_name}</span>
+                                                    <span className="text-muted-foreground">Size:</span>
+                                                    <span className="font-medium text-foreground">{viewedImage.size_name}</span>
                                                 </div>
                                                 <div className="flex justify-between">
-                                                    <span className="text-gray-500">Dimensions:</span>
-                                                    <span className="font-medium text-gray-900">{viewedImage.dimensions}</span>
+                                                    <span className="text-muted-foreground">Dimensions:</span>
+                                                    <span className="font-medium text-foreground">{viewedImage.dimensions}</span>
                                                 </div>
                                                 <div className="flex justify-between">
-                                                    <span className="text-gray-500">Created:</span>
-                                                    <span className="font-medium text-gray-900">{new Date(viewedImage.created_at).toLocaleString()}</span>
+                                                    <span className="text-muted-foreground">Created:</span>
+                                                    <span className="font-medium text-foreground">{new Date(viewedImage.created_at).toLocaleString()}</span>
                                                 </div>
                                                 {viewedImage.video_id && (
                                                     <div className="flex justify-between">
-                                                        <span className="text-gray-500">FB Video ID:</span>
-                                                        <span className="font-medium text-gray-900 text-xs">{viewedImage.video_id}</span>
+                                                        <span className="text-muted-foreground">FB Video ID:</span>
+                                                        <span className="font-medium text-foreground text-xs">{viewedImage.video_id}</span>
                                                     </div>
                                                 )}
                                             </div>
@@ -788,17 +788,17 @@ export default function GeneratedAds() {
             {/* Scale Winner Modal */}
             {scaleWinner.show && scaleWinner.ad && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => !scaleWinner.generating && setScaleWinner({ show: false, ad: null, keepModules: { intro: true, bridge: true, core: true, cta: true }, generating: false })}>
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
-                        <h3 className="text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+                    <div className="bg-card rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-xl font-bold text-foreground mb-2 flex items-center gap-2">
                             <Sparkles className="text-emerald-600" size={24} />
                             Scale Winner
                         </h3>
-                        <p className="text-sm text-gray-500 mb-1">Bundle: <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">{scaleWinner.ad.bundle_code}</span></p>
-                        <p className="text-sm text-gray-600 mb-4">Uncheck the module types you want to replace with new variations. Checked modules will be kept.</p>
+                        <p className="text-sm text-muted-foreground mb-1">Bundle: <span className="font-mono text-xs bg-secondary px-2 py-0.5 rounded">{scaleWinner.ad.bundle_code}</span></p>
+                        <p className="text-sm text-muted-foreground mb-4">Uncheck the module types you want to replace with new variations. Checked modules will be kept.</p>
 
                         <div className="space-y-3 mb-6">
                             {['intro', 'bridge', 'core', 'cta'].map(type => (
-                                <label key={type} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer">
+                                <label key={type} className="flex items-center gap-3 p-3 bg-secondary rounded-lg hover:bg-secondary cursor-pointer">
                                     <input
                                         type="checkbox"
                                         checked={scaleWinner.keepModules[type]}
@@ -808,8 +808,8 @@ export default function GeneratedAds() {
                                         }))}
                                         className="w-4 h-4 text-emerald-600 rounded"
                                     />
-                                    <span className="font-medium text-gray-900 capitalize">{type}</span>
-                                    <span className="text-xs text-gray-400 ml-auto">{scaleWinner.keepModules[type] ? 'Keep' : 'Replace'}</span>
+                                    <span className="font-medium text-foreground capitalize">{type}</span>
+                                    <span className="text-xs text-muted-foreground ml-auto">{scaleWinner.keepModules[type] ? 'Keep' : 'Replace'}</span>
                                 </label>
                             ))}
                         </div>
@@ -818,7 +818,7 @@ export default function GeneratedAds() {
                             <button
                                 onClick={() => setScaleWinner({ show: false, ad: null, keepModules: { intro: true, bridge: true, core: true, cta: true }, generating: false })}
                                 disabled={scaleWinner.generating}
-                                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium disabled:opacity-50"
+                                className="flex-1 px-4 py-3 bg-secondary text-foreground rounded-lg hover:bg-muted font-medium disabled:opacity-50"
                             >
                                 Cancel
                             </button>
@@ -843,7 +843,7 @@ export default function GeneratedAds() {
                         onClick={cancelDelete}
                     >
                         <div
-                            className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
+                            className="bg-card rounded-2xl shadow-2xl max-w-md w-full p-6"
                             onClick={(e) => e.stopPropagation()}
                         >
                             <div className="flex items-center gap-3 mb-4">
@@ -851,12 +851,12 @@ export default function GeneratedAds() {
                                     <Trash2 className="text-red-600" size={24} />
                                 </div>
                                 <div>
-                                    <h3 className="text-xl font-bold text-gray-900">Delete Ad Bundle?</h3>
-                                    <p className="text-sm text-gray-500">This action cannot be undone</p>
+                                    <h3 className="text-xl font-bold text-foreground">Delete Ad Bundle?</h3>
+                                    <p className="text-sm text-muted-foreground">This action cannot be undone</p>
                                 </div>
                             </div>
 
-                            <p className="text-gray-700 mb-6">
+                            <p className="text-foreground mb-6">
                                 Are you sure you want to delete this bundle with <strong>{deleteConfirmation.bundleAds.length} ad{deleteConfirmation.bundleAds.length > 1 ? 's' : ''}</strong>?
                                 All ad creatives will be permanently removed.
                             </p>
@@ -864,7 +864,7 @@ export default function GeneratedAds() {
                             <div className="flex gap-3">
                                 <button
                                     onClick={cancelDelete}
-                                    className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+                                    className="flex-1 px-4 py-3 bg-secondary text-foreground rounded-lg hover:bg-muted transition-colors font-medium"
                                 >
                                     Cancel
                                 </button>

@@ -106,17 +106,17 @@ export default function AdRemix() {
         <div className="max-w-5xl mx-auto">
             {/* Header */}
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+                <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
                     <Sparkles size={32} className="text-purple-600" />
                     Ad Remix Engine
                 </h1>
-                <p className="text-gray-600 mt-1">Deconstruct winning ads and reconstruct them with your brand</p>
+                <p className="text-muted-foreground mt-1">Deconstruct winning ads and reconstruct them with your brand</p>
             </div>
 
             {/* Progress Steps */}
-            <div className="mb-8 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="mb-8 bg-card rounded-xl shadow-sm border border-border p-6">
                 <div className="flex items-center justify-between relative">
-                    <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-full h-1 bg-gray-200 -z-10"></div>
+                    <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-full h-1 bg-muted -z-10"></div>
                     {steps.map((step) => {
                         const Icon = step.icon;
                         const isActive = step.id === currentStep;
@@ -125,17 +125,17 @@ export default function AdRemix() {
                         return (
                             <div
                                 key={step.id}
-                                className="flex flex-col items-center bg-white px-2"
+                                className="flex flex-col items-center bg-card px-2"
                             >
                                 <div
                                     className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 transition-all ${isActive ? 'bg-purple-600 text-white scale-110 shadow-md' :
                                         isCompleted ? 'bg-green-500 text-white' :
-                                            'bg-gray-200 text-gray-500'
+                                            'bg-muted text-muted-foreground'
                                         }`}
                                 >
                                     {isCompleted ? <Check size={20} /> : <Icon size={20} />}
                                 </div>
-                                <span className={`text-xs font-medium ${isActive ? 'text-purple-600' : 'text-gray-500'}`}>
+                                <span className={`text-xs font-medium ${isActive ? 'text-purple-600' : 'text-muted-foreground'}`}>
                                     {step.name}
                                 </span>
                             </div>
@@ -144,11 +144,11 @@ export default function AdRemix() {
             </div>
 
             {/* Step Content */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 min-h-[500px]">
+            <div className="bg-card rounded-xl shadow-sm border border-border p-8 min-h-[500px]">
                 {loading && (
-                    <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center rounded-xl">
+                    <div className="absolute inset-0 bg-card/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center rounded-xl">
                         <div className="w-16 h-16 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mb-4"></div>
-                        <h3 className="text-xl font-bold text-gray-900">
+                        <h3 className="text-xl font-bold text-foreground">
                             {currentStep === 1 ? 'Analyzing Template Structure...' : 'Generating Your Ad Concept...'}
                         </h3>
                     </div>
@@ -158,7 +158,7 @@ export default function AdRemix() {
                 {currentStep === 1 && (
                     <div>
                         <h3 className="text-xl font-bold mb-4">Select a Winning Template to Remix</h3>
-                        <p className="text-gray-600 mb-6">Choose an ad template to deconstruct and use as your blueprint</p>
+                        <p className="text-muted-foreground mb-6">Choose an ad template to deconstruct and use as your blueprint</p>
                         <ImageTemplateSelector
                             onSelect={(template) => {
                                 updateData('template', template);
@@ -212,11 +212,11 @@ export default function AdRemix() {
                 {currentStep === 5 && (
                     <div>
                         <h3 className="text-xl font-bold mb-4">Campaign Details</h3>
-                        <p className="text-gray-600 mb-6">Provide details to customize your remixed ad</p>
+                        <p className="text-muted-foreground mb-6">Provide details to customize your remixed ad</p>
 
                         <div className="max-w-2xl space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-medium text-foreground mb-2">
                                     Offer / Promotion *
                                 </label>
                                 <input
@@ -224,12 +224,12 @@ export default function AdRemix() {
                                     value={wizardData.campaignDetails.offer}
                                     onChange={(e) => updateCampaignDetails('offer', e.target.value)}
                                     placeholder="e.g., 50% off Black Friday, Buy 2 Get 1 Free"
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                                    className="w-full px-4 py-3 border border-border rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-medium text-foreground mb-2">
                                     Urgency / Timing
                                 </label>
                                 <input
@@ -237,12 +237,12 @@ export default function AdRemix() {
                                     value={wizardData.campaignDetails.urgency}
                                     onChange={(e) => updateCampaignDetails('urgency', e.target.value)}
                                     placeholder="e.g., Limited time, Ends tonight"
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                                    className="w-full px-4 py-3 border border-border rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-medium text-foreground mb-2">
                                     Key Messaging *
                                 </label>
                                 <textarea
@@ -250,7 +250,7 @@ export default function AdRemix() {
                                     onChange={(e) => updateCampaignDetails('messaging', e.target.value)}
                                     placeholder="e.g., Science-backed results, Trusted by 10,000+ customers"
                                     rows={3}
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                                    className="w-full px-4 py-3 border border-border rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
                                 />
                             </div>
                         </div>
@@ -261,36 +261,36 @@ export default function AdRemix() {
                 {currentStep === 6 && (
                     <div>
                         <h3 className="text-xl font-bold mb-4">Review & Generate</h3>
-                        <p className="text-gray-600 mb-6">Review your selections and generate the remixed ad concept</p>
+                        <p className="text-muted-foreground mb-6">Review your selections and generate the remixed ad concept</p>
 
                         <div className="space-y-4 max-w-2xl">
-                            <div className="bg-gray-50 p-4 rounded-lg">
-                                <h4 className="font-bold text-gray-900 mb-2">Template</h4>
-                                <p className="text-gray-700">{wizardData.template?.name}</p>
+                            <div className="bg-secondary p-4 rounded-lg">
+                                <h4 className="font-bold text-foreground mb-2">Template</h4>
+                                <p className="text-foreground">{wizardData.template?.name}</p>
                             </div>
 
-                            <div className="bg-gray-50 p-4 rounded-lg">
-                                <h4 className="font-bold text-gray-900 mb-2">Brand</h4>
-                                <p className="text-gray-700">{wizardData.brand?.name}</p>
+                            <div className="bg-secondary p-4 rounded-lg">
+                                <h4 className="font-bold text-foreground mb-2">Brand</h4>
+                                <p className="text-foreground">{wizardData.brand?.name}</p>
                             </div>
 
-                            <div className="bg-gray-50 p-4 rounded-lg">
-                                <h4 className="font-bold text-gray-900 mb-2">Product</h4>
-                                <p className="text-gray-700">{wizardData.product?.name}</p>
+                            <div className="bg-secondary p-4 rounded-lg">
+                                <h4 className="font-bold text-foreground mb-2">Product</h4>
+                                <p className="text-foreground">{wizardData.product?.name}</p>
                             </div>
 
-                            <div className="bg-gray-50 p-4 rounded-lg">
-                                <h4 className="font-bold text-gray-900 mb-2">Audience</h4>
-                                <p className="text-gray-700">{wizardData.profile?.name}</p>
+                            <div className="bg-secondary p-4 rounded-lg">
+                                <h4 className="font-bold text-foreground mb-2">Audience</h4>
+                                <p className="text-foreground">{wizardData.profile?.name}</p>
                             </div>
 
-                            <div className="bg-gray-50 p-4 rounded-lg">
-                                <h4 className="font-bold text-gray-900 mb-2">Campaign</h4>
-                                <p className="text-gray-700"><strong>Offer:</strong> {wizardData.campaignDetails.offer}</p>
+                            <div className="bg-secondary p-4 rounded-lg">
+                                <h4 className="font-bold text-foreground mb-2">Campaign</h4>
+                                <p className="text-foreground"><strong>Offer:</strong> {wizardData.campaignDetails.offer}</p>
                                 {wizardData.campaignDetails.urgency && (
-                                    <p className="text-gray-700"><strong>Urgency:</strong> {wizardData.campaignDetails.urgency}</p>
+                                    <p className="text-foreground"><strong>Urgency:</strong> {wizardData.campaignDetails.urgency}</p>
                                 )}
-                                <p className="text-gray-700"><strong>Messaging:</strong> {wizardData.campaignDetails.messaging}</p>
+                                <p className="text-foreground"><strong>Messaging:</strong> {wizardData.campaignDetails.messaging}</p>
                             </div>
                         </div>
                     </div>
@@ -303,8 +303,8 @@ export default function AdRemix() {
                             <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
                                 <Check size={40} />
                             </div>
-                            <h2 className="text-3xl font-bold text-gray-900 mb-2">Ad Concept Generated!</h2>
-                            <p className="text-gray-600">Your remixed ad concept is ready</p>
+                            <h2 className="text-3xl font-bold text-foreground mb-2">Ad Concept Generated!</h2>
+                            <p className="text-muted-foreground">Your remixed ad concept is ready</p>
                         </div>
 
                         <div className="space-y-6 max-w-3xl mx-auto">
@@ -313,12 +313,12 @@ export default function AdRemix() {
                                     <FileText size={20} />
                                     Headline
                                 </h4>
-                                <p className="text-lg font-bold text-gray-900">{adConcept.headline_remix}</p>
+                                <p className="text-lg font-bold text-foreground">{adConcept.headline_remix}</p>
                             </div>
 
                             <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-6">
                                 <h4 className="font-bold text-blue-900 mb-3">Body Copy</h4>
-                                <p className="text-gray-700 whitespace-pre-line">{adConcept.body_copy}</p>
+                                <p className="text-foreground whitespace-pre-line">{adConcept.body_copy}</p>
                             </div>
 
                             <div className="bg-green-50 border-2 border-green-200 rounded-xl p-6">
@@ -329,19 +329,19 @@ export default function AdRemix() {
                             </div>
 
                             <div className="bg-amber-50 border-2 border-amber-200 rounded-xl p-6">
-                                <h4 className="font-bold text-amber-900 mb-3 flex items-center gap-2">
+                                <h4 className="font-bold text-foreground mb-3 flex items-center gap-2">
                                     <Image size={20} />
                                     Visual Description
                                 </h4>
-                                <p className="text-gray-700">{adConcept.visual_description}</p>
+                                <p className="text-foreground">{adConcept.visual_description}</p>
                             </div>
 
-                            <div className="bg-gray-50 border-2 border-gray-200 rounded-xl p-6">
-                                <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                            <div className="bg-secondary border-2 border-border rounded-xl p-6">
+                                <h4 className="font-bold text-foreground mb-3 flex items-center gap-2">
                                     <Sparkles size={20} />
                                     Image Generation Prompt
                                 </h4>
-                                <p className="text-sm text-gray-700 font-mono bg-white p-4 rounded border border-gray-300">
+                                <p className="text-sm text-foreground font-mono bg-card p-4 rounded border border-border">
                                     {adConcept.image_generation_prompt}
                                 </p>
                             </div>
@@ -357,7 +357,7 @@ export default function AdRemix() {
                     {currentStep > 1 && currentStep < 7 && (
                         <button
                             onClick={() => setCurrentStep(currentStep - 1)}
-                            className="flex items-center gap-2 px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
+                            className="flex items-center gap-2 px-6 py-3 bg-secondary text-foreground rounded-lg hover:bg-muted font-medium"
                         >
                             <ChevronLeft size={20} />
                             Back

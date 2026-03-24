@@ -153,7 +153,7 @@ export default function ModularBlocksBoard({ product }) {
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between mt-4">
-                <h2 className="text-xl font-bold text-gray-900">Modular Board</h2>
+                <h2 className="text-xl font-bold text-foreground">Modular Board</h2>
                 <div className="flex items-center gap-4">
                     <button onClick={fetchModules} className="text-sm text-purple-600 hover:text-purple-800 font-medium">
                         Refresh Board
@@ -175,7 +175,7 @@ export default function ModularBlocksBoard({ product }) {
                     {COLUMNS.map(col => {
                         const sel = selectedBlocks[col.id];
                         return (
-                             <div key={col.id} className={`text-sm px-3 py-1 rounded-md border ${sel ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-400 border-indigo-200'} transition-all`}>
+                             <div key={col.id} className={`text-sm px-3 py-1 rounded-md border ${sel ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-card text-muted-foreground border-indigo-200'} transition-all`}>
                                  {sel ? formatName(sel).substring(0, 15) : col.title}
                              </div>
                         )
@@ -187,15 +187,15 @@ export default function ModularBlocksBoard({ product }) {
             </div>
 
             {assembledResult && (
-                <div className="bg-white border-2 border-indigo-500 rounded-xl p-6 shadow-md shadow-indigo-100 relative">
+                <div className="bg-card border-2 border-indigo-500 rounded-xl p-6 shadow-md shadow-indigo-100 relative">
                     <div className="absolute top-4 right-4 bg-indigo-100 text-indigo-700 text-xs font-mono px-3 py-1 rounded">
                         {assembledResult.bundle_code}
                     </div>
-                    <h3 className="text-lg font-bold text-gray-900 mb-4">Assembled Final Script</h3>
-                    <div className="prose prose-sm"><pre className="whitespace-pre-wrap font-sans text-gray-800 bg-gray-50 p-4 rounded-lg border border-gray-100">{assembledResult.assembled_text}</pre></div>
+                    <h3 className="text-lg font-bold text-foreground mb-4">Assembled Final Script</h3>
+                    <div className="prose prose-sm"><pre className="whitespace-pre-wrap font-sans text-foreground bg-secondary p-4 rounded-lg border border-border">{assembledResult.assembled_text}</pre></div>
                     <div className="mt-4 flex gap-3">
                         <button className="px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700">Save to Campaign</button>
-                        <button className="px-4 py-2 bg-white text-gray-700 border border-gray-300 text-sm font-bold rounded-lg hover:bg-gray-50 flex items-center gap-2" onClick={() => setPreviewContent(assembledResult.assembled_text)}><LayoutTemplate size={16} /> Safe Zones</button>
+                        <button className="px-4 py-2 bg-card text-foreground border border-border text-sm font-bold rounded-lg hover:bg-secondary flex items-center gap-2" onClick={() => setPreviewContent(assembledResult.assembled_text)}><LayoutTemplate size={16} /> Safe Zones</button>
                     </div>
                 </div>
             )}
@@ -233,12 +233,12 @@ export default function ModularBlocksBoard({ product }) {
                                             return (
                                                 <div 
                                                     key={m.id} 
-                                                    className={`p-4 rounded-xl shadow-sm border group relative cursor-pointer transition-all ${isSelected ? 'bg-indigo-50 border-indigo-400 ring-1 ring-indigo-400' : 'bg-white border-slate-200 hover:border-purple-300'}`}
+                                                    className={`p-4 rounded-xl shadow-sm border group relative cursor-pointer transition-all ${isSelected ? 'bg-indigo-50 border-indigo-400 ring-1 ring-indigo-400' : 'bg-card border-slate-200 hover:border-purple-300'}`}
                                                     onClick={() => handleSelectBlock(m)}
                                                 >
                                                     <button 
                                                         onClick={(e) => { e.stopPropagation(); setPreviewContent(m.content); }}
-                                                        className="absolute top-2 right-8 p-1 text-gray-400 hover:text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        className="absolute top-2 right-8 p-1 text-muted-foreground hover:text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity"
                                                         title="Check Safe Zones"
                                                     >
                                                         <Eye size={14} />
@@ -259,7 +259,7 @@ export default function ModularBlocksBoard({ product }) {
                                                     
                                                     {isSelected && (col.id === 'intro' || col.id === 'bridge') && (
                                                         <button 
-                                                            className="mt-3 w-full py-1.5 bg-white border border-indigo-200 text-indigo-600 text-xs font-bold rounded-lg hover:bg-indigo-50"
+                                                            className="mt-3 w-full py-1.5 bg-card border border-indigo-200 text-indigo-600 text-xs font-bold rounded-lg hover:bg-indigo-50"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 // Auto fill base intro/bridge for next step
@@ -295,7 +295,7 @@ export default function ModularBlocksBoard({ product }) {
             {/* Generation Modal */}
             {genModalOpen && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl">
+                    <div className="bg-card rounded-2xl max-w-lg w-full p-6 shadow-xl">
                         <h3 className="text-xl font-bold mb-4 capitalize flex items-center gap-2">
                             <Sparkles className="text-purple-600" size={24} />
                             Generate {genType}s
@@ -304,9 +304,9 @@ export default function ModularBlocksBoard({ product }) {
                         <div className="space-y-4 mb-6">
                             {(genType === 'bridge' || genType === 'core') && (
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Base Intro (Context)</label>
+                                    <label className="block text-sm font-medium text-foreground mb-1">Base Intro (Context)</label>
                                     <textarea 
-                                        className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 min-h-[80px] text-sm"
+                                        className="w-full p-3 border border-border rounded-xl focus:ring-2 focus:ring-purple-500 min-h-[80px] text-sm"
                                         placeholder="Paste the intro text this should follow..."
                                         value={baseIntro}
                                         onChange={e => setBaseIntro(e.target.value)}
@@ -316,9 +316,9 @@ export default function ModularBlocksBoard({ product }) {
 
                             {genType === 'core' && (
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Base Bridge (Context)</label>
+                                    <label className="block text-sm font-medium text-foreground mb-1">Base Bridge (Context)</label>
                                     <textarea 
-                                        className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 min-h-[80px] text-sm"
+                                        className="w-full p-3 border border-border rounded-xl focus:ring-2 focus:ring-purple-500 min-h-[80px] text-sm"
                                         placeholder="Paste the bridge text this should follow..."
                                         value={baseBridge}
                                         onChange={e => setBaseBridge(e.target.value)}
@@ -327,10 +327,10 @@ export default function ModularBlocksBoard({ product }) {
                             )}
                             
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Number to Generate</label>
+                                <label className="block text-sm font-medium text-foreground mb-1">Number to Generate</label>
                                 <input 
                                     type="number" min="1" max="10"
-                                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500"
+                                    className="w-full p-3 border border-border rounded-xl focus:ring-2 focus:ring-purple-500"
                                     value={genCount}
                                     onChange={e => setGenCount(parseInt(e.target.value) || 1)}
                                 />
@@ -340,7 +340,7 @@ export default function ModularBlocksBoard({ product }) {
                         <div className="flex justify-end gap-3">
                             <button 
                                 onClick={() => setGenModalOpen(false)}
-                                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                                className="px-4 py-2 text-muted-foreground hover:bg-secondary rounded-lg transition-colors"
                             >
                                 Cancel
                             </button>

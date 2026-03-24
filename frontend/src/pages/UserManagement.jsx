@@ -251,14 +251,14 @@ const UserManagement = () => {
             {/* Header */}
             <div className="flex justify-between items-center mb-8">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+                    <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
                         <Users size={32} className="text-amber-600" />
                         User Management
                     </h1>
-                    <p className="text-gray-600 mt-2">Manage users, roles, and permissions.</p>
+                    <p className="text-muted-foreground mt-2">Manage users, roles, and permissions.</p>
                 </div>
                 <div className="flex items-center gap-4">
-                    <span className="text-sm text-gray-500">
+                    <span className="text-sm text-muted-foreground">
                         {users.length} user{users.length !== 1 ? 's' : ''}
                     </span>
                     <button
@@ -272,15 +272,15 @@ const UserManagement = () => {
             </div>
 
             {/* Users Table */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
                 <table className="w-full text-left">
-                    <thead className="bg-gray-50 border-b border-gray-200">
+                    <thead className="bg-secondary border-b border-border">
                         <tr>
-                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">User</th>
-                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Roles</th>
-                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Created</th>
-                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Actions</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">User</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Roles</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Created</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
@@ -292,7 +292,7 @@ const UserManagement = () => {
                                             {user.name?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
                                         </div>
                                         <div>
-                                            <div className="font-medium text-gray-900 flex items-center gap-2">
+                                            <div className="font-medium text-foreground flex items-center gap-2">
                                                 {user.name || 'No name'}
                                                 {user.is_superuser && (
                                                     <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full font-medium">
@@ -300,7 +300,7 @@ const UserManagement = () => {
                                                     </span>
                                                 )}
                                             </div>
-                                            <div className="text-sm text-gray-500">{user.email}</div>
+                                            <div className="text-sm text-muted-foreground">{user.email}</div>
                                         </div>
                                     </div>
                                 </td>
@@ -312,37 +312,37 @@ const UserManagement = () => {
                                 <td className="px-6 py-4">
                                     <div className="flex flex-wrap gap-1">
                                         {user.roles.map((role) => (
-                                            <span key={role.id} className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-full">
+                                            <span key={role.id} className="px-2 py-0.5 text-xs bg-secondary text-muted-foreground rounded-full">
                                                 {role.name}
                                             </span>
                                         ))}
                                         {user.roles.length === 0 && (
-                                            <span className="text-gray-400 text-sm italic">No roles</span>
+                                            <span className="text-muted-foreground text-sm italic">No roles</span>
                                         )}
                                     </div>
                                 </td>
-                                <td className="px-6 py-4 text-sm text-gray-500">
+                                <td className="px-6 py-4 text-sm text-muted-foreground">
                                     {new Date(user.created_at).toLocaleDateString()}
                                 </td>
                                 <td className="px-6 py-4">
                                     <div className="flex items-center justify-end gap-1">
                                         <button
                                             onClick={() => handleEditUserClick(user)}
-                                            className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                            className="p-2 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                                             title="Edit user details"
                                         >
                                             <Pencil size={16} />
                                         </button>
                                         <button
                                             onClick={() => handleEditRoles(user)}
-                                            className="p-2 text-gray-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                                            className="p-2 text-muted-foreground hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
                                             title="Edit roles"
                                         >
                                             <Shield size={16} />
                                         </button>
                                         <button
                                             onClick={() => handleToggleActive(user)}
-                                            className={`p-2 rounded-lg transition-colors ${user.is_active ? 'text-gray-500 hover:text-yellow-600 hover:bg-yellow-50' : 'text-gray-500 hover:text-green-600 hover:bg-green-50'}`}
+                                            className={`p-2 rounded-lg transition-colors ${user.is_active ? 'text-muted-foreground hover:text-yellow-600 hover:bg-yellow-50' : 'text-muted-foreground hover:text-green-600 hover:bg-green-50'}`}
                                             title={user.is_active ? 'Deactivate' : 'Activate'}
                                             disabled={user.id === currentUser?.id}
                                         >
@@ -350,7 +350,7 @@ const UserManagement = () => {
                                         </button>
                                         <button
                                             onClick={() => handleDeleteClick(user)}
-                                            className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                            className="p-2 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                             title="Delete user"
                                             disabled={user.id === currentUser?.id}
                                         >
@@ -367,20 +367,20 @@ const UserManagement = () => {
             {/* Edit Roles Modal */}
             {editingUser && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setEditingUser(null)}>
-                    <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl" onClick={e => e.stopPropagation()}>
+                    <div className="bg-card rounded-xl max-w-md w-full p-6 shadow-xl" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
                                     <Shield className="text-amber-600" size={20} />
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-bold text-gray-900">Edit Roles</h3>
-                                    <p className="text-sm text-gray-500">{editingUser.email}</p>
+                                    <h3 className="text-lg font-bold text-foreground">Edit Roles</h3>
+                                    <p className="text-sm text-muted-foreground">{editingUser.email}</p>
                                 </div>
                             </div>
                             <button
                                 onClick={() => setEditingUser(null)}
-                                className="text-gray-400 hover:text-gray-500"
+                                className="text-muted-foreground hover:text-muted-foreground"
                             >
                                 <X size={20} />
                             </button>
@@ -389,18 +389,18 @@ const UserManagement = () => {
                             {roles.map((role) => (
                                 <label
                                     key={role.id}
-                                    className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
+                                    className="flex items-center gap-3 p-3 bg-secondary rounded-lg cursor-pointer hover:bg-secondary transition-colors"
                                 >
                                     <input
                                         type="checkbox"
                                         checked={selectedRoles.includes(role.id)}
                                         onChange={() => toggleRole(role.id)}
-                                        className="w-4 h-4 text-amber-600 bg-white border-gray-300 rounded focus:ring-amber-500"
+                                        className="w-4 h-4 text-amber-600 bg-card border-border rounded focus:ring-amber-500"
                                     />
                                     <div>
-                                        <div className="font-medium text-gray-900">{role.name}</div>
+                                        <div className="font-medium text-foreground">{role.name}</div>
                                         {role.description && (
-                                            <div className="text-xs text-gray-500">{role.description}</div>
+                                            <div className="text-xs text-muted-foreground">{role.description}</div>
                                         )}
                                     </div>
                                 </label>
@@ -409,7 +409,7 @@ const UserManagement = () => {
                         <div className="flex justify-end gap-3">
                             <button
                                 onClick={() => setEditingUser(null)}
-                                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors font-medium"
+                                className="px-4 py-2 text-foreground hover:bg-secondary rounded-lg transition-colors font-medium"
                             >
                                 Cancel
                             </button>
@@ -428,20 +428,20 @@ const UserManagement = () => {
             {/* Add User Modal */}
             {showAddModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAddModal(false)}>
-                    <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl" onClick={e => e.stopPropagation()}>
+                    <div className="bg-card rounded-xl max-w-md w-full p-6 shadow-xl" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
                                     <Plus className="text-amber-600" size={20} />
                                 </div>
-                                <h3 className="text-lg font-bold text-gray-900">Add New User</h3>
+                                <h3 className="text-lg font-bold text-foreground">Add New User</h3>
                             </div>
                             <button
                                 onClick={() => {
                                     setShowAddModal(false);
                                     setNewUser({ name: '', email: '', password: '', role_ids: [] });
                                 }}
-                                className="text-gray-400 hover:text-gray-500"
+                                className="text-muted-foreground hover:text-muted-foreground"
                             >
                                 <X size={20} />
                             </button>
@@ -449,41 +449,41 @@ const UserManagement = () => {
 
                         <form onSubmit={handleAddUser} className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                <label className="block text-sm font-medium text-foreground mb-1">
                                     Name
                                 </label>
                                 <input
                                     type="text"
                                     value={newUser.name}
                                     onChange={(e) => setNewUser(prev => ({ ...prev, name: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                                     placeholder="John Doe"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                <label className="block text-sm font-medium text-foreground mb-1">
                                     Email <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="email"
                                     value={newUser.email}
                                     onChange={(e) => setNewUser(prev => ({ ...prev, email: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                                     placeholder="user@example.com"
                                     required
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                <label className="block text-sm font-medium text-foreground mb-1">
                                     Password <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="password"
                                     value={newUser.password}
                                     onChange={(e) => setNewUser(prev => ({ ...prev, password: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                                     placeholder="••••••••"
                                     required
                                     minLength={6}
@@ -491,25 +491,25 @@ const UserManagement = () => {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-medium text-foreground mb-2">
                                     Roles
                                 </label>
                                 <div className="space-y-2">
                                     {roles.map((role) => (
                                         <label
                                             key={role.id}
-                                            className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
+                                            className="flex items-center gap-3 p-3 bg-secondary rounded-lg cursor-pointer hover:bg-secondary transition-colors"
                                         >
                                             <input
                                                 type="checkbox"
                                                 checked={newUser.role_ids.includes(role.id)}
                                                 onChange={() => toggleNewUserRole(role.id)}
-                                                className="w-4 h-4 text-amber-600 bg-white border-gray-300 rounded focus:ring-amber-500"
+                                                className="w-4 h-4 text-amber-600 bg-card border-border rounded focus:ring-amber-500"
                                             />
                                             <div>
-                                                <div className="font-medium text-gray-900">{role.name}</div>
+                                                <div className="font-medium text-foreground">{role.name}</div>
                                                 {role.description && (
-                                                    <div className="text-xs text-gray-500">{role.description}</div>
+                                                    <div className="text-xs text-muted-foreground">{role.description}</div>
                                                 )}
                                             </div>
                                         </label>
@@ -524,7 +524,7 @@ const UserManagement = () => {
                                         setShowAddModal(false);
                                         setNewUser({ name: '', email: '', password: '', role_ids: [] });
                                     }}
-                                    className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors font-medium"
+                                    className="px-4 py-2 text-foreground hover:bg-secondary rounded-lg transition-colors font-medium"
                                 >
                                     Cancel
                                 </button>
@@ -557,17 +557,17 @@ const UserManagement = () => {
             {/* Edit User Modal */}
             {showEditUserModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowEditUserModal(false)}>
-                    <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl" onClick={e => e.stopPropagation()}>
+                    <div className="bg-card rounded-xl max-w-md w-full p-6 shadow-xl" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
                                     <Pencil className="text-blue-600" size={20} />
                                 </div>
-                                <h3 className="text-lg font-bold text-gray-900">Edit User</h3>
+                                <h3 className="text-lg font-bold text-foreground">Edit User</h3>
                             </div>
                             <button
                                 onClick={() => setShowEditUserModal(false)}
-                                className="text-gray-400 hover:text-gray-500"
+                                className="text-muted-foreground hover:text-muted-foreground"
                             >
                                 <X size={20} />
                             </button>
@@ -575,41 +575,41 @@ const UserManagement = () => {
 
                         <form onSubmit={handleUpdateUser} className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                <label className="block text-sm font-medium text-foreground mb-1">
                                     Name
                                 </label>
                                 <input
                                     type="text"
                                     value={editUserFormData.name}
                                     onChange={(e) => setEditUserFormData(prev => ({ ...prev, name: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     placeholder="John Doe"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                <label className="block text-sm font-medium text-foreground mb-1">
                                     Email <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="email"
                                     value={editUserFormData.email}
                                     onChange={(e) => setEditUserFormData(prev => ({ ...prev, email: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     placeholder="user@example.com"
                                     required
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    New Password <span className="text-gray-400 font-normal">(optional)</span>
+                                <label className="block text-sm font-medium text-foreground mb-1">
+                                    New Password <span className="text-muted-foreground font-normal">(optional)</span>
                                 </label>
                                 <input
                                     type="password"
                                     value={editUserFormData.password}
                                     onChange={(e) => setEditUserFormData(prev => ({ ...prev, password: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     placeholder="Leave blank to keep current"
                                     minLength={6}
                                 />
@@ -619,7 +619,7 @@ const UserManagement = () => {
                                 <button
                                     type="button"
                                     onClick={() => setShowEditUserModal(false)}
-                                    className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors font-medium"
+                                    className="px-4 py-2 text-foreground hover:bg-secondary rounded-lg transition-colors font-medium"
                                 >
                                     Cancel
                                 </button>

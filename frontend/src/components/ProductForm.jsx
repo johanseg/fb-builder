@@ -123,24 +123,24 @@ const ProductForm = ({ onClose, onSave, initialData = null }) => {
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={onClose}>
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-                <div className="flex justify-between items-center p-6 border-b border-gray-100">
-                    <h2 className="text-xl font-bold text-gray-900">
+            <div className="bg-card rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center p-6 border-b border-border">
+                    <h2 className="text-xl font-bold text-foreground">
                         {initialData ? 'Edit Product' : 'Add New Product'}
                     </h2>
-                    <button onClick={onClose} className="text-gray-500 hover:bg-gray-100 p-2 rounded-full">
+                    <button onClick={onClose} className="text-muted-foreground hover:bg-secondary p-2 rounded-full">
                         <X size={20} />
                     </button>
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-6 space-y-6">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Brand</label>
+                        <label className="block text-sm font-medium text-foreground mb-1">Brand</label>
                         <select
                             required
                             value={formData.brandId}
                             onChange={e => setFormData({ ...formData, brandId: e.target.value })}
-                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            className="w-full p-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500"
                             disabled={!!initialData}
                         >
                             <option value="">Select a Brand...</option>
@@ -154,35 +154,35 @@ const ProductForm = ({ onClose, onSave, initialData = null }) => {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
+                        <label className="block text-sm font-medium text-foreground mb-1">Product Name</label>
                         <input
                             required
                             type="text"
                             maxLength={100}
                             value={formData.name}
                             onChange={e => setFormData({ ...formData, name: e.target.value })}
-                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            className="w-full p-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500"
                             placeholder="e.g. Glow Serum"
                         />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                        <label className="block text-sm font-medium text-foreground mb-1">Description</label>
                         <textarea
                             value={formData.description}
                             maxLength={500}
                             onChange={e => setFormData({ ...formData, description: e.target.value })}
-                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            className="w-full p-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500"
                             rows="3"
                             placeholder="Short description of the product..."
                         />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Product Shots</label>
+                        <label className="block text-sm font-medium text-foreground mb-2">Product Shots</label>
                         <div className="grid grid-cols-3 gap-2 mb-3">
                             {(formData.product_shots || []).map((shot, index) => (
-                                <div key={index} className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden group">
+                                <div key={index} className="relative aspect-square bg-secondary rounded-lg overflow-hidden group">
                                     <img src={shot} alt={`Product shot ${index + 1}`} className="w-full h-full object-cover" />
                                     <button
                                         type="button"
@@ -197,7 +197,7 @@ const ProductForm = ({ onClose, onSave, initialData = null }) => {
                                 type="button"
                                 onClick={() => fileInputRef.current?.click()}
                                 disabled={uploading}
-                                className="aspect-square border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-500 hover:border-blue-500 hover:text-blue-500 transition-colors"
+                                className="aspect-square border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center text-muted-foreground hover:border-blue-500 hover:text-blue-500 transition-colors"
                             >
                                 {uploading ? <Loader size={20} className="animate-spin" /> : <Upload size={20} />}
                                 <span className="text-xs mt-1">{uploading ? 'Uploading...' : 'Upload'}</span>
@@ -211,81 +211,81 @@ const ProductForm = ({ onClose, onSave, initialData = null }) => {
                             onChange={handleFileUpload}
                             className="hidden"
                         />
-                        <p className="text-xs text-gray-500">Upload product images to use in ad generation.</p>
+                        <p className="text-xs text-muted-foreground">Upload product images to use in ad generation.</p>
                     </div>
 
                     {/* Creative Brief Settings (Collapsible) */}
-                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="border border-border rounded-lg overflow-hidden">
                         <button
                             type="button"
                             onClick={() => setShowBrief(!showBrief)}
-                            className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
+                            className="w-full flex items-center justify-between p-4 bg-secondary hover:bg-secondary transition-colors"
                         >
                             <div>
-                                <h3 className="font-semibold text-gray-900 text-left">Product Knowledge Base (Creative Brief)</h3>
-                                <p className="text-sm text-gray-500 text-left">Information used by the AI to generate ad scripts</p>
+                                <h3 className="font-semibold text-foreground text-left">Product Knowledge Base (Creative Brief)</h3>
+                                <p className="text-sm text-muted-foreground text-left">Information used by the AI to generate ad scripts</p>
                             </div>
-                            {showBrief ? <ChevronUp size={20} className="text-gray-500" /> : <ChevronDown size={20} className="text-gray-500" />}
+                            {showBrief ? <ChevronUp size={20} className="text-muted-foreground" /> : <ChevronDown size={20} className="text-muted-foreground" />}
                         </button>
                         
                         {showBrief && (
-                            <div className="p-4 bg-white space-y-4 border-t border-gray-200 max-h-[400px] overflow-y-auto">
+                            <div className="p-4 bg-card space-y-4 border-t border-border max-h-[400px] overflow-y-auto">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Primary Pain Points (1 per line)</label>
+                                    <label className="block text-sm font-medium text-foreground mb-1">Primary Pain Points (1 per line)</label>
                                     <textarea
                                         value={formData.pain_points}
                                         onChange={e => setFormData({ ...formData, pain_points: e.target.value })}
-                                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                                        className="w-full p-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                                         rows="3"
                                         placeholder="E.g. Wasting hours manually editing videos\nAds fatigue too quickly in the Meta algorithm"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Desired Outcomes (1 per line)</label>
+                                    <label className="block text-sm font-medium text-foreground mb-1">Desired Outcomes (1 per line)</label>
                                     <textarea
                                         value={formData.desired_outcomes}
                                         onChange={e => setFormData({ ...formData, desired_outcomes: e.target.value })}
-                                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                                        className="w-full p-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                                         rows="3"
                                         placeholder="E.g. Scale ad spend profitably\nGet endless fresh creative variations automatically"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Root Causes / Mechanisms (1 per line)</label>
+                                    <label className="block text-sm font-medium text-foreground mb-1">Root Causes / Mechanisms (1 per line)</label>
                                     <textarea
                                         value={formData.root_causes}
                                         onChange={e => setFormData({ ...formData, root_causes: e.target.value })}
-                                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                                        className="w-full p-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                                         rows="3"
                                         placeholder="E.g. Platform changes require high creative volume but production is slow"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Proof Points (1 per line)</label>
+                                    <label className="block text-sm font-medium text-foreground mb-1">Proof Points (1 per line)</label>
                                     <textarea
                                         value={formData.proof_points}
                                         onChange={e => setFormData({ ...formData, proof_points: e.target.value })}
-                                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                                        className="w-full p-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                                         rows="3"
                                         placeholder="E.g. Trusted by 5,000+ top D2C brands\nGenerated over $1B in tracked revenue"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Differentiators (1 per line)</label>
+                                    <label className="block text-sm font-medium text-foreground mb-1">Differentiators (1 per line)</label>
                                     <textarea
                                         value={formData.differentiators}
                                         onChange={e => setFormData({ ...formData, differentiators: e.target.value })}
-                                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                                        className="w-full p-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                                         rows="3"
                                         placeholder="E.g. Proprietary modular AI generation vs standard templatized tools"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Risk Reversals (1 per line)</label>
+                                    <label className="block text-sm font-medium text-foreground mb-1">Risk Reversals (1 per line)</label>
                                     <textarea
                                         value={formData.risk_reversals}
                                         onChange={e => setFormData({ ...formData, risk_reversals: e.target.value })}
-                                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                                        className="w-full p-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                                         rows="2"
                                         placeholder="E.g. 14-day free trial\nCancel anytime"
                                     />
@@ -294,11 +294,11 @@ const ProductForm = ({ onClose, onSave, initialData = null }) => {
                         )}
                     </div>
 
-                    <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                    <div className="flex justify-end gap-3 pt-4 border-t border-border">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                            className="px-4 py-2 text-foreground hover:bg-secondary rounded-lg"
                         >
                             Cancel
                         </button>

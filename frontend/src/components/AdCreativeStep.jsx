@@ -358,14 +358,14 @@ const AdCreativeStep = ({ onNext, onBack }) => {
     return (
         <div>
             <h2 className="text-2xl font-bold mb-6">Ad Creative - Standard Ads</h2>
-            <p className="text-gray-600 mb-6">
+            <p className="text-muted-foreground mb-6">
                 Create standard ads with a single primary text and headline. We will create one ad for each image you upload.
             </p>
 
             <div className="space-y-6">
                 {/* Creative Name */}
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                         Creative Name *
                     </label>
                     <input
@@ -373,14 +373,14 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                         value={creativeData.creativeName}
                         onChange={(e) => handleInputChange('creativeName', e.target.value)}
                         placeholder="Summer Sale Dynamic Creative"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                        className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                     />
                 </div>
 
                 {/* Facebook Page Selection */}
                 <div>
                     <div className="flex justify-between items-center mb-2">
-                        <label className="block text-sm font-medium text-gray-700">
+                        <label className="block text-sm font-medium text-foreground">
                             Facebook Page *
                         </label>
                         <button
@@ -397,10 +397,10 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                             value={creativeData.pageId}
                             onChange={(e) => handleInputChange('pageId', e.target.value)}
                             placeholder="Enter Facebook Page ID (e.g., 933995649786806)"
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                         />
                     ) : loadingPages ? (
-                        <div className="flex items-center gap-2 text-gray-500 py-2">
+                        <div className="flex items-center gap-2 text-muted-foreground py-2">
                             <Loader className="animate-spin" size={20} />
                             <span>Loading pages...</span>
                         </div>
@@ -408,7 +408,7 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                         <select
                             value={creativeData.pageId}
                             onChange={(e) => handlePageSelection(e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                         >
                             <option value="">Select a Facebook Page...</option>
                             {pages.map(page => (
@@ -436,13 +436,13 @@ const AdCreativeStep = ({ onNext, onBack }) => {
 
                 {/* Media Upload (Images + Videos) */}
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                         Ad Media (Images or Videos) *
                     </label>
 
                     {/* Upload Area */}
                     <div
-                        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors mb-4 ${isDragging ? 'border-amber-500 bg-amber-50' : 'border-gray-300 hover:border-amber-500'
+                        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors mb-4 ${isDragging ? 'border-amber-500 bg-amber-50' : 'border-border hover:border-amber-500'
                             }`}
                         onDragEnter={handleDragEnter}
                         onDragOver={handleDragOver}
@@ -459,13 +459,13 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                         />
                         <label htmlFor="ad-media-upload" className="cursor-pointer flex flex-col items-center">
                             <div className="flex gap-2 mb-2">
-                                <Image className={`${isDragging ? 'text-amber-500' : 'text-gray-400'}`} size={28} />
-                                <Film className={`${isDragging ? 'text-amber-500' : 'text-gray-400'}`} size={28} />
+                                <Image className={`${isDragging ? 'text-amber-500' : 'text-muted-foreground'}`} size={28} />
+                                <Film className={`${isDragging ? 'text-amber-500' : 'text-muted-foreground'}`} size={28} />
                             </div>
-                            <span className={`font-medium ${isDragging ? 'text-amber-700' : 'text-gray-600'}`}>
+                            <span className={`font-medium ${isDragging ? 'text-amber-700' : 'text-muted-foreground'}`}>
                                 {isDragging ? 'Drop files here' : 'Click to upload images or videos'}
                             </span>
-                            <span className="text-sm text-gray-400 mt-1">or drag and drop</span>
+                            <span className="text-sm text-muted-foreground mt-1">or drag and drop</span>
                             <span className="text-xs text-amber-500 mt-2 bg-amber-50 px-2 py-1 rounded">Supports multiple files • Videos up to 500MB</span>
                         </label>
                     </div>
@@ -474,7 +474,7 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                     {creativeData.creatives && creativeData.creatives.length > 0 && (
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
                             {creativeData.creatives.map((creative) => (
-                                <div key={creative.id} className="relative group border rounded-lg overflow-hidden aspect-square bg-gray-100">
+                                <div key={creative.id} className="relative group border rounded-lg overflow-hidden aspect-square bg-secondary">
                                     {creative.mediaType === 'video' ? (
                                         <video
                                             src={creative.previewUrl}
@@ -522,11 +522,11 @@ const AdCreativeStep = ({ onNext, onBack }) => {
 
                     {/* URL Input (Optional fallback) */}
                     <div className="mt-2">
-                        <p className="text-sm text-gray-500 mb-1">Or paste a media URL (image or video):</p>
+                        <p className="text-sm text-muted-foreground mb-1">Or paste a media URL (image or video):</p>
                         <input
                             type="text"
                             placeholder="https://example.com/image.jpg or https://example.com/video.mp4"
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm"
+                            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm"
                             onBlur={(e) => {
                                 if (e.target.value) {
                                     const url = e.target.value.toLowerCase();
@@ -553,7 +553,7 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                 {/* Body Text */}
                 <div>
                     <div className="flex items-center justify-between mb-2">
-                        <label className="block text-sm font-medium text-gray-700">
+                        <label className="block text-sm font-medium text-foreground">
                             Primary Text *
                         </label>
                         {creativeData.bodies.length < 3 && (
@@ -577,7 +577,7 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                                     onChange={(e) => handleBodyChange(index, e.target.value)}
                                     placeholder={`Body copy ${index + 1}...`}
                                     rows="3"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                                 />
                                 {index >= 1 && (
                                     <button
@@ -599,7 +599,7 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                 {/* Headline */}
                 <div>
                     <div className="flex items-center justify-between mb-2">
-                        <label className="block text-sm font-medium text-gray-700">
+                        <label className="block text-sm font-medium text-foreground">
                             Headline *
                         </label>
                         {creativeData.headlines.length < 3 && (
@@ -623,7 +623,7 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                                     value={headline}
                                     onChange={(e) => handleHeadlineChange(index, e.target.value)}
                                     placeholder={`Headline ${index + 1}...`}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                                 />
                                 {index >= 1 && (
                                     <button
@@ -644,7 +644,7 @@ const AdCreativeStep = ({ onNext, onBack }) => {
 
                 {/* Description */}
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                         Description
                     </label>
                     <input
@@ -652,7 +652,7 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                         value={creativeData.description}
                         onChange={(e) => handleInputChange('description', e.target.value)}
                         placeholder="Shop now and save!"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                        className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                     />
                 </div>
 
@@ -689,13 +689,13 @@ const AdCreativeStep = ({ onNext, onBack }) => {
 
                 {/* Call to Action */}
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                         Call to Action *
                     </label>
                     <select
                         value={creativeData.cta}
                         onChange={(e) => handleInputChange('cta', e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                        className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                     >
                         {CTA_OPTIONS.map(cta => (
                             <option key={cta} value={cta}>{cta.replace(/_/g, ' ')}</option>
@@ -705,7 +705,7 @@ const AdCreativeStep = ({ onNext, onBack }) => {
 
                 {/* Website URL */}
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                         Website URL (Landing Page) *
                     </label>
                     <input
@@ -713,7 +713,7 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                         value={creativeData.websiteUrl}
                         onChange={(e) => handleInputChange('websiteUrl', e.target.value)}
                         placeholder="https://yourwebsite.com/landing"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                        className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                     />
                 </div>
             </div>
@@ -722,7 +722,7 @@ const AdCreativeStep = ({ onNext, onBack }) => {
             <div className="mt-8 flex justify-between">
                 <button
                     onClick={onBack}
-                    className="px-6 py-3 text-gray-600 hover:text-gray-800 font-medium"
+                    className="px-6 py-3 text-muted-foreground hover:text-foreground font-medium"
                 >
                     Back
                 </button>

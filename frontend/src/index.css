@@ -2,52 +2,91 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #FFFAF0;
-  /* Warm Off-White */
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-/* BreadWinner Theme Overrides */
 @layer base {
-  body {
-    @apply text-amber-900 bg-[#FFFAF0];
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
-  }
+  :root {
+    /* TSI Engine Design System - Industrial Dark Theme */
+    --background: 0 0% 10.2%;        /* #1a1a1a - Dark charcoal */
+    --foreground: 0 0% 95%;          /* #f2f2f2 - Off-white text */
 
-  /* Override default focus rings to amber */
-  *:focus-visible {
-    @apply outline-none ring-2 ring-amber-500 ring-offset-2;
+    --card: 0 0% 14.1%;              /* #242424 - Card background */
+    --card-foreground: 0 0% 95%;
+
+    --popover: 0 0% 14.1%;
+    --popover-foreground: 0 0% 95%;
+
+    --primary: 45 93% 47%;           /* #f59e0b - Amber accent */
+    --primary-foreground: 0 0% 10.2%;
+
+    --secondary: 0 0% 20%;           /* #333333 - Secondary surface */
+    --secondary-foreground: 0 0% 95%;
+
+    --muted: 0 0% 25%;               /* Muted elements */
+    --muted-foreground: 0 0% 60%;    /* Muted text */
+
+    --accent: 45 93% 47%;            /* Amber for highlights */
+    --accent-foreground: 0 0% 10.2%;
+
+    --destructive: 0 84.2% 60.2%;    /* Red for warnings */
+    --destructive-foreground: 0 0% 98%;
+
+    --success: 142 71% 45%;          /* Green for success */
+    --success-foreground: 0 0% 98%;
+
+    --warning: 45 93% 47%;           /* Amber for warnings */
+    --warning-foreground: 0 0% 10.2%;
+
+    --border: 0 0% 20%;              /* Subtle borders */
+    --input: 0 0% 20%;
+    --ring: 45 93% 47%;              /* Amber focus ring */
+
+    --radius: 0.25rem;               /* Minimal border radius - brutalist aesthetic */
+
+    /* Status colors */
+    --status-active: 142 71% 45%;    /* Green */
+    --status-paused: 0 84.2% 60.2%;  /* Red */
+    --status-inherited: 45 93% 47%;  /* Amber */
+    
+    font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+    color-scheme: dark;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 
-/* Custom Scrollbar for that artisan feel */
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  *:focus-visible {
+    @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-background;
+  }
+}
+
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #FFFBEB;
+  background: hsl(var(--background));
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #D97706;
+  background: hsl(var(--secondary));
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #B45309;
+  background: hsl(var(--muted));
 }
 
 /* Toast Animations */

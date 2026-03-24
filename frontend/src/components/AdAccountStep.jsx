@@ -87,16 +87,16 @@ const AdAccountStep = ({ onNext }) => {
     return (
         <div>
             <h2 className="text-2xl font-bold mb-2">Select Ad Account</h2>
-            <p className="text-gray-600 mb-6">
+            <p className="text-muted-foreground mb-6">
                 Choose which Facebook ad account you want to use for this campaign.
             </p>
 
-            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="p-4 bg-secondary rounded-lg border border-border">
+                <label className="block text-sm font-medium text-foreground mb-2">
                     Ad Account *
                 </label>
                 {loadingAccounts ? (
-                    <div className="flex items-center gap-2 text-gray-500">
+                    <div className="flex items-center gap-2 text-muted-foreground">
                         <Loader className="animate-spin" size={16} />
                         <span>Loading ad accounts...</span>
                     </div>
@@ -111,7 +111,7 @@ const AdAccountStep = ({ onNext }) => {
                         </button>
                     </div>
                 ) : adAccounts.length === 0 ? (
-                    <div className="text-gray-500 text-sm">
+                    <div className="text-muted-foreground text-sm">
                         No ad accounts found. Please check your access token.
                     </div>
                 ) : (
@@ -130,20 +130,20 @@ const AdAccountStep = ({ onNext }) => {
                                 }
                             }}
                             placeholder="Search ad accounts by name or ID..."
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                         />
 
                         {showDropdown && filteredAccounts.length > 0 && (
-                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                            <div className="absolute z-10 w-full mt-1 bg-card border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
                                 {filteredAccounts.map(account => (
                                     <div
                                         key={account.id}
                                         onClick={() => handleAccountSelect(account)}
-                                        className={`px-4 py-3 cursor-pointer hover:bg-amber-50 border-b border-gray-100 last:border-b-0 ${selectedAdAccount?.id === account.id ? 'bg-amber-50' : ''
+                                        className={`px-4 py-3 cursor-pointer hover:bg-amber-50 border-b border-border last:border-b-0 ${selectedAdAccount?.id === account.id ? 'bg-amber-50' : ''
                                             }`}
                                     >
-                                        <div className="font-medium text-gray-900">{account.name}</div>
-                                        <div className="text-sm text-gray-500">
+                                        <div className="font-medium text-foreground">{account.name}</div>
+                                        <div className="text-sm text-muted-foreground">
                                             ID: {account.accountId} • {account.currency} • {account.status === 1 ? 'Active' : 'Inactive'}
                                         </div>
                                     </div>
@@ -152,7 +152,7 @@ const AdAccountStep = ({ onNext }) => {
                         )}
 
                         {showDropdown && searchQuery && filteredAccounts.length === 0 && (
-                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-4 text-gray-500 text-sm">
+                            <div className="absolute z-10 w-full mt-1 bg-card border border-border rounded-lg shadow-lg p-4 text-muted-foreground text-sm">
                                 No accounts match "{searchQuery}"
                             </div>
                         )}
@@ -162,10 +162,10 @@ const AdAccountStep = ({ onNext }) => {
 
             {/* Account Details Card */}
             {selectedAdAccount && !showDropdown && (
-                <div className="mt-6 bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+                <div className="mt-6 bg-card border border-border rounded-lg shadow-sm overflow-hidden">
                     {/* Header */}
                     <div className="bg-gradient-to-r from-amber-100 to-orange-100 p-4 border-b border-amber-200">
-                        <h3 className="text-lg font-bold text-amber-900">{selectedAdAccount.name}</h3>
+                        <h3 className="text-lg font-bold text-foreground">{selectedAdAccount.name}</h3>
                         <div className="flex items-center gap-4 mt-2 text-amber-700 text-sm">
                             <span>ID: {selectedAdAccount.accountId}</span>
                             <span>•</span>
@@ -180,28 +180,28 @@ const AdAccountStep = ({ onNext }) => {
                     <div className="grid grid-cols-2 gap-4 p-4">
                         {/* Currency & Timezone */}
                         <div className="flex items-start gap-3">
-                            <DollarSign className="text-gray-400 mt-0.5" size={18} />
+                            <DollarSign className="text-muted-foreground mt-0.5" size={18} />
                             <div>
-                                <div className="text-xs text-gray-500 font-medium">Currency</div>
-                                <div className="text-sm text-gray-900">{selectedAdAccount.currency}</div>
+                                <div className="text-xs text-muted-foreground font-medium">Currency</div>
+                                <div className="text-sm text-foreground">{selectedAdAccount.currency}</div>
                             </div>
                         </div>
 
                         <div className="flex items-start gap-3">
-                            <Calendar className="text-gray-400 mt-0.5" size={18} />
+                            <Calendar className="text-muted-foreground mt-0.5" size={18} />
                             <div>
-                                <div className="text-xs text-gray-500 font-medium">Timezone</div>
-                                <div className="text-sm text-gray-900">{selectedAdAccount.timezone}</div>
+                                <div className="text-xs text-muted-foreground font-medium">Timezone</div>
+                                <div className="text-sm text-foreground">{selectedAdAccount.timezone}</div>
                             </div>
                         </div>
 
                         {/* Business Name - only if exists */}
                         {selectedAdAccount.businessName && (
                             <div className="col-span-2 flex items-start gap-3">
-                                <Building2 className="text-gray-400 mt-0.5" size={18} />
+                                <Building2 className="text-muted-foreground mt-0.5" size={18} />
                                 <div>
-                                    <div className="text-xs text-gray-500 font-medium">Business</div>
-                                    <div className="text-sm text-gray-900">{selectedAdAccount.businessName}</div>
+                                    <div className="text-xs text-muted-foreground font-medium">Business</div>
+                                    <div className="text-sm text-foreground">{selectedAdAccount.businessName}</div>
                                 </div>
                             </div>
                         )}
