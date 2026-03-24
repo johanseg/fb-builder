@@ -15,7 +15,10 @@
       "Bash(uvicorn:*)",
       "Bash(brew services start:*)",
       "Bash(brew services:*)",
-      "Bash(psql:*)"
+      "Bash(psql:*)",
+      "WebSearch",
+      "WebFetch(domain:www.eraser.io)",
+      "Bash(wc -l /Users/johan/AI/cursor/TSI-FB-builder/frontend/src/pages/*.jsx)"
     ],
     "deny": [],
     "ask": []

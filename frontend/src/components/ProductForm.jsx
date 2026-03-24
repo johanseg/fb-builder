@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { X, Upload, Loader } from 'lucide-react';
+import { X, Upload, Loader, ChevronDown, ChevronUp } from 'lucide-react';
 import { useBrands } from '../context/BrandContext';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
@@ -11,12 +11,19 @@ const ProductForm = ({ onClose, onSave, initialData = null }) => {
     const { brands } = useBrands();
     const { showSuccess, showError } = useToast();
     const { authFetch } = useAuth();
-    const [formData, setFormData] = useState(initialData || {
-        name: '',
-        description: '',
-        brandId: '',
-        product_shots: []
+    const [formData, setFormData] = useState({
+        name: initialData?.name || '',
+        description: initialData?.description || '',
+        brandId: initialData?.brandId || '',
+        product_shots: initialData?.product_shots || [],
+        pain_points: (initialData?.pain_points || []).join('\n'),
+        desired_outcomes: (initialData?.desired_outcomes || []).join('\n'),
+        root_causes: (initialData?.root_causes || []).join('\n'),
+        proof_points: (initialData?.proof_points || []).join('\n'),
+        differentiators: (initialData?.differentiators || []).join('\n'),
+        risk_reversals: (initialData?.risk_reversals || []).join('\n')
     });
+    const [showBrief, setShowBrief] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [saving, setSaving] = useState(false);
     const fileInputRef = useRef(null);
@@ -37,7 +44,13 @@ const ProductForm = ({ onClose, onSave, initialData = null }) => {
                 ...formData,
                 name: validateProductName(formData.name),
                 description: validateProductDescription(formData.description),
-                product_shots: formData.product_shots || []
+                product_shots: formData.product_shots || [],
+                pain_points: formData.pain_points ? formData.pain_points.split('\n').map(s => s.trim()).filter(Boolean) : [],
+                desired_outcomes: formData.desired_outcomes ? formData.desired_outcomes.split('\n').map(s => s.trim()).filter(Boolean) : [],
+                root_causes: formData.root_causes ? formData.root_causes.split('\n').map(s => s.trim()).filter(Boolean) : [],
+                proof_points: formData.proof_points ? formData.proof_points.split('\n').map(s => s.trim()).filter(Boolean) : [],
+                differentiators: formData.differentiators ? formData.differentiators.split('\n').map(s => s.trim()).filter(Boolean) : [],
+                risk_reversals: formData.risk_reversals ? formData.risk_reversals.split('\n').map(s => s.trim()).filter(Boolean) : []
             };
 
             await onSave(validatedData);
@@ -199,6 +212,86 @@ const ProductForm = ({ onClose, onSave, initialData = null }) => {
                             className="hidden"
                         />
                         <p className="text-xs text-gray-500">Upload product images to use in ad generation.</p>
+                    </div>
+
+                    {/* Creative Brief Settings (Collapsible) */}
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                        <button
+                            type="button"
+                            onClick={() => setShowBrief(!showBrief)}
+                            className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
+                        >
+                            <div>
+                                <h3 className="font-semibold text-gray-900 text-left">Product Knowledge Base (Creative Brief)</h3>
+                                <p className="text-sm text-gray-500 text-left">Information used by the AI to generate ad scripts</p>
+                            </div>
+                            {showBrief ? <ChevronUp size={20} className="text-gray-500" /> : <ChevronDown size={20} className="text-gray-500" />}
+                        </button>
+                        
+                        {showBrief && (
+                            <div className="p-4 bg-white space-y-4 border-t border-gray-200 max-h-[400px] overflow-y-auto">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Primary Pain Points (1 per line)</label>
+                                    <textarea
+                                        value={formData.pain_points}
+                                        onChange={e => setFormData({ ...formData, pain_points: e.target.value })}
+                                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                                        rows="3"
+                                        placeholder="E.g. Wasting hours manually editing videos\nAds fatigue too quickly in the Meta algorithm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Desired Outcomes (1 per line)</label>
+                                    <textarea
+                                        value={formData.desired_outcomes}
+                                        onChange={e => setFormData({ ...formData, desired_outcomes: e.target.value })}
+                                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                                        rows="3"
+                                        placeholder="E.g. Scale ad spend profitably\nGet endless fresh creative variations automatically"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Root Causes / Mechanisms (1 per line)</label>
+                                    <textarea
+                                        value={formData.root_causes}
+                                        onChange={e => setFormData({ ...formData, root_causes: e.target.value })}
+                                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                                        rows="3"
+                                        placeholder="E.g. Platform changes require high creative volume but production is slow"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Proof Points (1 per line)</label>
+                                    <textarea
+                                        value={formData.proof_points}
+                                        onChange={e => setFormData({ ...formData, proof_points: e.target.value })}
+                                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                                        rows="3"
+                                        placeholder="E.g. Trusted by 5,000+ top D2C brands\nGenerated over $1B in tracked revenue"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Differentiators (1 per line)</label>
+                                    <textarea
+                                        value={formData.differentiators}
+                                        onChange={e => setFormData({ ...formData, differentiators: e.target.value })}
+                                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                                        rows="3"
+                                        placeholder="E.g. Proprietary modular AI generation vs standard templatized tools"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Risk Reversals (1 per line)</label>
+                                    <textarea
+                                        value={formData.risk_reversals}
+                                        onChange={e => setFormData({ ...formData, risk_reversals: e.target.value })}
+                                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                                        rows="2"
+                                        placeholder="E.g. 14-day free trial\nCancel anytime"
+                                    />
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">

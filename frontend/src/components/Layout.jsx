@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Package, Users, Video, Wand2, Settings, LogOut, Image, ShoppingBag, Target, ChevronLeft, ChevronRight, FileImage, Search, ChevronDown, UserCog } from 'lucide-react';
+import { LayoutDashboard, Package, Users, Video, Wand2, Settings, LogOut, Image, ShoppingBag, Target, ChevronLeft, ChevronRight, FileImage, Search, ChevronDown, UserCog, Blocks, BarChart3 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 
@@ -9,7 +9,7 @@ export default function Layout() {
     const navigate = useNavigate();
     const { user, logout, hasRole } = useAuth();
     const { showSuccess } = useToast();
-    const [expandedMenus, setExpandedMenus] = useState({ Brands: false, Research: false });
+    const [expandedMenus, setExpandedMenus] = useState({ Brands: false, Research: false, 'Script Factory': false, Analytics: false });
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [showUserMenu, setShowUserMenu] = useState(false);
 
@@ -30,19 +30,36 @@ export default function Layout() {
                 { label: 'Settings', path: '/research/settings' }
             ]
         },
-        { icon: Wand2, label: 'Build Creatives', path: '/build-creatives' },
+        {
+            icon: Blocks,
+            label: 'Script Factory',
+            subItems: [
+                { label: 'Build Creatives', path: '/build-creatives' },
+                { label: 'Modular Matrix', path: '/modular-ads' },
+                { label: 'Ad Modules Library', path: '/ad-modules-library' },
+            ]
+        },
         {
             icon: ShoppingBag,
             label: 'Brands',
             subItems: [
                 { label: 'Brands', path: '/brands' },
                 { label: 'Products', path: '/products' },
-                { label: 'Customer Profiles', path: '/profiles' }
+                { label: 'Customer Profiles', path: '/profiles' },
+                { label: 'AI Personas', path: '/personas' }
             ]
         },
         { icon: Image, label: 'Winning Ads', path: '/winning-ads' },
         { icon: FileImage, label: 'Generated Ads', path: '/generated-ads' },
         { icon: Target, label: 'Facebook Campaigns', path: '/facebook-campaigns' },
+        {
+            icon: BarChart3,
+            label: 'Analytics',
+            subItems: [
+                { label: 'Reporting', path: '/reporting' },
+                { label: 'Ad Remix', path: '/ad-remix' },
+            ]
+        },
     ];
 
     const toggleMenu = (label) => {

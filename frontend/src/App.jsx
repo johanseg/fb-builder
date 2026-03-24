@@ -20,10 +20,13 @@ import CreateAds from './pages/CreateAds';
 import ImageAds from './pages/ImageAds';
 import Wizard from './components/Wizard';
 import VideoAds from './pages/VideoAds';
+import ModularAds from './pages/ModularAds';
+import AdModulesLibrary from './pages/AdModulesLibrary';
 import Reporting from './pages/Reporting';
 import Brands from './pages/Brands';
 import Products from './pages/Products';
 import CustomerProfiles from './pages/CustomerProfiles';
+import AIPersonas from './pages/AIPersonas';
 import FacebookCampaigns from './pages/FacebookCampaigns';
 import WinningAds from './pages/WinningAds';
 import GeneratedAds from './pages/GeneratedAds';
@@ -60,6 +63,8 @@ function App() {
                   <Route path="research/brand-scrapes" element={<BrandScrapes />} />
                   <Route path="research/settings" element={<ResearchSettings />} />
                   <Route path="build-creatives" element={<CreateAds />} />
+                  <Route path="modular-ads" element={<ModularAds />} />
+                  <Route path="ad-modules-library" element={<AdModulesLibrary />} />
                   <Route path="image-ads" element={<ImageAds />} />
                   <Route path="video-ads" element={<VideoAds />} />
                   <Route path="facebook-campaigns" element={<FacebookCampaigns />} />
@@ -68,6 +73,7 @@ function App() {
                   <Route path="brands" element={<Brands />} />
                   <Route path="products" element={<Products />} />
                   <Route path="profiles" element={<CustomerProfiles />} />
+                  <Route path="personas" element={<AIPersonas />} />
                   <Route path="ad-remix" element={<AdRemix />} />
                   <Route path="reporting" element={<Reporting />} />
                   <Route path="settings" element={<Settings />} />

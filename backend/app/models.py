@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Text, JSON, Table, Boolean
+from sqlalchemy import Column, String, Integer, Float, ForeignKey, DateTime, Text, JSON, Table, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -107,12 +107,14 @@ class Brand(Base):
     secondary_color = Column(String, default='#10B981')
     highlight_color = Column(String, default='#F59E0B')
     voice = Column(Text, nullable=True)
+    break_even_roas = Column(Float, nullable=True, default=None)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     products = relationship("Product", back_populates="brand", cascade="all, delete-orphan")
     profiles = relationship("CustomerProfile", secondary=brand_profiles, back_populates="brands")
     generated_ads = relationship("GeneratedAd", back_populates="brand")
+    ai_personas = relationship("AIPersona", back_populates="brand", cascade="all, delete-orphan")
 
     @property
     def colors(self):
@@ -135,9 +137,16 @@ class Product(Base):
     description = Column(Text, nullable=True)
     product_shots = Column(JSON, nullable=True)
     default_url = Column(Text, nullable=True)
+    pain_points = Column(JSON, nullable=True)
+    desired_outcomes = Column(JSON, nullable=True)
+    root_causes = Column(JSON, nullable=True)
+    proof_points = Column(JSON, nullable=True)
+    differentiators = Column(JSON, nullable=True)
+    risk_reversals = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     brand = relationship("Brand", back_populates="products")
+    ad_modules = relationship("AdModule", back_populates="product", cascade="all, delete-orphan")
 
 class CustomerProfile(Base):
     __tablename__ = "customer_profiles"
@@ -268,6 +277,9 @@ class GeneratedAd(Base):
     video_url = Column(String, nullable=True)
     video_id = Column(String, nullable=True)  # Facebook video ID
     thumbnail_url = Column(String, nullable=True)
+    # Modular system fields
+    bundle_code = Column(String, nullable=True, index=True)
+    parent_ad_id = Column(String, ForeignKey("generated_ads.id", ondelete="SET NULL"), nullable=True)
 
     brand = relationship("Brand", back_populates="generated_ads")
     template = relationship("WinningAd", back_populates="generated_ads")
@@ -478,3 +490,36 @@ class BrandScrapedAd(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     brand_scrape = relationship("BrandScrape", back_populates="ads")
+
+
+
+
+
+class AIPersona(Base):
+    __tablename__ = "ai_personas"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    brand_id = Column(String, ForeignKey("brands.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    visual_characteristics = Column(JSON, nullable=True)
+    voice_guidelines = Column(Text, nullable=True)
+    base_image_url = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    brand = relationship("Brand", back_populates="ai_personas")
+
+class AdModule(Base):
+    __tablename__ = "ad_modules"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    product_id = Column(String, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    module_type = Column(String, nullable=False) # 'intro', 'bridge', 'core', 'cta', 'micro_movie'
+    content = Column(Text, nullable=False)
+    generation_metadata = Column(JSON, nullable=True) # e.g. prompt used, parameters
+    performance_score = Column(Integer, default=0)
+    tags = Column(JSON, nullable=True) # Array of strings
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    product = relationship("Product", back_populates="ad_modules")

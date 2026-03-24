@@ -1,121 +1,195 @@
-import React from 'react';
-import { ArrowUpRight, ArrowDownRight, MousePointer, Eye, BarChart2, BarChart, Download } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { BarChart, Upload, ArrowUpRight, ArrowDownRight, AlertTriangle, Sparkles, Loader } from 'lucide-react';
 
-const StatCard = ({ title, value, change, trend, icon: Icon }) => (
-    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-        <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-gray-50 rounded-lg text-gray-600">
-                <Icon size={20} />
-            </div>
-            <span className={`flex items-center text-sm font-medium ${trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
-                {change}
-                {trend === 'up' ? <ArrowUpRight size={16} className="ml-1" /> : <ArrowDownRight size={16} className="ml-1" />}
-            </span>
-        </div>
-        <h3 className="text-gray-500 text-sm font-medium">{title}</h3>
-        <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
-    </div>
-);
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
-const Reporting = () => {
-    const stats = [
-        { label: "Total Impressions", value: "124.5K", change: "+12.3%", trend: "up", icon: Eye, color: "text-amber-600" },
-        { label: "Total Clicks", value: "3,842", change: "+5.4%", trend: "up", icon: MousePointer, color: "text-green-600" },
-        { label: "Avg. CTR", value: "3.1%", change: "-0.2%", trend: "down", icon: BarChart2, color: "text-red-600" },
-        { label: "Conversion Rate", value: "1.8%", change: "+0.1%", trend: "up", icon: BarChart, color: "text-purple-600" },
-    ];
+export default function Reporting() {
+    const { authFetch } = useAuth();
+    const { showError, showSuccess } = useToast();
+    
+    const [uploading, setUploading] = useState(false);
+    const [flags, setFlags] = useState([]);
+    const [loadingFlags, setLoadingFlags] = useState(true);
+    const [iteratingId, setIteratingId] = useState(null);
+
+    useEffect(() => {
+        fetchKillRuleFlags();
+    }, []);
+
+    const fetchKillRuleFlags = async () => {
+        try {
+            const res = await authFetch(`${API_URL}/performance/kill-rule`);
+            if (!res.ok) throw new Error("Failed to fetch kill rule flags");
+            const data = await res.json();
+            setFlags(data);
+        } catch (err) {
+            showError(err.message);
+        } finally {
+            setLoadingFlags(false);
+        }
+    };
+
+    const handleFileUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        setUploading(true);
+        try {
+            const res = await authFetch(`${API_URL}/performance/import`, {
+                method: 'POST',
+                // Don't set Content-Type header manually when sending FormData
+                body: formData
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || "Failed to import performance data");
+            
+            showSuccess(data.message);
+            fetchKillRuleFlags(); // Refresh the flags
+        } catch (err) {
+            showError("Upload failed: " + err.message);
+        } finally {
+            setUploading(false);
+            e.target.value = null; // reset
+        }
+    };
+
+    const handleIterate = async (moduleId) => {
+        setIteratingId(moduleId);
+        try {
+            const res = await authFetch(`${API_URL}/modular-generation/iterate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ module_id: moduleId, count: 3 })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || "Iteration failed");
+            
+            showSuccess(`Successfully generated ${data.length} variations! View them on the Modular Board.`);
+        } catch (err) {
+            showError(err.message);
+        } finally {
+            setIteratingId(null);
+        }
+    };
+
+    const winners = flags.filter(f => f.status === 'SCALE');
+    const losers = flags.filter(f => f.status === 'KILL');
 
     return (
-        <div className="max-w-6xl mx-auto space-y-8">
-            {/* Header */}
-            <div className="flex justify-between items-center">
+        <div className="max-w-7xl mx-auto space-y-8">
+            <div className="flex justify-between items-center bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-gray-200">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
-                        <BarChart size={32} className="text-amber-600" />
-                        Campaign Reporting
+                        <BarChart size={32} className="text-purple-600" />
+                        Performance Intelligence
                     </h1>
-                    <p className="text-gray-600">Track performance across all your campaigns</p>
+                    <p className="text-gray-600">Train the system on real results to identify winning variables.</p>
                 </div>
-                <div className="flex gap-2">
-                    <select className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-amber-500 focus:border-transparent">
-                        <option>Last 7 Days</option>
-                        <option>Last 30 Days</option>
-                        <option>This Month</option>
-                        <option>Last Month</option>
-                    </select>
-                    <button className="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors">
-                        <Download size={20} />
-                    </button>
+                
+                <div className="flex flex-col items-end">
+                    <label className={`cursor-pointer px-6 py-3 rounded-xl font-bold text-white transition-colors flex items-center gap-2 ${uploading ? 'bg-purple-400' : 'bg-purple-600 hover:bg-purple-700'}`}>
+                        {uploading ? <Loader className="animate-spin" size={20} /> : <Upload size={20} />}
+                        {uploading ? 'Processing File...' : 'Import Facebook CSV'}
+                        <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} disabled={uploading} />
+                    </label>
+                    <p className="text-xs text-gray-500 mt-2">Exports must contain `Ad Name`, `Amount spent (USD)`, and standard funnel events.</p>
                 </div>
             </div>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {stats.map((stat, index) => (
-                    <div key={index} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                        <div className="flex justify-between items-start mb-4">
-                            <div className={`p-3 rounded-lg ${stat.color.replace('text-', 'bg-').replace('600', '50')}`}>
-                                <stat.icon className={stat.color} size={24} />
+            {loadingFlags ? (
+                <div className="py-20 flex justify-center"><Loader className="animate-spin text-purple-600" size={32} /></div>
+            ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* SCALING WINS */}
+                    <div className="bg-emerald-50 rounded-2xl p-6 md:p-8 border border-emerald-100">
+                        <h2 className="text-2xl font-bold text-emerald-900 mb-6 flex items-center gap-2">
+                            <Sparkles className="text-emerald-600" />
+                            Winning Variables (<span className="text-xl">Fit Score 4-5</span>)
+                        </h2>
+                        
+                        {winners.length === 0 ? (
+                            <div className="text-center py-10 bg-white/50 rounded-xl border border-emerald-100 text-emerald-700">
+                                No scalable modules found yet. Keep testing!
                             </div>
-                            <span className={`flex items-center text-sm font-medium ${stat.trend === 'up' ? 'text-green-600' : 'text-red-600'
-                                }`}>
-                                {stat.trend === 'up' ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
-                                {stat.change}
-                            </span>
-                        </div>
-                        <h3 className="text-gray-500 text-sm font-medium">{stat.label}</h3>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">{stat.value}</p>
+                        ) : (
+                            <div className="space-y-4">
+                                {winners.map(flag => (
+                                    <div key={flag.module_id} className="bg-white rounded-xl p-5 shadow-sm border border-emerald-200">
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div>
+                                                <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-1 rounded uppercase mr-2">{flag.module_type}</span>
+                                                <span className="text-sm font-mono text-gray-500">ID: {flag.module_id.substring(0,8)}</span>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-emerald-600 font-bold flex items-center justify-end gap-1"><ArrowUpRight size={16}/> Score: {flag.score}</div>
+                                                <div className="text-xs text-gray-500">Spend: ${flag.spend.toFixed(2)}</div>
+                                            </div>
+                                        </div>
+                                        <div className="text-gray-800 text-sm bg-gray-50 p-3 rounded border border-gray-100 mb-3 whitespace-pre-wrap">
+                                            {flag.content}
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <div className="text-emerald-700 font-medium">
+                                                💡 {flag.reason}
+                                            </div>
+                                            <button 
+                                                onClick={() => handleIterate(flag.module_id)}
+                                                disabled={iteratingId === flag.module_id}
+                                                className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs transition-colors flex items-center gap-1 disabled:opacity-50"
+                                            >
+                                                {iteratingId === flag.module_id ? <Loader className="animate-spin" size={14}/> : <Sparkles size={14}/>}
+                                                Iterate Winner
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
-                ))}
-            </div>
 
-            {/* Charts Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                    <h3 className="text-lg font-bold text-gray-900 mb-6">Performance Over Time</h3>
-                    <div className="h-64 flex items-end justify-between gap-2">
-                        {[...Array(12)].map((_, i) => (
-                            <div key={i} className="w-full bg-amber-100 rounded-t-sm relative group">
-                                <div
-                                    className="absolute bottom-0 left-0 w-full bg-amber-500 rounded-t-sm transition-all duration-500 group-hover:bg-amber-600"
-                                    style={{ height: `${Math.random() * 100}%` }}
-                                ></div>
+                    {/* KILL RULE */}
+                    <div className="bg-red-50 rounded-2xl p-6 md:p-8 border border-red-100">
+                        <h2 className="text-2xl font-bold text-red-900 mb-6 flex items-center gap-2">
+                            <AlertTriangle className="text-red-500" />
+                            7-Day Kill Rule (<span className="text-xl">Fit Score 0-1</span>)
+                        </h2>
+                        
+                        {losers.length === 0 ? (
+                            <div className="text-center py-10 bg-white/50 rounded-xl border border-red-100 text-red-700">
+                                No underperforming modules flagged.
                             </div>
-                        ))}
+                        ) : (
+                            <div className="space-y-4">
+                                {losers.map(flag => (
+                                    <div key={flag.module_id} className="bg-white rounded-xl p-5 shadow-sm border border-red-200">
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div>
+                                                <span className="bg-red-100 text-red-800 text-xs font-bold px-2 py-1 rounded uppercase mr-2">{flag.module_type}</span>
+                                                <span className="text-sm font-mono text-gray-500">ID: {flag.module_id.substring(0,8)}</span>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-red-600 font-bold flex items-center justify-end gap-1"><ArrowDownRight size={16}/> Score: {flag.score}</div>
+                                                <div className="text-xs text-gray-500">Spend: ${flag.spend.toFixed(2)}</div>
+                                            </div>
+                                        </div>
+                                        <div className="text-gray-800 text-sm bg-gray-50 p-3 rounded border border-gray-100 mb-3 whitespace-pre-wrap">
+                                            {flag.content}
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <div className="text-red-700 font-medium w-full">⚠️ {flag.reason}</div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
-
-                <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                    <h3 className="text-lg font-bold text-gray-900 mb-6">Platform Distribution</h3>
-                    <div className="flex items-center justify-center h-64">
-                        <div className="relative w-48 h-48">
-                            <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
-                                <path
-                                    className="text-gray-100"
-                                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="3.8"
-                                />
-                                <path
-                                    className="text-amber-500"
-                                    strokeDasharray="75, 100"
-                                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="3.8"
-                                />
-                            </svg>
-                            <div className="absolute inset-0 flex items-center justify-center flex-col">
-                                <span className="text-3xl font-bold text-gray-900">75%</span>
-                                <span className="text-xs text-gray-500 uppercase font-medium">Facebook</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            )}
         </div>
     );
-};
-
-export default Reporting;
+}

@@ -305,43 +305,171 @@ Navigate to **Campaigns**
 
 ## Architecture
 
+### System Overview
+
+```mermaid
+graph TB
+    subgraph Frontend["Frontend — React 19 + Vite + TailwindCSS"]
+        UI[Browser Client]
+        Auth[AuthContext<br/>JWT + Refresh]
+        Brand[BrandContext]
+        Campaign[CampaignContext]
+        Toast[ToastContext]
+    end
+
+    subgraph Backend["Backend — FastAPI + SQLAlchemy"]
+        API[API Gateway<br/>CORS · Rate Limiting · JWT Auth]
+
+        subgraph Routes["API Routes /api/v1/"]
+            R_Auth[auth]
+            R_Brands[brands]
+            R_Products[products]
+            R_Research[research]
+            R_Facebook[facebook]
+            R_CopyGen[copy_generation]
+            R_AdRemix[ad_remix]
+            R_Uploads[uploads]
+            R_GenAds[generated_ads]
+            R_Templates[templates]
+            R_Dashboard[dashboard]
+            R_Users[users]
+        end
+
+        subgraph Services["Business Logic Services"]
+            S_FB[FacebookService<br/>Campaign Management]
+            S_Scraper[Scraper<br/>API + Chromium Fallback]
+            S_Research[ResearchService<br/>Search & Dedup]
+            S_Remix[AdRemixService<br/>Deconstruct/Reconstruct]
+            S_BrandScraper[BrandScraper<br/>Competitor Monitoring]
+        end
+    end
+
+    subgraph External["External Services"]
+        FB_API[Facebook<br/>Marketing API]
+        FB_ADS[Facebook<br/>Ads Library API]
+        GEMINI[Google Gemini<br/>Copy & Vision AI]
+        FAL[Fal.ai<br/>Image Generation]
+    end
+
+    subgraph Storage["Data Storage"]
+        PG[(PostgreSQL<br/>Railway)]
+        R2[Cloudflare R2<br/>Media Storage]
+    end
+
+    UI -->|authFetch| API
+    API --> Routes
+    R_Facebook --> S_FB
+    R_Research --> S_Research
+    R_Research --> S_BrandScraper
+    R_AdRemix --> S_Remix
+    R_CopyGen --> GEMINI
+    S_FB --> FB_API
+    S_Scraper --> FB_ADS
+    S_Research --> S_Scraper
+    S_Remix --> GEMINI
+    S_BrandScraper --> R2
+    S_BrandScraper --> FB_ADS
+    R_Uploads --> R2
+    R_GenAds --> FAL
+    Routes --> PG
+
+    style Frontend fill:#1a1a2e,stroke:#16213e,color:#e2e8f0
+    style Backend fill:#0f3460,stroke:#16213e,color:#e2e8f0
+    style External fill:#533483,stroke:#16213e,color:#e2e8f0
+    style Storage fill:#1a1a2e,stroke:#e94560,color:#e2e8f0
 ```
-facebook_ad_builder/
-├── backend/                 # Python FastAPI
-│   ├── app/
-│   │   ├── api/v1/         # REST endpoints
-│   │   │   ├── brands.py
-│   │   │   ├── products.py
-│   │   │   ├── research.py
-│   │   │   ├── ad_remix.py
-│   │   │   └── facebook.py
-│   │   ├── services/       # Business logic
-│   │   │   ├── facebook_service.py
-│   │   │   ├── ad_remix_service.py
-│   │   │   └── scraper.py
-│   │   ├── models.py       # SQLAlchemy models
-│   │   └── main.py         # FastAPI app
-│   └── requirements.txt
-├── frontend/               # React + Vite
-│   ├── src/
-│   │   ├── pages/         # Route components
-│   │   ├── components/    # Reusable UI
-│   │   ├── context/       # React context
-│   │   └── lib/           # Utilities
-│   └── package.json
-└── .env.example           # Environment template
+
+### Ad Creation Pipeline
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant FE as React Frontend
+    participant API as FastAPI Backend
+    participant G as Google Gemini
+    participant F as Fal.ai
+    participant DB as PostgreSQL
+    participant R2 as Cloudflare R2
+
+    U->>FE: Select Brand + Product
+    FE->>API: POST /copy_generation/generate
+    API->>G: Generate ad copy variations
+    G-->>API: Headlines, body text, CTAs
+    API-->>FE: Return copy options
+
+    U->>FE: Request image generation
+    FE->>API: POST /generated_ads
+    API->>F: Generate AI images
+    F-->>API: Image URLs
+    API->>R2: Upload images
+    API->>DB: Save GeneratedAd record
+    API-->>FE: Return ad with media
+
+    U->>FE: Push to Facebook
+    FE->>API: POST /facebook/campaigns
+    API->>API: POST /facebook/adsets
+    API->>API: POST /facebook/ads
+    API->>DB: Sync campaign hierarchy
+    API-->>FE: Campaign live
+```
+
+### Competitor Research Pipeline
+
+```mermaid
+flowchart LR
+    A[User enters<br/>search keywords] --> B{Scraper Service}
+    B -->|Primary| C[Facebook Ads<br/>Library API]
+    B -->|Fallback: blocked<br/>or throttled| D[Chromium<br/>Browser Scraper]
+    C --> E[Deduplication<br/>& Filtering]
+    D --> E
+    E --> F[(PostgreSQL<br/>SavedSearch +<br/>ScrapedAd)]
+    F --> G[Research Page<br/>Browse & Analyze]
+    G --> H[Save as<br/>WinningAd Template]
+    H --> I[Ad Remix:<br/>Deconstruct Blueprint]
+    I --> J[Reconstruct with<br/>Your Brand Data]
+
+    style B fill:#e94560,stroke:#16213e,color:#fff
+    style E fill:#0f3460,stroke:#16213e,color:#e2e8f0
+    style I fill:#533483,stroke:#16213e,color:#e2e8f0
+```
+
+### Database Entity Relationships
+
+```mermaid
+erDiagram
+    User ||--o{ RefreshToken : has
+    User }o--o{ Role : has
+    Role }o--o{ Permission : grants
+
+    Brand ||--o{ Product : contains
+    Brand }o--o{ CustomerProfile : targets
+    Brand ||--o{ GeneratedAd : produces
+
+    GeneratedAd }o--|| Product : for
+    GeneratedAd }o--o| WinningAd : "based on template"
+
+    WinningAd ||--|| ScrapedAd : "derived from"
+
+    SavedSearch ||--o{ ScrapedAd : contains
+    SavedSearch }o--o| Vertical : categorized
+
+    FacebookCampaign ||--o{ FacebookAdSet : has
+    FacebookAdSet ||--o{ FacebookAd : has
+
+    BrandScrape ||--o{ BrandScrapedAd : contains
 ```
 
 ### Tech Stack
 
 | Layer | Technology |
 |-------|------------|
-| Frontend | React 19, Vite, TailwindCSS |
-| Backend | Python 3.11+, FastAPI, SQLAlchemy |
-| Database | PostgreSQL |
-| AI | Google Gemini, Fal.ai |
-| Storage | Cloudflare R2 |
-| Auth | JWT (access + refresh tokens) |
+| Frontend | React 19, Vite 7, TailwindCSS |
+| Backend | Python 3.11+, FastAPI 0.104, SQLAlchemy 2.0 |
+| Database | PostgreSQL 15+ (Railway) |
+| AI | Google Gemini (copy & vision), Fal.ai (images) |
+| Storage | Cloudflare R2 (production), local uploads (dev) |
+| Auth | JWT access tokens (30min) + refresh tokens (7 days) |
+| Deployment | Railway (3 services) |
 
 ---
 
@@ -484,7 +612,7 @@ Contributions are welcome! Please:
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License.
 
 ---
 

@@ -137,8 +137,11 @@ def auth_headers(client, test_user):
     """Get authentication headers for test user."""
     response = client.post(
         "/api/v1/auth/login/json",
-        json={"email": "test@example.com", "password": "testpassword"}
+        json={"email": test_user.email, "password": "testpassword"}
     )
+    if response.status_code != 200:
+        print(f"Login failed: {response.status_code} - {response.text}")
+    assert response.status_code == 200
     token = response.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
 

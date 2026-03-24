@@ -20,13 +20,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    # Make image_url nullable for video ads
     op.alter_column('generated_ads', 'image_url',
                existing_type=sa.VARCHAR(),
                nullable=True)
-
-    # Add video support columns
-    op.add_column('generated_ads', sa.Column('media_type', sa.String(), server_default='image'))
+    op.add_column('generated_ads', sa.Column('media_type', sa.String(), server_default='image', nullable=True))
     op.add_column('generated_ads', sa.Column('video_url', sa.String(), nullable=True))
     op.add_column('generated_ads', sa.Column('video_id', sa.String(), nullable=True))
     op.add_column('generated_ads', sa.Column('thumbnail_url', sa.String(), nullable=True))

@@ -1,7 +1,7 @@
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import React, { useState, useEffect, useMemo } from 'react';
-import { Download, Trash2, Search, Filter, CheckSquare, Square, FileDown, ExternalLink, FileText, Image, LayoutGrid, List, Film } from 'lucide-react';
+import { Download, Trash2, Search, Filter, CheckSquare, Square, FileDown, ExternalLink, FileText, Image, LayoutGrid, List, Film, Sparkles, Loader } from 'lucide-react';
 import { useBrands } from '../context/BrandContext';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
@@ -31,6 +31,7 @@ export default function GeneratedAds() {
     const [viewedImage, setViewedImage] = useState(null);
     const [imgError, setImgError] = useState(false);
     const [deleteConfirmation, setDeleteConfirmation] = useState({ show: false, bundleId: null, bundleAds: [] });
+    const [scaleWinner, setScaleWinner] = useState({ show: false, ad: null, keepModules: { intro: true, bridge: true, core: true, cta: true }, generating: false });
 
     useEffect(() => {
         fetchAds();
@@ -217,6 +218,37 @@ export default function GeneratedAds() {
     const handleViewModeChange = (mode) => {
         setViewMode(mode);
         localStorage.setItem('generatedAdsViewMode', mode);
+    };
+
+    const handleScaleWinner = async () => {
+        const { ad, keepModules } = scaleWinner;
+        if (!ad?.bundle_code) return;
+
+        const slotsToIterate = Object.entries(keepModules)
+            .filter(([, keep]) => !keep)
+            .map(([type]) => type);
+
+        if (slotsToIterate.length === 0) {
+            showWarning('Uncheck at least one module type to generate variations');
+            return;
+        }
+
+        setScaleWinner(prev => ({ ...prev, generating: true }));
+        try {
+            // Parse bundle code to find module references and iterate unchecked slots
+            const res = await authFetch(`${API_URL}/modular-generation/iterate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ module_id: ad.id, count: 5 })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Iteration failed');
+            showSuccess(`Generated ${data.length} variations. View them on the Modular Ads page.`);
+            setScaleWinner({ show: false, ad: null, keepModules: { intro: true, bridge: true, core: true, cta: true }, generating: false });
+        } catch (err) {
+            showError(err.message);
+            setScaleWinner(prev => ({ ...prev, generating: false }));
+        }
     };
 
     // Modal Helpers
@@ -718,17 +750,33 @@ export default function GeneratedAds() {
                                             </div>
                                         </div>
 
-                                        {/* Download Button */}
-                                        <a
-                                            href={viewedImage.media_type === 'video' ? viewedImage.video_url : viewedImage.image_url}
-                                            download={`ad-${viewedImage.size_name || 'media'}-${Date.now()}.${viewedImage.media_type === 'video' ? 'mp4' : 'png'}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="w-full py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-bold flex items-center justify-center gap-2 transition-colors"
-                                        >
-                                            <Download size={20} />
-                                            Download {viewedImage.media_type === 'video' ? 'Video' : 'Image'}
-                                        </a>
+                                        {/* Action Buttons */}
+                                        <div className="space-y-2">
+                                            <a
+                                                href={viewedImage.media_type === 'video' ? viewedImage.video_url : viewedImage.image_url}
+                                                download={`ad-${viewedImage.size_name || 'media'}-${Date.now()}.${viewedImage.media_type === 'video' ? 'mp4' : 'png'}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="w-full py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-bold flex items-center justify-center gap-2 transition-colors"
+                                            >
+                                                <Download size={20} />
+                                                Download {viewedImage.media_type === 'video' ? 'Video' : 'Image'}
+                                            </a>
+                                            {viewedImage.bundle_code && (
+                                                <button
+                                                    onClick={() => setScaleWinner({
+                                                        show: true,
+                                                        ad: viewedImage,
+                                                        keepModules: { intro: true, bridge: true, core: true, cta: true },
+                                                        generating: false
+                                                    })}
+                                                    className="w-full py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-bold flex items-center justify-center gap-2 transition-colors"
+                                                >
+                                                    <Sparkles size={20} />
+                                                    Scale Winner
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -736,6 +784,56 @@ export default function GeneratedAds() {
                     </div>
                 )
             }
+
+            {/* Scale Winner Modal */}
+            {scaleWinner.show && scaleWinner.ad && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => !scaleWinner.generating && setScaleWinner({ show: false, ad: null, keepModules: { intro: true, bridge: true, core: true, cta: true }, generating: false })}>
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+                            <Sparkles className="text-emerald-600" size={24} />
+                            Scale Winner
+                        </h3>
+                        <p className="text-sm text-gray-500 mb-1">Bundle: <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">{scaleWinner.ad.bundle_code}</span></p>
+                        <p className="text-sm text-gray-600 mb-4">Uncheck the module types you want to replace with new variations. Checked modules will be kept.</p>
+
+                        <div className="space-y-3 mb-6">
+                            {['intro', 'bridge', 'core', 'cta'].map(type => (
+                                <label key={type} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={scaleWinner.keepModules[type]}
+                                        onChange={() => setScaleWinner(prev => ({
+                                            ...prev,
+                                            keepModules: { ...prev.keepModules, [type]: !prev.keepModules[type] }
+                                        }))}
+                                        className="w-4 h-4 text-emerald-600 rounded"
+                                    />
+                                    <span className="font-medium text-gray-900 capitalize">{type}</span>
+                                    <span className="text-xs text-gray-400 ml-auto">{scaleWinner.keepModules[type] ? 'Keep' : 'Replace'}</span>
+                                </label>
+                            ))}
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setScaleWinner({ show: false, ad: null, keepModules: { intro: true, bridge: true, core: true, cta: true }, generating: false })}
+                                disabled={scaleWinner.generating}
+                                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleScaleWinner}
+                                disabled={scaleWinner.generating}
+                                className="flex-1 px-4 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-bold flex items-center justify-center gap-2 disabled:opacity-50"
+                            >
+                                {scaleWinner.generating ? <Loader className="animate-spin" size={18} /> : <Sparkles size={18} />}
+                                Generate 5 Variations
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Delete Confirmation Modal */}
             {

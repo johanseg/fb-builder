@@ -1,22 +1,11 @@
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
+from app.schemas.product import ProductBase, Product
 
-class ProductBase(BaseModel):
-    name: str
-    description: Optional[str] = None
-    product_shots: Optional[List[str]] = []
 
 class ProductCreate(ProductBase):
     id: Optional[str] = None
-
-class Product(ProductBase):
-    id: str
-    brand_id: str
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 class BrandColors(BaseModel):
     primary: str
