@@ -478,11 +478,7 @@ Contributions are welcome! Please:
 
 ## Author
 
-**Jason Akatiff**
-
-- Website: [iSCALE.com](https://iscale.com) | [A4D.com](https://a4d.com)
-- Telegram: [@jasonakatiff](https://t.me/jasonakatiff)
-- Email: [jason@jasonakatiff.com](mailto:jason@jasonakatiff.com)
+**Johan Garcia**
 
 ---
 
@@ -493,5 +489,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 <p align="center">
-  Built with ❤️ by <a href="https://iscale.com">iSCALE</a> using FastAPI, React, and AI
+  Built with ❤️ by Johan  & Claude & Codex & Antigravity.
 </p>
