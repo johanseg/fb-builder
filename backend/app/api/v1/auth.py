@@ -61,7 +61,7 @@ async def _authenticate_user(db: Session, email: str, password: str) -> Token:
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-@limiter.limit("3/minute")
+@limiter.limit("30/minute")
 async def register(
     request: Request,
     user_data: UserCreate,
@@ -104,7 +104,7 @@ async def register(
 
 
 @router.post("/login", response_model=Token)
-@limiter.limit("5/minute")
+@limiter.limit("50/minute")
 async def login(
     request: Request,
     username: str = Form(...),
@@ -116,14 +116,14 @@ async def login(
 
 
 @router.post("/login/json", response_model=Token)
-@limiter.limit("5/minute")
+@limiter.limit("50/minute")
 async def login_json(request: Request, user_data: UserLogin, db: Session = Depends(get_db)):
     """Login with JSON body and get access and refresh tokens"""
     return await _authenticate_user(db, user_data.email, user_data.password)
 
 
 @router.post("/refresh", response_model=Token)
-@limiter.limit("10/minute")
+@limiter.limit("100/minute")
 async def refresh_token(request: Request, token_data: TokenRefresh, db: Session = Depends(get_db)):
     """Get new access and refresh tokens using a refresh token (rolling refresh)"""
     # Find the refresh token
