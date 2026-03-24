@@ -38,14 +38,17 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:;"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     if request.url.scheme == "https":
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 
 # Trust proxy headers (Railway uses reverse proxy)
-# In production, consider restricting to specific CIDR ranges
-trusted_proxies = os.getenv("TRUSTED_PROXIES", "*")
-app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=[trusted_proxies] if trusted_proxies != "*" else ["*"])
+# Set TRUSTED_PROXIES env var to a comma-separated list of trusted IPs
+trusted_proxies_env = os.getenv("TRUSTED_PROXIES")
+trusted_hosts = [p.strip() for p in trusted_proxies_env.split(",") if p.strip()] if trusted_proxies_env else ["127.0.0.1"]
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=trusted_hosts)
 
 # CORS origins from env var or defaults
 default_origins = [
@@ -120,7 +123,6 @@ app.include_router(performance.router, prefix="/api/v1/performance", tags=["perf
 app.include_router(personas.router, prefix="/api/v1/personas", tags=["personas"])
 
 # Mount static files for uploads
-import os
 uploads_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
 os.makedirs(uploads_dir, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")

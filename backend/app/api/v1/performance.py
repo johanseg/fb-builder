@@ -92,8 +92,14 @@ async def import_performance_csv(
                 module_metrics[frag]["max_score"] = row_score
 
     updated_count = 0
-    all_modules = db.query(AdModule).all()
-    
+    if not module_metrics:
+        return {"message": "No matching bundle codes found in CSV. Updated 0 modules."}
+
+    # Build OR filters to only load modules whose IDs start with a known fragment
+    from sqlalchemy import or_, func as sa_func
+    fragment_filters = [sa_func.lower(AdModule.id).like(f"{frag}%") for frag in module_metrics.keys()]
+    all_modules = db.query(AdModule).filter(or_(*fragment_filters)).all()
+
     for mod in all_modules:
         mod_id_str = str(mod.id).lower()
         matched_frag = next((f for f in module_metrics.keys() if mod_id_str.startswith(f)), None)

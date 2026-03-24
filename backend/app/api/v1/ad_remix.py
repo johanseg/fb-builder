@@ -8,7 +8,8 @@ from typing import List
 import json
 
 from app.database import get_db
-from app.models import WinningAd, Brand, Product, CustomerProfile
+from app.models import WinningAd, Brand, Product, CustomerProfile, User
+from app.core.deps import get_current_active_user
 from app.schemas.ad_blueprint import (
     AdBlueprint,
     AdBlueprintResponse,
@@ -25,7 +26,8 @@ router = APIRouter()
 @router.post("/deconstruct", response_model=AdBlueprint)
 async def deconstruct_ad_template(
     request: DeconstructRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Deconstruct a template into a structural blueprint
@@ -60,7 +62,8 @@ async def deconstruct_ad_template(
 @router.post("/reconstruct", response_model=AdConcept)
 async def reconstruct_ad_from_blueprint(
     request: ReconstructRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Reconstruct an ad by applying brand data to a blueprint
@@ -120,7 +123,8 @@ async def reconstruct_ad_from_blueprint(
 @router.get("/blueprints/{template_id}", response_model=AdBlueprint)
 async def get_template_blueprint(
     template_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Get the blueprint for a specific template
@@ -140,7 +144,8 @@ async def get_template_blueprint(
 
 @router.get("/blueprints", response_model=List[dict])
 async def list_templates_with_blueprints(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     List all templates that have been deconstructed

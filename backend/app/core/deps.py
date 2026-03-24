@@ -120,3 +120,11 @@ async def get_optional_user(
 
     user = db.query(User).filter(User.id == user_id).first()
     return user
+
+
+def get_or_404(db: Session, model_class, resource_id, resource_name: str = "Resource"):
+    """Get a database resource by ID or raise 404."""
+    resource = db.query(model_class).filter(model_class.id == resource_id).first()
+    if resource is None:
+        raise HTTPException(status_code=404, detail=f"{resource_name} not found")
+    return resource

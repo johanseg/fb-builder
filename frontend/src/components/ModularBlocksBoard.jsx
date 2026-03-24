@@ -12,6 +12,8 @@ export default function ModularBlocksBoard({ product }) {
     
     const [modules, setModules] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [deleteTargetId, setDeleteTargetId] = useState(null);
     
     // Generation Modal State
     const [genModalOpen, setGenModalOpen] = useState(false);
@@ -47,8 +49,15 @@ export default function ModularBlocksBoard({ product }) {
         }
     };
 
-    const handleDelete = async (id) => {
-        if (!confirm("Are you sure you want to delete this module?")) return;
+    const handleDelete = (id) => {
+        setDeleteTargetId(id);
+        setShowDeleteConfirm(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        const id = deleteTargetId;
+        setShowDeleteConfirm(false);
+        setDeleteTargetId(null);
         try {
             const res = await authFetch(`${API_URL}/ad-modules/${id}`, { method: 'DELETE' });
             if (!res.ok) throw new Error('Failed to delete');
@@ -59,7 +68,7 @@ export default function ModularBlocksBoard({ product }) {
                 if(newSelection[k]?.id === id) newSelection[k] = null;
             });
             setSelectedBlocks(newSelection);
-            
+
             showSuccess("Module deleted");
         } catch (err) {
             showError("Delete failed: " + err.message);
@@ -290,6 +299,20 @@ export default function ModularBlocksBoard({ product }) {
             {/* Safe Zone Preview Modal */}
             {previewContent && (
                 <SafeZonePreview content={previewContent} onClose={() => setPreviewContent(null)} />
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {showDeleteConfirm && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+                    <div className="bg-card border border-border rounded-xl p-6 max-w-sm mx-4">
+                        <h3 className="text-lg font-semibold text-foreground mb-2">Delete Module</h3>
+                        <p className="text-muted-foreground mb-4">Are you sure you want to delete this module? This action cannot be undone.</p>
+                        <div className="flex gap-3 justify-end">
+                            <button onClick={() => setShowDeleteConfirm(false)} className="px-4 py-2 rounded-lg border border-border text-foreground hover:bg-secondary">Cancel</button>
+                            <button onClick={handleConfirmDelete} className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700">Delete</button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* Generation Modal */}

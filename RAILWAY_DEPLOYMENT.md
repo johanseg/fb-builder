@@ -67,6 +67,9 @@ After the first deployment:
 > [!TIP]
 > Alternatively, you can run `python init_db.py` using Railway's CLI or by connecting to the service shell.
 
+> [!NOTE]
+> `init_db.py` only creates tables and seeds initial data. If there are schema changes managed by Alembic, you must also run `alembic upgrade head` manually (via Railway CLI or service shell) after `init_db.py`.
+
 ## Step 4: Configure Frontend Service
 
 ### Set Environment Variables
@@ -76,15 +79,16 @@ After the first deployment:
 3. Add the following environment variables:
 
 ```
-VITE_API_URL=${{backend.RAILWAY_PUBLIC_DOMAIN}}
-VITE_SUPABASE_URL=your_supabase_url_here
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key_here
+VITE_API_URL=https://${{backend.RAILWAY_PUBLIC_DOMAIN}}/api/v1
 VITE_FACEBOOK_ACCESS_TOKEN=your_facebook_token_here
 VITE_FACEBOOK_AD_ACCOUNT_ID=your_facebook_ad_account_id_here
 ```
 
 > [!IMPORTANT]
-> The `VITE_API_URL` uses Railway's reference syntax to automatically get your backend service URL. Make sure to include `https://` prefix: `https://${{backend.RAILWAY_PUBLIC_DOMAIN}}`
+> The `VITE_API_URL` uses Railway's reference syntax to automatically get your backend service URL. Make sure to include the `https://` prefix and `/api/v1` suffix: `https://${{backend.RAILWAY_PUBLIC_DOMAIN}}/api/v1`
+
+> [!NOTE]
+> The frontend defaults to port 3000 in production via `${PORT:-3000}`. Railway sets the `PORT` variable automatically, but if unset, port 3000 is used as the fallback.
 
 ### Enable Public Networking
 
@@ -140,9 +144,7 @@ If you need to manually trigger a deployment:
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `VITE_API_URL` | Backend API URL | `https://backend.railway.app` |
-| `VITE_SUPABASE_URL` | Supabase project URL | `https://xxx.supabase.co` |
-| `VITE_SUPABASE_ANON_KEY` | Supabase anonymous key | `eyJ...` |
+| `VITE_API_URL` | Backend API URL | `https://backend.railway.app/api/v1` |
 | `VITE_FACEBOOK_ACCESS_TOKEN` | Facebook Marketing API token | `EAAx...` |
 | `VITE_FACEBOOK_AD_ACCOUNT_ID` | Facebook Ad Account ID | `act_123456789` |
 

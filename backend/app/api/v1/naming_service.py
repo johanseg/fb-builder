@@ -86,10 +86,14 @@ def export_combinations(
     Creates a structural CSV-ready payload matching all current modules for a product 
     using the Cartesian product.
     """
-    intros = db.query(AdModule).filter(AdModule.product_id == product_id, AdModule.module_type == "intro").all()
-    bridges = db.query(AdModule).filter(AdModule.product_id == product_id, AdModule.module_type == "bridge").all()
-    cores = db.query(AdModule).filter(AdModule.product_id == product_id, AdModule.module_type == "core").all()
-    ctas = db.query(AdModule).filter(AdModule.product_id == product_id, AdModule.module_type == "cta").all()
+    all_modules = db.query(AdModule).filter(AdModule.product_id == product_id, AdModule.module_type.in_(["intro", "bridge", "core", "cta"])).all()
+    modules_by_type = {}
+    for mod in all_modules:
+        modules_by_type.setdefault(mod.module_type, []).append(mod)
+    intros = modules_by_type.get("intro", [])
+    bridges = modules_by_type.get("bridge", [])
+    cores = modules_by_type.get("core", [])
+    ctas = modules_by_type.get("cta", [])
 
     if not all([intros, bridges, cores, ctas]):
         raise HTTPException(status_code=400, detail="Must have at least one of each module type (Intro, Bridge, Core, CTA) to export combinations.")

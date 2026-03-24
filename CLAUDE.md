@@ -70,7 +70,7 @@ railway service logs --service <name>       # view logs
 ### Backend (`backend/app/`)
 
 - **Entry**: `main.py` — FastAPI app, CORS setup, security headers, rate limiting, registers 20 routers under `/api/v1/`
-- **Models**: `models.py` — single file with ~24 SQLAlchemy models (including AdModule, AIPersona)
+- **Models**: `models.py` — single file with ~26 SQLAlchemy models (including AdModule, AIPersona)
 - **Routes**: `api/v1/` — auth, users, brands, products, research, generated_ads, templates, facebook, uploads, dashboard, copy_generation, profiles, ad_remix, prompts, ad_styles, modular_generation, ad_modules, naming, performance, personas
 - **Services**: `services/` — facebook_service.py, research_service.py, ad_remix_service.py (Gemini Vision), brand_scraper.py, scraper.py
 - **AI Agents**: `services/agents/` — 5 specialized Gemini agents (IntroAgent, BridgeAgent, CoreAgent, CtaAgent, MicroMovieAgent) coordinated by AgentOrchestrator. Prompts stored as `.md` in `services/agents/prompts/`

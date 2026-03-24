@@ -24,6 +24,42 @@ from app.schemas.auth import (
 router = APIRouter()
 
 
+async def _authenticate_user(db: Session, email: str, password: str) -> Token:
+    """Shared authentication logic for login endpoints."""
+    user = db.query(User).filter(User.email == email).first()
+
+    if not user or not verify_password(password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is disabled"
+        )
+
+    # Create tokens
+    access_token = create_access_token(data={"sub": user.id})
+    refresh_token_str, expires_at = create_refresh_token()
+
+    # Store refresh token in database
+    refresh_token_obj = RefreshToken(
+        user_id=user.id,
+        token=refresh_token_str,
+        expires_at=expires_at
+    )
+    db.add(refresh_token_obj)
+    db.commit()
+
+    return Token(
+        access_token=access_token,
+        refresh_token=refresh_token_str
+    )
+
+
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("3/minute")
 async def register(
@@ -76,76 +112,14 @@ async def login(
     db: Session = Depends(get_db)
 ):
     """Login and get access and refresh tokens (OAuth2 form)"""
-    user = db.query(User).filter(User.email == username).first()
-
-    if not user or not verify_password(password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is disabled"
-        )
-
-    # Create tokens
-    access_token = create_access_token(data={"sub": user.id})
-    refresh_token_str, expires_at = create_refresh_token()
-
-    # Store refresh token in database
-    refresh_token_obj = RefreshToken(
-        user_id=user.id,
-        token=refresh_token_str,
-        expires_at=expires_at
-    )
-    db.add(refresh_token_obj)
-    db.commit()
-
-    return Token(
-        access_token=access_token,
-        refresh_token=refresh_token_str
-    )
+    return await _authenticate_user(db, username, password)
 
 
 @router.post("/login/json", response_model=Token)
 @limiter.limit("5/minute")
 async def login_json(request: Request, user_data: UserLogin, db: Session = Depends(get_db)):
     """Login with JSON body and get access and refresh tokens"""
-    user = db.query(User).filter(User.email == user_data.email).first()
-
-    if not user or not verify_password(user_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is disabled"
-        )
-
-    # Create tokens
-    access_token = create_access_token(data={"sub": user.id})
-    refresh_token_str, expires_at = create_refresh_token()
-
-    # Store refresh token in database
-    refresh_token_obj = RefreshToken(
-        user_id=user.id,
-        token=refresh_token_str,
-        expires_at=expires_at
-    )
-    db.add(refresh_token_obj)
-    db.commit()
-
-    return Token(
-        access_token=access_token,
-        refresh_token=refresh_token_str
-    )
+    return await _authenticate_user(db, user_data.email, user_data.password)
 
 
 @router.post("/refresh", response_model=Token)

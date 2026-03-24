@@ -41,7 +41,7 @@ class User(Base):
     email = Column(String, unique=True, nullable=False, index=True)
     hashed_password = Column(String, nullable=False)
     name = Column(String, nullable=True)
-    is_active = Column(Boolean, default=True)
+    is_active = Column(Boolean, default=True, index=True)
     is_superuser = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -132,7 +132,7 @@ class Product(Base):
     __tablename__ = "products"
 
     id = Column(String, primary_key=True, default=generate_uuid)
-    brand_id = Column(String, ForeignKey("brands.id", ondelete="CASCADE"), nullable=False)
+    brand_id = Column(String, ForeignKey("brands.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String, nullable=False)
     description = Column(Text, nullable=True)
     product_shots = Column(JSON, nullable=True)
@@ -260,8 +260,8 @@ class GeneratedAd(Base):
     __tablename__ = "generated_ads"
 
     id = Column(String, primary_key=True, default=generate_uuid)
-    brand_id = Column(String, ForeignKey("brands.id", ondelete="SET NULL"), nullable=True)
-    product_id = Column(String, ForeignKey("products.id", ondelete="SET NULL"), nullable=True) # Assuming product_id is also FK, though not explicit in original schema it makes sense
+    brand_id = Column(String, ForeignKey("brands.id", ondelete="SET NULL"), nullable=True, index=True)
+    product_id = Column(String, ForeignKey("products.id", ondelete="SET NULL"), nullable=True, index=True) # Assuming product_id is also FK, though not explicit in original schema it makes sense
     template_id = Column(String, ForeignKey("winning_ads.id", ondelete="SET NULL"), nullable=True)
     image_url = Column(String, nullable=True)  # Changed to nullable for video ads
     headline = Column(String, nullable=True)
@@ -513,8 +513,8 @@ class AdModule(Base):
     __tablename__ = "ad_modules"
 
     id = Column(String, primary_key=True, default=generate_uuid)
-    product_id = Column(String, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
-    module_type = Column(String, nullable=False) # 'intro', 'bridge', 'core', 'cta', 'micro_movie'
+    product_id = Column(String, ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True)
+    module_type = Column(String, nullable=False, index=True) # 'intro', 'bridge', 'core', 'cta', 'micro_movie'
     content = Column(Text, nullable=False)
     generation_metadata = Column(JSON, nullable=True) # e.g. prompt used, parameters
     performance_score = Column(Integer, default=0)

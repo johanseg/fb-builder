@@ -6,7 +6,7 @@ import uuid
 import httpx
 import os
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 from app.core.config import settings
 from sqlalchemy import func
 
@@ -96,7 +96,7 @@ class ResearchService:
 
             if existing:
                 # Update last_seen timestamp and increment seen_count
-                existing.last_seen = datetime.utcnow()
+                existing.last_seen = datetime.now(timezone.utc)
                 existing.seen_count = (existing.seen_count or 0) + 1
                 saved_ads.append(existing)
                 ads_duplicate += 1
@@ -150,7 +150,7 @@ class ResearchService:
                             ScrapedAd.content_hash == ad.content_hash
                         ).first()
                         if existing:
-                            existing.last_seen = datetime.utcnow()
+                            existing.last_seen = datetime.now(timezone.utc)
                             existing.seen_count = (existing.seen_count or 0) + 1
                             saved_ads_clean.append(existing)
 

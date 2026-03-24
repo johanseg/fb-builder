@@ -23,7 +23,7 @@ This document serves as the Source of Truth for the Facebook Ad Automation App. 
     - **ORM**: SQLAlchemy
     - **Migrations**: Alembic (Recommended)
     - **NOTE**: SQLite is DEPRECATED and must not be used.
-- **Task Queue**: Celery + Redis (for long-running tasks)
+- **Background Tasks**: Run synchronously within request handlers (no external task queue)
 
 ### Infrastructure
 - **Containerization**: Docker
@@ -32,7 +32,7 @@ This document serves as the Source of Truth for the Facebook Ad Automation App. 
 ## 3. Security & Standards (CRITICAL)
 
 ### Authentication & Authorization
-- **Auth Provider**: Supabase Auth or Custom JWT.
+- **Auth Provider**: Custom JWT.
 - **Middleware**: All protected routes MUST be secured via `Depends(verify_token)`.
 - **RBAC**: Implement Role-Based Access Control where necessary.
 - **CORS**: Strict `allow_origins` policy (Development: `localhost:5173`, Production: Specific Domain). **Wildcard `*` is PROHIBITED in production.**
@@ -138,7 +138,7 @@ The project follows a modular structure. API routes are versioned (`/api/v1`).
 - **Endpoints**: `/api/v1/generated-ads`, `/api/v1/copy-generation`
 - **Features**: 
     - Generate scripts via LLM (Gemini).
-    - Create video assets via AI (Kie.ai/Fal.ai).
+    - Create video assets via AI (Fal.ai).
 
 ### Module 4: Campaign Launching (Facebook)
 - **Endpoints**: `/api/v1/facebook`

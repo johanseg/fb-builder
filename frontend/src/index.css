@@ -4,49 +4,49 @@
 
 @layer base {
   :root {
-    /* TSI Engine Design System - Industrial Dark Theme */
-    --background: 0 0% 10.2%;        /* #1a1a1a - Dark charcoal */
-    --foreground: 0 0% 95%;          /* #f2f2f2 - Off-white text */
+    /* Premium Industrial Dark Theme */
+    --background: 224 71% 4%;        /* Deep dark blue/black */
+    --foreground: 213 31% 91%;       /* Crispy text off-white */
 
-    --card: 0 0% 14.1%;              /* #242424 - Card background */
-    --card-foreground: 0 0% 95%;
+    --card: 222 47% 7%;              /* Slightly lighter dark background for cards */
+    --card-foreground: 213 31% 91%;
 
-    --popover: 0 0% 14.1%;
-    --popover-foreground: 0 0% 95%;
+    --popover: 222 47% 7%;
+    --popover-foreground: 213 31% 91%;
 
-    --primary: 45 93% 47%;           /* #f59e0b - Amber accent */
-    --primary-foreground: 0 0% 10.2%;
+    --primary: 35 100% 55%;          /* Vibrant amber/orange accent */
+    --primary-foreground: 224 71% 4%;
 
-    --secondary: 0 0% 20%;           /* #333333 - Secondary surface */
-    --secondary-foreground: 0 0% 95%;
+    --secondary: 222.2 47.4% 11.2%;  /* Dark grey/blue for soft surfaces */
+    --secondary-foreground: 213 31% 91%;
 
-    --muted: 0 0% 25%;               /* Muted elements */
-    --muted-foreground: 0 0% 60%;    /* Muted text */
+    --muted: 223 47% 11%;
+    --muted-foreground: 215.4 16.3% 56.9%; /* Subtle grey text */
 
-    --accent: 45 93% 47%;            /* Amber for highlights */
-    --accent-foreground: 0 0% 10.2%;
+    --accent: 35 100% 55%;
+    --accent-foreground: 224 71% 4%;
 
-    --destructive: 0 84.2% 60.2%;    /* Red for warnings */
+    --destructive: 0 84.2% 60.2%;    /* Clean UI Red */
     --destructive-foreground: 0 0% 98%;
 
-    --success: 142 71% 45%;          /* Green for success */
+    --success: 142 71% 45%;          /* Clean UI Green */
     --success-foreground: 0 0% 98%;
 
-    --warning: 45 93% 47%;           /* Amber for warnings */
-    --warning-foreground: 0 0% 10.2%;
+    --warning: 45 93% 47%;           /* Yellow warning */
+    --warning-foreground: 224 71% 4%;
 
-    --border: 0 0% 20%;              /* Subtle borders */
-    --input: 0 0% 20%;
-    --ring: 45 93% 47%;              /* Amber focus ring */
+    --border: 216 34% 17%;           /* Subtle border */
+    --input: 216 34% 17%;
+    --ring: 35 100% 55%;             /* Amber focus ring */
 
-    --radius: 0.25rem;               /* Minimal border radius - brutalist aesthetic */
+    --radius: 0.75rem;               /* Smooth rounded corners */
 
     /* Status colors */
-    --status-active: 142 71% 45%;    /* Green */
-    --status-paused: 0 84.2% 60.2%;  /* Red */
-    --status-inherited: 45 93% 47%;  /* Amber */
+    --status-active: 142 71% 45%;    
+    --status-paused: 0 84.2% 60.2%;  
+    --status-inherited: 35 100% 55%; 
     
-    font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
     color-scheme: dark;
     font-synthesis: none;
     text-rendering: optimizeLegibility;
@@ -61,12 +61,27 @@
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-background text-foreground antialiased selection:bg-primary/30 selection:text-primary max-w-[100vw] overflow-x-hidden;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
   *:focus-visible {
     @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-background;
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-background/40 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.36)];
+  }
+  .glass-card {
+    @apply bg-card/60 backdrop-blur-lg border border-white/5 shadow-2xl;
+  }
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70;
+  }
+  .text-gradient-primary {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-amber-400 to-orange-500;
   }
 }
 
@@ -77,19 +92,19 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: hsl(var(--background));
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--secondary));
+  background: hsl(var(--border) / 0.5);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted));
+  background: hsl(var(--muted-foreground));
 }
 
-/* Toast Animations */
+/* Animations */
 @keyframes slide-in {
   from {
     transform: translateX(100%);
@@ -103,4 +118,13 @@
 
 .animate-slide-in {
   animation: slide-in 0.3s ease-out;
+}
+
+@keyframes pulse-glow {
+  0% { box-shadow: 0 0 0 0px rgba(245, 158, 11, 0.2); }
+  100% { box-shadow: 0 0 0 15px rgba(245, 158, 11, 0); }
+}
+
+.hover-glow:hover {
+  animation: pulse-glow 1.5s infinite;
 }

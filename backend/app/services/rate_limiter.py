@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -18,7 +18,7 @@ class RateLimiter:
         """
         from app.models import SearchLog
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         window_start = now - timedelta(minutes=self.window_minutes)
 
         # Count total API calls in the last 59 minutes from SearchLog
@@ -47,7 +47,7 @@ class RateLimiter:
         """Get current usage statistics from SearchLog"""
         from app.models import SearchLog
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         window_start = now - timedelta(minutes=self.window_minutes)
 
         # Count total API calls in the last 59 minutes

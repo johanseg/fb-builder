@@ -14,6 +14,7 @@ import { BrandProvider } from './context/BrandContext';
 import { CampaignProvider } from './context/CampaignContext';
 import { ToastProvider } from './context/ToastContext';
 import PrivateRoute from './components/PrivateRoute';
+import ErrorBoundary from './components/ErrorBoundary';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import CreateAds from './pages/CreateAds';
@@ -44,6 +45,7 @@ function App() {
       <AuthProvider>
         <BrandProvider>
           <CampaignProvider>
+            <ErrorBoundary>
             <BrowserRouter>
               <Routes>
                 {/* Public routes */}
@@ -88,6 +90,7 @@ function App() {
                 </Route>
               </Routes>
             </BrowserRouter>
+            </ErrorBoundary>
           </CampaignProvider>
         </BrandProvider>
       </AuthProvider>

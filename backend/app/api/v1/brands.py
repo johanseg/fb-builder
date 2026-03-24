@@ -49,11 +49,10 @@ def create_brand(
             db.add(db_product)
     
     if brand.profileIds:
-        for pid in brand.profileIds:
-            profile = db.query(ProfileModel).filter(ProfileModel.id == pid).first()
-            if profile:
-                db_brand.profiles.append(profile)
-    
+        profiles = db.query(ProfileModel).filter(ProfileModel.id.in_(brand.profileIds)).all()
+        for profile in profiles:
+            db_brand.profiles.append(profile)
+
     db.commit()
     db.refresh(db_brand)
     return db_brand
@@ -150,10 +149,10 @@ def update_brand(
     if brand.profileIds is not None:
         # Clear existing associations
         db_brand.profiles = []
-        # Add new associations
-        for pid in brand.profileIds:
-            profile = db.query(ProfileModel).filter(ProfileModel.id == pid).first()
-            if profile:
+        # Add new associations via bulk query
+        if brand.profileIds:
+            profiles = db.query(ProfileModel).filter(ProfileModel.id.in_(brand.profileIds)).all()
+            for profile in profiles:
                 db_brand.profiles.append(profile)
 
     db.commit()
