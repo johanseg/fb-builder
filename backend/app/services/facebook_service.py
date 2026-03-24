@@ -64,6 +64,14 @@ class FacebookService:
         try:
             me = User(fbid='me', api=self.api)
             my_accounts = me.get_ad_accounts(fields=['id', 'name', 'account_id', 'account_status', 'currency', 'balance', 'amount_spent'])
+            
+            # Filter accounts if ALLOWED_FB_ACCOUNTS is set (accepts as many as added)
+            allowed_accounts_raw = os.getenv("ALLOWED_FB_ACCOUNTS")
+            if allowed_accounts_raw:
+                allowed_ids = [acc_id.strip() for acc_id in allowed_accounts_raw.split(',') if acc_id.strip()]
+                allowed_ids = [aid if aid.startswith('act_') else f"act_{aid}" for aid in allowed_ids]
+                my_accounts = [acc for acc in my_accounts if acc.get('id') in allowed_ids]
+                
             print(f"Found {len(my_accounts)} accounts.")
             return [dict(acc) for acc in my_accounts]
         except Exception as e:
