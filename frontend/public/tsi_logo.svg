@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <defs>
+    <linearGradient id="amber-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#F59E0B"/>
+      <stop offset="100%" style="stop-color:#D97706"/>
+    </linearGradient>
+    <linearGradient id="amber-light" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FBBF24"/>
+      <stop offset="100%" style="stop-color:#F59E0B"/>
+    </linearGradient>
+  </defs>
+  <!-- Background rounded square -->
+  <rect x="4" y="4" width="112" height="112" rx="24" fill="#1a1a2e" stroke="url(#amber-gradient)" stroke-width="2"/>
+  <!-- TSI Letters -->
+  <text x="60" y="72" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="800" font-size="42" fill="url(#amber-light)" letter-spacing="2">TSI</text>
+  <!-- Underline accent -->
+  <rect x="24" y="82" width="72" height="3" rx="1.5" fill="url(#amber-gradient)" opacity="0.8"/>
+</svg>

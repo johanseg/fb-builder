@@ -9,7 +9,7 @@ export default function Layout() {
     const navigate = useNavigate();
     const { user, logout, hasRole } = useAuth();
     const { showSuccess } = useToast();
-    const [expandedMenus, setExpandedMenus] = useState({ Brands: false, Research: false, 'Script Factory': false, Analytics: false });
+    const [expandedMenus, setExpandedMenus] = useState({ Audience: false, Research: false, 'Script Factory': false, Analytics: false });
     const [isCollapsed, setIsCollapsed] = useState(false);
 
     const handleLogout = async () => {
@@ -39,11 +39,9 @@ export default function Layout() {
             ]
         },
         {
-            icon: ShoppingBag,
-            label: 'Brands',
+            icon: Users,
+            label: 'Audience',
             subItems: [
-                { label: 'Brands', path: '/brands' },
-                { label: 'Products', path: '/products' },
                 { label: 'Customer Profiles', path: '/profiles' },
                 { label: 'AI Personas', path: '/personas' }
             ]
@@ -83,12 +81,12 @@ export default function Layout() {
                 <div className={`p-6 border-b border-white/5 ${isCollapsed ? 'px-4' : ''}`}>
                     <div className={`flex items-center gap-3 ${isCollapsed ? 'justify-center' : ''}`}>
                         <div className="w-10 h-10 bg-black/40 rounded-xl flex items-center justify-center overflow-hidden border border-white/10 flex-shrink-0 shadow-inner">
-                            <img src="/breadwinner_logo.png" alt="BreadWinner Logo" className="w-full h-full object-cover opacity-90" />
+                            <img src="/tsi_logo.svg" alt="Townsquare Interactive" className="w-full h-full object-cover opacity-90" />
                         </div>
                         {!isCollapsed && (
                             <div className="overflow-hidden whitespace-nowrap">
-                                <h1 className="text-xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white to-white/70">BreadWinner</h1>
-                                <p className="text-xs text-primary/80 font-medium tracking-wide uppercase mt-0.5">Fresh campaigns</p>
+                                <h1 className="text-xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white to-white/70" title="Townsquare Interactive">TSI</h1>
+                                <p className="text-xs text-primary/80 font-medium tracking-wide uppercase mt-0.5">Ad Creative Studio</p>
                             </div>
                         )}
                     </div>

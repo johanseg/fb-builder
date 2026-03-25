@@ -1,11 +1,9 @@
-import React, { useState } from 'react';
-import { ChevronRight, ChevronLeft, Sparkles, Check, Image, FileText, Briefcase, Package, Users } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ChevronLeft, Sparkles, Check, Image, FileText, Users } from 'lucide-react';
 import { useBrands } from '../context/BrandContext';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import ImageTemplateSelector from '../components/ImageTemplateSelector';
-import BrandSelectionStep from '../components/steps/BrandSelectionStep';
-import ProductSelectionStep from '../components/steps/ProductSelectionStep';
 import ProfileSelectionStep from '../components/steps/ProfileSelectionStep';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
@@ -31,13 +29,20 @@ export default function AdRemix() {
         }
     });
 
+    // Auto-populate brand and product from first available
+    useEffect(() => {
+        if (brands.length > 0 && !wizardData.brand) {
+            const brand = brands[0];
+            const product = brand.products?.[0] || null;
+            setWizardData(prev => ({ ...prev, brand, product }));
+        }
+    }, [brands]);
+
     const steps = [
         { id: 1, name: 'Template', icon: Image },
-        { id: 2, name: 'Brand', icon: Briefcase },
-        { id: 3, name: 'Product', icon: Package },
-        { id: 4, name: 'Profile', icon: Users },
-        { id: 5, name: 'Campaign', icon: FileText },
-        { id: 6, name: 'Review', icon: Check }
+        { id: 2, name: 'Profile', icon: Users },
+        { id: 3, name: 'Campaign', icon: FileText },
+        { id: 4, name: 'Review', icon: Check }
     ];
 
     const updateData = (field, value) => {
@@ -93,7 +98,7 @@ export default function AdRemix() {
 
             const data = await response.json();
             setAdConcept(data);
-            setCurrentStep(7); // Move to results step
+            setCurrentStep(5); // Move to results step
         } catch (error) {
             console.error('Reconstruction error:', error);
             showError('Failed to reconstruct ad. Please try again.');
@@ -170,46 +175,20 @@ export default function AdRemix() {
                     </div>
                 )}
 
-                {/* Step 2: Brand Selection */}
+                {/* Step 2: Profile Selection */}
                 {currentStep === 2 && (
-                    <BrandSelectionStep
-                        brands={brands}
-                        selectedBrand={wizardData.brand}
-                        onSelect={(brand) => {
-                            updateData('brand', brand);
+                    <ProfileSelectionStep
+                        profiles={customerProfiles}
+                        selectedProfile={wizardData.profile}
+                        onSelect={(profile) => {
+                            updateData('profile', profile);
                             setCurrentStep(3);
                         }}
                     />
                 )}
 
-                {/* Step 3: Product Selection */}
+                {/* Step 3: Campaign Details */}
                 {currentStep === 3 && (
-                    <ProductSelectionStep
-                        products={wizardData.brand?.products || []}
-                        selectedProduct={wizardData.product}
-                        useProductShots={false}
-                        onSelect={(product) => {
-                            updateData('product', product);
-                            setCurrentStep(4);
-                        }}
-                        onToggleProductShots={() => { }}
-                    />
-                )}
-
-                {/* Step 4: Profile Selection */}
-                {currentStep === 4 && (
-                    <ProfileSelectionStep
-                        profiles={customerProfiles.filter(p => wizardData.brand?.profileIds?.includes(p.id))}
-                        selectedProfile={wizardData.profile}
-                        onSelect={(profile) => {
-                            updateData('profile', profile);
-                            setCurrentStep(5);
-                        }}
-                    />
-                )}
-
-                {/* Step 5: Campaign Details */}
-                {currentStep === 5 && (
                     <div>
                         <h3 className="text-xl font-bold mb-4">Campaign Details</h3>
                         <p className="text-muted-foreground mb-6">Provide details to customize your remixed ad</p>
@@ -257,8 +236,8 @@ export default function AdRemix() {
                     </div>
                 )}
 
-                {/* Step 6: Review & Generate */}
-                {currentStep === 6 && (
+                {/* Step 4: Review & Generate */}
+                {currentStep === 4 && (
                     <div>
                         <h3 className="text-xl font-bold mb-4">Review & Generate</h3>
                         <p className="text-muted-foreground mb-6">Review your selections and generate the remixed ad concept</p>
@@ -296,8 +275,8 @@ export default function AdRemix() {
                     </div>
                 )}
 
-                {/* Step 7: Results */}
-                {currentStep === 7 && adConcept && (
+                {/* Step 5: Results */}
+                {currentStep === 5 && adConcept && (
                     <div>
                         <div className="text-center mb-8">
                             <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -354,7 +333,7 @@ export default function AdRemix() {
             <div className="mt-6 flex items-center justify-between">
                 <div></div>
                 <div className="flex gap-3">
-                    {currentStep > 1 && currentStep < 7 && (
+                    {currentStep > 1 && currentStep < 5 && (
                         <button
                             onClick={() => setCurrentStep(currentStep - 1)}
                             className="flex items-center gap-2 px-6 py-3 bg-secondary text-foreground rounded-lg hover:bg-muted font-medium"
@@ -364,7 +343,7 @@ export default function AdRemix() {
                         </button>
                     )}
 
-                    {currentStep === 6 && (
+                    {currentStep === 4 && (
                         <button
                             onClick={handleReconstruct}
                             disabled={!wizardData.campaignDetails.offer || !wizardData.campaignDetails.messaging}
@@ -375,7 +354,7 @@ export default function AdRemix() {
                         </button>
                     )}
 
-                    {currentStep === 7 && (
+                    {currentStep === 5 && (
                         <button
                             onClick={() => window.location.reload()}
                             className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium"

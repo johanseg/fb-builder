@@ -4,8 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { ChevronRight, ChevronLeft, Check, Briefcase, Package, Users, Image, Hash, FileText, Sparkles, Download, ChevronDown, ChevronUp, Settings, CheckCircle2, ArrowRight } from 'lucide-react';
 import { useBrands } from '../context/BrandContext';
 import ImageTemplateSelector from '../components/ImageTemplateSelector';
-import BrandSelectionStep from '../components/steps/BrandSelectionStep';
-import ProductSelectionStep from '../components/steps/ProductSelectionStep';
 import ProfileSelectionStep from '../components/steps/ProfileSelectionStep';
 import StyleSelector from '../components/StyleSelector';
 
@@ -53,6 +51,15 @@ export default function ImageAds() {
         };
     });
 
+    // Auto-populate brand and product from first available brand
+    useEffect(() => {
+        if (brands.length > 0 && !wizardData.brand) {
+            const brand = brands[0];
+            const product = brand?.products?.[0] || null;
+            setWizardData(prev => ({ ...prev, brand, product }));
+        }
+    }, [brands]);
+
     // Save campaign details to localStorage whenever they change
     useEffect(() => {
         if (wizardData.campaignDetails) {
@@ -61,14 +68,12 @@ export default function ImageAds() {
     }, [wizardData.campaignDetails]);
 
     const steps = [
-        { id: 1, name: 'Brand', icon: Briefcase },
-        { id: 2, name: 'Product', icon: Package },
-        { id: 3, name: 'Profile', icon: Users },
-        { id: 4, name: 'Template', icon: Image },
-        { id: 5, name: 'Variations', icon: Hash },
-        { id: 6, name: 'Size', icon: Image },
-        { id: 7, name: 'Campaign', icon: FileText },
-        { id: 8, name: 'Review', icon: Check }
+        { id: 1, name: 'Profile', icon: Users },
+        { id: 2, name: 'Template', icon: Image },
+        { id: 3, name: 'Variations', icon: Hash },
+        { id: 4, name: 'Size', icon: Image },
+        { id: 5, name: 'Campaign', icon: FileText },
+        { id: 6, name: 'Review', icon: Check }
     ];
 
     const updateData = (field, value) => {
@@ -96,13 +101,11 @@ export default function ImageAds() {
 
     const isStepComplete = (stepId) => {
         switch (stepId) {
-            case 1: return wizardData.brand !== null;
-            case 2: return wizardData.product !== null;
-            case 3: return wizardData.profile !== null;
-            case 4: return wizardData.template !== null;
-            case 5: return wizardData.variationCount >= 1 && wizardData.variationCount <= 10;
-            case 6: return wizardData.imageSizes && wizardData.imageSizes.length > 0;
-            case 7: return wizardData.campaignDetails.offer && wizardData.campaignDetails.messaging;
+            case 1: return wizardData.profile !== null;
+            case 2: return wizardData.template !== null;
+            case 3: return wizardData.variationCount >= 1 && wizardData.variationCount <= 10;
+            case 4: return wizardData.imageSizes && wizardData.imageSizes.length > 0;
+            case 5: return wizardData.campaignDetails.offer && wizardData.campaignDetails.messaging;
             default: return true;
         }
     };
@@ -147,7 +150,7 @@ export default function ImageAds() {
             const data = await response.json();
             setGeneratedCopy(data);
             // Move to copy selection step
-            setCurrentStep(9);
+            setCurrentStep(7);
         } catch (error) {
             console.error('Copy generation error:', error);
             showError('Failed to generate copy. Please try again.');
@@ -229,7 +232,7 @@ export default function ImageAds() {
                 // Don't fail the whole operation if saving fails
             }
 
-            setCurrentStep(10); // Move to image result step
+            setCurrentStep(8); // Move to image result step
         } catch (error) {
             console.error('Image generation error:', error);
             showError('Failed to generate images. Please try again.');
@@ -299,44 +302,16 @@ export default function ImageAds() {
                     <div className="absolute inset-0 bg-card/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center rounded-xl">
                         <div className="w-16 h-16 border-4 border-amber-200 border-t-amber-600 rounded-full animate-spin mb-4"></div>
                         <h3 className="text-xl font-bold text-foreground">
-                            {currentStep === 9 ? 'Generating High-Converting Images...' : 'Generating Ad Copy...'}
+                            {currentStep === 7 ? 'Generating High-Converting Images...' : 'Generating Ad Copy...'}
                         </h3>
                         <p className="text-muted-foreground mt-2">Using AI to create your perfect ads</p>
                     </div>
                 )}
 
-                {/* Step 1: Brand Selection */}
+                {/* Step 1: Profile Selection */}
                 {currentStep === 1 && (
-                    <BrandSelectionStep
-                        brands={brands}
-                        selectedBrand={wizardData.brand}
-                        onSelect={(brand) => {
-                            updateData('brand', brand);
-                            nextStep();
-                        }}
-                    />
-                )}
-
-                {/* Step 2: Product Selection */}
-                {currentStep === 2 && (
-                    <ProductSelectionStep
-                        products={wizardData.brand?.products || []}
-                        selectedProduct={wizardData.product}
-                        useProductShots={wizardData.useProductShots}
-                        onSelect={(product) => {
-                            updateData('product', product);
-                            // Reset product shots preference when changing product
-                            updateData('useProductShots', false);
-                            nextStep();
-                        }}
-                        onToggleProductShots={(use) => updateData('useProductShots', use)}
-                    />
-                )}
-
-                {/* Step 3: Profile Selection */}
-                {currentStep === 3 && (
                     <ProfileSelectionStep
-                        profiles={customerProfiles.filter(p => wizardData.brand?.profileIds?.includes(p.id))}
+                        profiles={customerProfiles}
                         selectedProfile={wizardData.profile}
                         onSelect={(profile) => {
                             updateData('profile', profile);
@@ -345,8 +320,8 @@ export default function ImageAds() {
                     />
                 )}
 
-                {/* Step 4: Template/Style Selection */}
-                {currentStep === 4 && (
+                {/* Step 2: Template/Style Selection */}
+                {currentStep === 2 && (
                     <div>
                         <h3 className="text-xl font-bold mb-4">Select a Template or Style</h3>
                         <p className="text-muted-foreground mb-6">
@@ -408,16 +383,16 @@ export default function ImageAds() {
                     </div>
                 )}
 
-                {/* Step 5: Variation Count */}
-                {currentStep === 5 && (
+                {/* Step 3: Variation Count */}
+                {currentStep === 3 && (
                     <VariationCountStep
                         count={wizardData.variationCount}
                         onChange={(count) => updateData('variationCount', count)}
                     />
                 )}
 
-                {/* Step 6: Image Size Selection */}
-                {currentStep === 6 && (
+                {/* Step 4: Image Size Selection */}
+                {currentStep === 4 && (
                     <ImageSizeStep
                         selectedSizes={wizardData.imageSizes}
                         onSelect={(sizes) => updateData('imageSizes', sizes)}
@@ -428,25 +403,25 @@ export default function ImageAds() {
                     />
                 )}
 
-                {/* Step 7: Campaign Details */}
-                {currentStep === 7 && (
+                {/* Step 5: Campaign Details */}
+                {currentStep === 5 && (
                     <CampaignDetailsStep
                         details={wizardData.campaignDetails}
                         onChange={updateCampaignDetails}
                     />
                 )}
 
-                {/* Step 8: Review */}
-                {currentStep === 8 && (
+                {/* Step 6: Review */}
+                {currentStep === 6 && (
                     <ReviewStep wizardData={wizardData} />
                 )}
 
-                {/* Step 9: Copy Selection (after generation) */}
-                {currentStep === 9 && generatedCopy && (
+                {/* Step 7: Copy Selection (after generation) */}
+                {currentStep === 7 && generatedCopy && (
                     <CopySelectionStep
                         generatedCopy={generatedCopy}
                         wizardData={wizardData}
-                        onBack={() => setCurrentStep(8)}
+                        onBack={() => setCurrentStep(6)}
                         onRegenerate={handleGenerate}
                         isRegenerating={generating}
                         onProceed={handleImageGeneration}
@@ -456,14 +431,14 @@ export default function ImageAds() {
                     />
                 )}
 
-                {/* Step 10: Image Generation Result */}
-                {currentStep === 10 && (
+                {/* Step 8: Image Generation Result */}
+                {currentStep === 8 && (
                     generatedImages.length > 0 ? (
                         <ImageGenerationStep
                             generatedImages={generatedImages}
                             wizardData={wizardData}
                             selectedCopy={selectedCopy}
-                            onBack={() => setCurrentStep(9)}
+                            onBack={() => setCurrentStep(7)}
                             onRestart={() => window.location.reload()}
                         />
                     ) : (
@@ -474,7 +449,7 @@ export default function ImageAds() {
                             <h3 className="text-xl font-bold text-foreground mb-2">Generation Error</h3>
                             <p className="text-muted-foreground mb-6">Something went wrong displaying the generated images.</p>
                             <button
-                                onClick={() => setCurrentStep(9)}
+                                onClick={() => setCurrentStep(7)}
                                 className="px-6 py-3 bg-muted text-foreground rounded-lg hover:bg-gray-300 font-medium transition-colors"
                             >
                                 Go Back
@@ -485,7 +460,7 @@ export default function ImageAds() {
             </div>
 
             {/* Footer Actions */}
-            {currentStep <= 8 && (
+            {currentStep <= 6 && (
                 <div className="mt-6 flex items-center justify-between">
                     <button
                         onClick={prevStep}
@@ -499,7 +474,7 @@ export default function ImageAds() {
                         Back
                     </button>
 
-                    {currentStep === 8 ? (
+                    {currentStep === 6 ? (
                         <button
                             onClick={handleGenerate}
                             disabled={!canProceed() || generating}

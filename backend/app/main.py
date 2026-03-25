@@ -1,5 +1,5 @@
 """
-Facebook Ad Builder - Backend API
+Townsquare Interactive Ad Creative Studio - Backend API
 
 Created by Jason Akatiff
 iSCALE.com | A4D.com
@@ -22,7 +22,7 @@ from app.core.rate_limit import limiter
 _is_dev = os.getenv("ENVIRONMENT", "production") != "production"
 
 app = FastAPI(
-    title="Facebook Ad Automation API",
+    title="TSI Ad Creative Studio API",
     version="1.0.0",
     openapi_url="/api/v1/openapi.json" if _is_dev else None,
     docs_url="/api/v1/docs" if _is_dev else None,
@@ -73,7 +73,7 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to the Facebook Ad Automation API"}
+    return {"message": "Welcome to the TSI Ad Creative Studio API"}
 
 @app.get("/health")
 async def health_check():

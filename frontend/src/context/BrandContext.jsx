@@ -71,6 +71,13 @@ export const BrandProvider = ({ children }) => {
         }
     }, [isAuthenticated, authLoading, loadData]);
 
+    // Auto-select the first brand as default (single-brand mode)
+    useEffect(() => {
+        if (brands.length > 0 && activeBrand === null) {
+            setActiveBrand(brands[0]);
+        }
+    }, [brands, activeBrand]);
+
     // Brand Management
     const addBrand = async (brand) => {
         try {

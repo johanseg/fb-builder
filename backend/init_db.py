@@ -140,10 +140,50 @@ def create_superuser(email: str, password: str, name: str = "Admin"):
     finally:
         db.close()
 
+def seed_default_brand():
+    """Seed the default Townsquare Interactive brand and product"""
+    db = SessionLocal()
+    try:
+        existing = db.query(Brand).filter(Brand.name == "Townsquare Interactive").first()
+        if existing:
+            print("  Default brand already exists: Townsquare Interactive")
+            return
+
+        brand = Brand(
+            name="Townsquare Interactive",
+            voice="Credible, practical, confident, grounded, specific, clear, performance-minded, local-business fluent. Never overhyped, never bro marketing, never fluffy agency jargon.",
+            primary_color="#F59E0B",
+            secondary_color="#D97706",
+            highlight_color="#FBBF24",
+        )
+        db.add(brand)
+        db.flush()
+
+        product = Product(
+            brand_id=brand.id,
+            name="Local Marketing & Digital Presence",
+            description="Done-for-you local marketing execution: website presence, local SEO, Google Business Profile optimization, blog/content support, local search visibility, CRM, email/SMS marketing, online bookings, payments, and lead capture tools. Built for established local businesses that already do good work offline but are invisible, inconsistent, or weak online.",
+        )
+        db.add(product)
+        db.commit()
+        print("  Created default brand: Townsquare Interactive")
+        print("  Created default product: Local Marketing & Digital Presence")
+
+    except Exception as e:
+        db.rollback()
+        print(f"Error seeding default brand: {e}")
+    finally:
+        db.close()
+
+
 if __name__ == "__main__":
     init_db()
     print("\nSeeding roles and permissions...")
     seed_roles_and_permissions()
+
+    # Seed default Townsquare Interactive brand
+    print("\nSeeding default brand...")
+    seed_default_brand()
 
     # Optionally create a default superuser (requires env vars)
     import os

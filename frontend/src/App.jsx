@@ -1,5 +1,5 @@
 /**
- * Facebook Ad Builder - Frontend
+ * Townsquare Interactive Ad Creative Studio - Frontend
  *
  * Created by Jason Akatiff
  * iSCALE.com | A4D.com
@@ -24,8 +24,6 @@ import VideoAds from './pages/VideoAds';
 import ModularAds from './pages/ModularAds';
 import AdModulesLibrary from './pages/AdModulesLibrary';
 import Reporting from './pages/Reporting';
-import Brands from './pages/Brands';
-import Products from './pages/Products';
 import CustomerProfiles from './pages/CustomerProfiles';
 import AIPersonas from './pages/AIPersonas';
 import FacebookCampaigns from './pages/FacebookCampaigns';
@@ -72,8 +70,6 @@ function App() {
                   <Route path="facebook-campaigns" element={<FacebookCampaigns />} />
                   <Route path="winning-ads" element={<WinningAds />} />
                   <Route path="generated-ads" element={<GeneratedAds />} />
-                  <Route path="brands" element={<Brands />} />
-                  <Route path="products" element={<Products />} />
                   <Route path="profiles" element={<CustomerProfiles />} />
                   <Route path="personas" element={<AIPersonas />} />
                   <Route path="ad-remix" element={<AdRemix />} />

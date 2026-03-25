@@ -34,13 +34,13 @@ export default function Dashboard() {
     const stats = [
         { label: 'Total Campaigns', value: statsData.campaigns_count, icon: TrendingUp, color: 'from-amber-500 to-orange-600' },
         { label: 'Generated Ads', value: statsData.generated_ads_count, icon: Image, color: 'from-orange-500 to-red-600' },
-        { label: 'Active Brands', value: statsData.brands_count, icon: ShoppingBag, color: 'from-amber-600 to-yellow-600' },
+        { label: 'Products', value: statsData.products_count, icon: Package, color: 'from-amber-600 to-yellow-600' },
         { label: 'Templates', value: statsData.templates_count, icon: Star, color: 'from-yellow-400 to-amber-500' },
     ];
 
     const quickActions = [
         { label: 'Build Creatives', description: 'Create new image or video ads', icon: Wand2, path: '/build-creatives', color: 'from-amber-500 to-orange-500' },
-        { label: 'Manage Brands', description: 'Update brand assets and profiles', icon: ShoppingBag, path: '/brands', color: 'from-orange-500 to-red-500' },
+        { label: 'Customer Profiles', description: 'Manage target audience profiles', icon: Package, path: '/profiles', color: 'from-orange-500 to-red-500' },
         { label: 'Browse Templates', description: 'Explore winning ad templates', icon: Star, path: '/winning-ads', color: 'from-amber-600 to-yellow-600' },
     ];
 

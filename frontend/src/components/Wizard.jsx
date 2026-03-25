@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronRight, Check, Wand2, Layout, Image as ImageIcon, Briefcase, LayoutGrid, List, Search, BarChart2, Layers } from 'lucide-react';
+import { ChevronRight, Check, Wand2, Layout, Image as ImageIcon, BarChart2, Layers } from 'lucide-react';
 import CopyBuilder from './CopyBuilder';
 import TemplateSelector from './TemplateSelector';
-import BrandOptionsStep from './BrandOptionsStep';
 import AnalyzeTemplatesStep from './AnalyzeTemplatesStep';
 import NanoBananaGenerationStep from './NanoBananaGenerationStep';
 import BulkAdCreation from './BulkAdCreation';
@@ -13,10 +12,8 @@ import { useToast } from '../context/ToastContext';
 const Wizard = () => {
     const { showSuccess } = useToast();
     const [step, setStep] = useState(1);
-    const { brands, customerProfiles, activeBrand, setActiveBrand } = useBrands();
+    const { brands, activeBrand, setActiveBrand } = useBrands();
     const { setCreativeData } = useCampaign();
-    const [viewMode, setViewMode] = useState('list'); // 'list' or 'grid'
-    const [expandedBrands, setExpandedBrands] = useState({}); // Track which brands are expanded
 
     // Wizard State
     const [selectedProduct, setSelectedProduct] = useState(null);
@@ -29,16 +26,21 @@ const Wizard = () => {
         cta: ''
     });
 
-    // Auto-fill from product if selected
+    // Auto-select brand and product from context
     useEffect(() => {
-        if (selectedProduct) {
-            setCopyData(prev => ({
-                ...prev,
-                productName: selectedProduct.name,
-                // You could also map description to something if needed
-            }));
+        if (brands.length > 0 && !activeBrand) {
+            setActiveBrand(brands[0]);
         }
-    }, [selectedProduct]);
+    }, [brands, activeBrand, setActiveBrand]);
+
+    // Auto-select first product when brand becomes available
+    useEffect(() => {
+        if (activeBrand?.products?.length > 0 && !selectedProduct) {
+            const product = activeBrand.products[0];
+            setSelectedProduct(product); // eslint-disable-line react-hooks/set-state-in-effect
+            setCopyData(prev => ({ ...prev, productName: product.name }));
+        }
+    }, [activeBrand]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleNext = () => {
         setStep(step + 1);
@@ -67,13 +69,11 @@ const Wizard = () => {
     };
 
     const steps = [
-        { id: 1, name: 'Select Brand', icon: Briefcase },
-        { id: 2, name: 'Brand Options', icon: Search },
-        { id: 3, name: 'Choose Template', icon: Layout },
-        { id: 4, name: 'Analyze', icon: BarChart2 },
-        { id: 5, name: 'Copy Builder', icon: Wand2 },
-        { id: 6, name: 'Generate', icon: ImageIcon },
-        { id: 7, name: 'Create Batch', icon: Layers },
+        { id: 1, name: 'Choose Template', icon: Layout },
+        { id: 2, name: 'Analyze', icon: BarChart2 },
+        { id: 3, name: 'Copy Builder', icon: Wand2 },
+        { id: 4, name: 'Generate', icon: ImageIcon },
+        { id: 5, name: 'Create Batch', icon: Layers },
     ];
 
     return (
@@ -114,173 +114,8 @@ const Wizard = () => {
             {/* Step Content */}
             <div className="bg-card rounded-2xl shadow-sm border border-border p-8 min-h-[500px]">
 
-                {/* Step 1: Brand Selection */}
+                {/* Step 1: Template Selection */}
                 {step === 1 && (
-                    <div>
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-2xl font-bold">Select a Brand</h2>
-                            <div className="flex bg-secondary p-1 rounded-lg">
-                                <button
-                                    onClick={() => setViewMode('list')}
-                                    className={`p-2 rounded-md transition-all ${viewMode === 'list' ? 'bg-card shadow-sm text-blue-600' : 'text-muted-foreground hover:text-foreground'}`}
-                                >
-                                    <List size={20} />
-                                </button>
-                                <button
-                                    onClick={() => setViewMode('grid')}
-                                    className={`p-2 rounded-md transition-all ${viewMode === 'grid' ? 'bg-card shadow-sm text-blue-600' : 'text-muted-foreground hover:text-foreground'}`}
-                                >
-                                    <LayoutGrid size={20} />
-                                </button>
-                            </div>
-                        </div>
-
-                        {brands.length === 0 ? (
-                            <div className="text-center py-12">
-                                <p className="text-muted-foreground mb-4">No brands found. Create a brand to get started.</p>
-                                <a href="/brands" className="text-blue-600 font-medium hover:underline">Go to Brand Management</a>
-                            </div>
-                        ) : (
-                            <>
-                                {viewMode === 'grid' ? (
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        {brands.map(brand => (
-                                            <div
-                                                key={brand.id}
-                                                onClick={() => setActiveBrand(brand)}
-                                                className={`cursor-pointer p-4 rounded-xl border-2 transition-all ${activeBrand?.id === brand.id
-                                                    ? 'border-blue-600 bg-blue-50'
-                                                    : 'border-border hover:border-blue-300'
-                                                    }`}
-                                            >
-                                                <div className="flex items-center gap-3 mb-3">
-                                                    <div
-                                                        className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold"
-                                                        style={{ backgroundColor: brand.colors.primary }}
-                                                    >
-                                                        {brand.name.charAt(0)}
-                                                    </div>
-                                                    <span className="font-bold text-foreground">{brand.name}</span>
-                                                </div>
-                                                <div className="text-xs text-muted-foreground">
-                                                    {brand.products.length} Products • {brand.voice || 'No voice set'}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="space-y-2">
-                                        {brands.map(brand => {
-                                            const brandProfiles = customerProfiles.filter(p =>
-                                                brand.profileIds?.includes(p.id)
-                                            );
-                                            const isExpanded = expandedBrands[brand.id];
-
-                                            return (
-                                                <div key={brand.id} className="border-2 rounded-xl overflow-hidden transition-all">
-                                                    {/* Brand Row */}
-                                                    <div
-                                                        onClick={() => {
-                                                            setActiveBrand(brand);
-                                                            setExpandedBrands(prev => ({
-                                                                ...prev,
-                                                                [brand.id]: !prev[brand.id]
-                                                            }));
-                                                        }}
-                                                        className={`cursor-pointer p-4 transition-all flex items-center justify-between ${activeBrand?.id === brand.id
-                                                            ? 'border-blue-600 bg-blue-50'
-                                                            : 'border-border hover:border-blue-300 hover:bg-secondary'
-                                                            }`}
-                                                    >
-                                                        <div className="flex items-center gap-4">
-                                                            <div
-                                                                className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold"
-                                                                style={{ backgroundColor: brand.colors.primary }}
-                                                            >
-                                                                {brand.name.charAt(0)}
-                                                            </div>
-                                                            <div>
-                                                                <span className="font-bold text-foreground block">{brand.name}</span>
-                                                                <span className="text-xs text-muted-foreground">
-                                                                    {brand.products.length} Products • {brandProfiles.length} Profiles
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex items-center gap-4">
-                                                            <div className="flex gap-1">
-                                                                <div className="w-4 h-4 rounded" style={{ backgroundColor: brand.colors.primary }}></div>
-                                                                <div className="w-4 h-4 rounded" style={{ backgroundColor: brand.colors.secondary }}></div>
-                                                            </div>
-                                                            {activeBrand?.id === brand.id && <Check className="text-blue-600" size={20} />}
-                                                            <ChevronRight
-                                                                className={`text-muted-foreground transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-                                                                size={20}
-                                                            />
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Customer Profiles (Collapsible) */}
-                                                    {isExpanded && brandProfiles.length > 0 && (
-                                                        <div className="bg-secondary border-t border-border p-4">
-                                                            <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Customer Profiles</h4>
-                                                            <div className="space-y-2">
-                                                                {brandProfiles.map(profile => (
-                                                                    <div
-                                                                        key={profile.id}
-                                                                        className="bg-card p-3 rounded-lg border border-border text-sm"
-                                                                    >
-                                                                        <div className="font-medium text-foreground mb-1">{profile.name}</div>
-                                                                        {profile.demographics && (
-                                                                            <div className="text-xs text-muted-foreground mb-1">
-                                                                                {profile.demographics}
-                                                                            </div>
-                                                                        )}
-                                                                        {profile.pain_points && (
-                                                                            <div className="text-xs text-muted-foreground">
-                                                                                Pain Points: {profile.pain_points}
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                            </>
-                        )}
-
-                        <div className="mt-8 flex justify-end">
-                            <button
-                                onClick={handleNext}
-                                disabled={!activeBrand}
-                                className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors ${activeBrand
-                                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                    : 'bg-muted text-muted-foreground cursor-not-allowed'
-                                    }`}
-                            >
-                                Next Step <ChevronRight size={20} />
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                {/* Step 2: Brand Options */}
-                {step === 2 && (
-                    <BrandOptionsStep
-                        activeBrand={activeBrand}
-                        selectedProduct={selectedProduct}
-                        onSelectProduct={setSelectedProduct}
-                        onNext={handleNext}
-                        onBack={handleBack}
-                    />
-                )}
-
-                {/* Step 3: Template Selection */}
-                {step === 3 && (
                     <TemplateSelector
                         selectedTemplate={selectedTemplate}
                         onSelect={setSelectedTemplate}
@@ -289,8 +124,8 @@ const Wizard = () => {
                     />
                 )}
 
-                {/* Step 4: Analyze Templates */}
-                {step === 4 && (
+                {/* Step 2: Analyze Templates */}
+                {step === 2 && (
                     <AnalyzeTemplatesStep
                         selectedTemplate={selectedTemplate}
                         onNext={handleNext}
@@ -298,8 +133,8 @@ const Wizard = () => {
                     />
                 )}
 
-                {/* Step 5: Copy Builder */}
-                {step === 5 && (
+                {/* Step 3: Copy Builder */}
+                {step === 3 && (
                     <CopyBuilder
                         data={copyData}
                         setData={setCopyData}
@@ -309,8 +144,8 @@ const Wizard = () => {
                     />
                 )}
 
-                {/* Step 6: Generate Images (Nano Banana Pro) */}
-                {step === 6 && (
+                {/* Step 4: Generate Images (Nano Banana Pro) */}
+                {step === 4 && (
                     <NanoBananaGenerationStep
                         copyData={copyData}
                         selectedTemplate={selectedTemplate}
@@ -320,8 +155,8 @@ const Wizard = () => {
                     />
                 )}
 
-                {/* Step 7: Create Batch */}
-                {step === 7 && (
+                {/* Step 5: Create Batch */}
+                {step === 5 && (
                     <BulkAdCreation
                         onNext={() => showSuccess('Campaign Created Successfully!')}
                         onBack={handleBack}

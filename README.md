@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="frontend/public/breadwinner_logo.png" alt="Facebook Ad Builder" width="120" />
+  <img src="frontend/public/tsi_logo.svg" alt="Townsquare Interactive" width="120" />
 </p>
 
-<h1 align="center">Facebook Ad Builder</h1>
+<h1 align="center">Townsquare Interactive - Ad Creative Studio</h1>
 
 <p align="center">
-  <strong>AI-powered Facebook ad automation platform</strong><br>
+  <strong>AI-powered ad creative platform for local business marketing</strong><br>
   From competitor research to ad generation and campaign management
 </p>
 

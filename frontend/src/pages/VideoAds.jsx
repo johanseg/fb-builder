@@ -1,8 +1,6 @@
-import React, { useState } from 'react';
-import { Video, Briefcase, Package, Users, Check, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Video, Users, Check, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import { useBrands } from '../context/BrandContext';
-import BrandSelectionStep from '../components/steps/BrandSelectionStep';
-import ProductSelectionStep from '../components/steps/ProductSelectionStep';
 import ProfileSelectionStep from '../components/steps/ProfileSelectionStep';
 
 export default function VideoAds() {
@@ -15,12 +13,19 @@ export default function VideoAds() {
         useProductShots: false
     });
 
+    // Auto-populate brand and product from first available
+    useEffect(() => {
+        if (brands.length > 0) {
+            const brand = brands[0];
+            const product = brand?.products?.[0] || null;
+            setWizardData(prev => ({ ...prev, brand, product }));
+        }
+    }, [brands]);
+
     const steps = [
-        { id: 1, name: 'Brand', icon: Briefcase },
-        { id: 2, name: 'Product', icon: Package },
-        { id: 3, name: 'Profile', icon: Users },
-        { id: 4, name: 'Video Style', icon: Video },
-        { id: 5, name: 'Generate', icon: Sparkles }
+        { id: 1, name: 'Profile', icon: Users },
+        { id: 2, name: 'Video Style', icon: Video },
+        { id: 3, name: 'Generate', icon: Sparkles }
     ];
 
     const updateData = (field, value) => {
@@ -29,9 +34,7 @@ export default function VideoAds() {
 
     const isStepComplete = (stepId) => {
         switch (stepId) {
-            case 1: return wizardData.brand !== null;
-            case 2: return wizardData.product !== null;
-            case 3: return wizardData.profile !== null;
+            case 1: return wizardData.profile !== null;
             default: return true;
         }
     };
@@ -122,37 +125,10 @@ export default function VideoAds() {
 
             {/* Step Content */}
             <div className="bg-card rounded-xl shadow-sm border border-border p-8 min-h-[500px] relative">
-                {/* Step 1: Brand Selection */}
+                {/* Step 1: Profile Selection */}
                 {currentStep === 1 && (
-                    <BrandSelectionStep
-                        brands={brands}
-                        selectedBrand={wizardData.brand}
-                        onSelect={(brand) => {
-                            updateData('brand', brand);
-                            nextStep();
-                        }}
-                    />
-                )}
-
-                {/* Step 2: Product Selection */}
-                {currentStep === 2 && (
-                    <ProductSelectionStep
-                        products={wizardData.brand?.products || []}
-                        selectedProduct={wizardData.product}
-                        useProductShots={wizardData.useProductShots}
-                        onSelect={(product) => {
-                            updateData('product', product);
-                            updateData('useProductShots', false);
-                            nextStep();
-                        }}
-                        onToggleProductShots={(use) => updateData('useProductShots', use)}
-                    />
-                )}
-
-                {/* Step 3: Profile Selection */}
-                {currentStep === 3 && (
                     <ProfileSelectionStep
-                        profiles={customerProfiles.filter(p => wizardData.brand?.profileIds?.includes(p.id))}
+                        profiles={customerProfiles}
                         selectedProfile={wizardData.profile}
                         onSelect={(profile) => {
                             updateData('profile', profile);
@@ -161,8 +137,8 @@ export default function VideoAds() {
                     />
                 )}
 
-                {/* Step 4: Video Style (Placeholder) */}
-                {currentStep === 4 && (
+                {/* Step 2: Video Style (Placeholder) */}
+                {currentStep === 2 && (
                     <div className="text-center py-12">
                         <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6">
                             <Video className="text-amber-600" size={32} />
@@ -172,8 +148,8 @@ export default function VideoAds() {
                     </div>
                 )}
 
-                {/* Step 5: Generate (Placeholder) */}
-                {currentStep === 5 && (
+                {/* Step 3: Generate (Placeholder) */}
+                {currentStep === 3 && (
                     <div className="text-center py-12">
                         <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6">
                             <Sparkles className="text-amber-600" size={32} />

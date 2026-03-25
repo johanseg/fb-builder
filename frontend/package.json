@@ -1,8 +1,8 @@
 {
-  "name": "facebook_ad_builder",
+  "name": "tsi-ad-creative-studio",
   "private": true,
   "version": "1.0.0",
-  "description": "AI-powered Facebook ad automation platform",
+  "description": "Townsquare Interactive Ad Creative Studio",
   "author": "Jason Akatiff <jason@jasonakatiff.com> (https://iscale.com)",
   "license": "MIT",
   "type": "module",

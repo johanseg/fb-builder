@@ -1,5 +1,5 @@
 # Gitleaks configuration
-title = "BreadWinner Secrets Scan"
+title = "Townsquare Interactive Secrets Scan"
 
 [allowlist]
 description = "Allowlist for known false positives"

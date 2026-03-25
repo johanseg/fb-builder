@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Facebook Ad Builder — AI-powered full-stack app for automating Facebook ad lifecycle: competitor research, AI ad generation, campaign management, and performance reporting.
+Townsquare Interactive Ad Creative Studio — AI-powered full-stack app for automating Facebook ad lifecycle: competitor research, AI ad generation, campaign management, and performance reporting. Built for Townsquare Interactive's local marketing team.
 
 - **Frontend**: React 19 + Vite 7 + TailwindCSS
 - **Backend**: Python FastAPI 0.104

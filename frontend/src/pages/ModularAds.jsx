@@ -12,7 +12,6 @@ export default function ModularAds() {
     const { authFetch } = useAuth();
     const { showError, showSuccess } = useToast();
     
-    const [selectedBrand, setSelectedBrand] = useState('');
     const [selectedProduct, setSelectedProduct] = useState('');
     const [generationType, setGenerationType] = useState('matrix'); // matrix or micro_movie
     const [microMovies, setMicroMovies] = useState(null);
@@ -20,9 +19,16 @@ export default function ModularAds() {
     const [avatarType, setAvatarType] = useState('');
     const [personas, setPersonas] = useState([]);
 
-    const activeBrand = brands.find(b => b.id === selectedBrand);
+    const activeBrand = brands[0] || null;
     const availableProducts = activeBrand?.products || [];
     const activeProduct = availableProducts.find(p => p.id === selectedProduct);
+
+    // Auto-select first product when brand loads
+    React.useEffect(() => {
+        if (availableProducts.length > 0 && !selectedProduct) {
+            setSelectedProduct(availableProducts[0].id);
+        }
+    }, [availableProducts, selectedProduct]);
 
     React.useEffect(() => {
         if (activeBrand) {
@@ -122,29 +128,14 @@ export default function ModularAds() {
 
             <div className="bg-card rounded-2xl shadow-sm border border-border p-6 md:p-8">
                 <h2 className="text-xl font-bold text-foreground mb-6 border-b border-border pb-4">1. Select Product Knowledge Base</h2>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                     <div>
-                        <label className="block text-sm font-medium text-foreground mb-1">Brand</label>
-                        <select 
-                            className="w-full p-3 border border-border rounded-xl focus:ring-2 focus:ring-purple-500"
-                            value={selectedBrand} 
-                            onChange={e => { setSelectedBrand(e.target.value); setSelectedProduct(''); }}
-                        >
-                            <option value="">Select Brand...</option>
-                            {brands.map(b => (
-                                <option key={b.id} value={b.id}>{b.name}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div>
                         <label className="block text-sm font-medium text-foreground mb-1">Product</label>
-                        <select 
-                            className="w-full p-3 border border-border rounded-xl focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
-                            value={selectedProduct} 
+                        <select
+                            className="w-full p-3 border border-border rounded-xl focus:ring-2 focus:ring-purple-500"
+                            value={selectedProduct}
                             onChange={e => setSelectedProduct(e.target.value)}
-                            disabled={!selectedBrand}
                         >
                             <option value="">Select Product...</option>
                             {availableProducts.map(p => (
