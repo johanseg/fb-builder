@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 import os
 import uuid
+import mimetypes
 from typing import Dict
 from pathlib import Path
 from app.core.config import settings
@@ -53,7 +54,8 @@ async def upload_to_r2(file_content: bytes, filename: str, content_type: str) ->
         )
         return f"{settings.R2_PUBLIC_URL}/{filename}"
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to upload to R2: {str(e)}")
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 async def upload_to_local(file_content: bytes, filename: str) -> str:
@@ -95,9 +97,12 @@ async def upload_file(file: UploadFile = File(...), current_user: User = Depends
         # Generate a unique filename
         filename = f"{uuid.uuid4()}{file_extension}"
 
+        # Derive content type from validated file extension instead of trusting client
+        content_type = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
+
         # Upload to R2 if configured, otherwise local
         if settings.r2_enabled:
-            url = await upload_to_r2(file_content, filename, file.content_type or 'application/octet-stream')
+            url = await upload_to_r2(file_content, filename, content_type)
         else:
             url = await upload_to_local(file_content, filename)
 
@@ -107,4 +112,5 @@ async def upload_file(file: UploadFile = File(...), current_user: User = Depends
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Could not upload file: {str(e)}")
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")

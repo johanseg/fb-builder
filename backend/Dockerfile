@@ -42,6 +42,15 @@ COPY . .
 # Create uploads directory
 RUN mkdir -p uploads
 
+# Create non-root user and set ownership
+RUN useradd --create-home --shell /bin/bash appuser \
+    && chown -R appuser:appuser /app
+
+# Playwright needs --no-sandbox when running as non-root
+ENV PLAYWRIGHT_CHROMIUM_SANDBOX=0
+
+USER appuser
+
 # Expose port (Railway uses dynamic $PORT)
 EXPOSE 8000
 

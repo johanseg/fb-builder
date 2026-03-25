@@ -1,7 +1,7 @@
 """
 Ad Remix API Endpoints
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 from typing import List
@@ -10,6 +10,7 @@ import json
 from app.database import get_db
 from app.models import WinningAd, Brand, Product, CustomerProfile, User
 from app.core.deps import get_current_active_user
+from app.core.rate_limit import limiter
 from app.schemas.ad_blueprint import (
     AdBlueprint,
     AdBlueprintResponse,
@@ -24,8 +25,10 @@ router = APIRouter()
 
 
 @router.post("/deconstruct", response_model=AdBlueprint)
+@limiter.limit("10/minute")
 async def deconstruct_ad_template(
-    request: DeconstructRequest,
+    request: Request,
+    body: DeconstructRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
@@ -40,10 +43,10 @@ async def deconstruct_ad_template(
     - Visual style guide
     """
     # Get the template
-    template = db.query(WinningAd).filter(WinningAd.id == request.template_id).first()
+    template = db.query(WinningAd).filter(WinningAd.id == body.template_id).first()
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
-    
+
     # Deconstruct the template
     try:
         blueprint = await deconstruct_template(template.image_url)
@@ -56,12 +59,15 @@ async def deconstruct_ad_template(
         return blueprint
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Deconstruction failed: {str(e)}")
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/reconstruct", response_model=AdConcept)
+@limiter.limit("10/minute")
 async def reconstruct_ad_from_blueprint(
-    request: ReconstructRequest,
+    request: Request,
+    body: ReconstructRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
@@ -72,29 +78,29 @@ async def reconstruct_ad_from_blueprint(
     with your brand/product information while maintaining the proven structure.
     """
     # Get the template with blueprint
-    template = db.query(WinningAd).filter(WinningAd.id == request.template_id).first()
+    template = db.query(WinningAd).filter(WinningAd.id == body.template_id).first()
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
-    
+
     if not template.blueprint_json:
         raise HTTPException(
             status_code=400,
             detail="Template has not been deconstructed yet. Run /deconstruct first."
         )
-    
+
     # Get brand, product, and profile data
-    brand = db.query(Brand).filter(Brand.id == request.brand_id).first()
+    brand = db.query(Brand).filter(Brand.id == body.brand_id).first()
     if not brand:
         raise HTTPException(status_code=404, detail="Brand not found")
-    
-    product = db.query(Product).filter(Product.id == request.product_id).first()
+
+    product = db.query(Product).filter(Product.id == body.product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    
-    profile = db.query(CustomerProfile).filter(CustomerProfile.id == request.profile_id).first()
+
+    profile = db.query(CustomerProfile).filter(CustomerProfile.id == body.profile_id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Customer profile not found")
-    
+
     # Build brand data
     brand_data = BrandData(
         brand_name=brand.name,
@@ -104,9 +110,9 @@ async def reconstruct_ad_from_blueprint(
         audience_demographics=profile.demographics or "",
         audience_pain_points=profile.pain_points or "",
         audience_goals=profile.goals or "",
-        campaign_offer=request.campaign_offer,
-        campaign_urgency=request.campaign_urgency,
-        campaign_messaging=request.campaign_messaging
+        campaign_offer=body.campaign_offer,
+        campaign_urgency=body.campaign_urgency,
+        campaign_messaging=body.campaign_messaging
     )
     
     # Reconstruct the blueprint
@@ -117,7 +123,8 @@ async def reconstruct_ad_from_blueprint(
         return ad_concept
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Reconstruction failed: {str(e)}")
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/blueprints/{template_id}", response_model=AdBlueprint)

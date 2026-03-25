@@ -24,7 +24,6 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
-    "@supabase/supabase-js": "^2.83.0",
     "axios": "^1.13.2",
     "lucide-react": "^0.554.0",
     "react": "^19.2.1",
@@ -33,7 +32,6 @@
   },
   "optionalDependencies": {
     "adm-zip": "^0.5.16",
-    "better-sqlite3": "^12.4.1",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",

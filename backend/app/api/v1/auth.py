@@ -1,6 +1,10 @@
+import hashlib
+
 from fastapi import APIRouter, Depends, HTTPException, status, Form, Request
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
+from typing import Optional
 
 from app.database import get_db
 from app.core.rate_limit import limiter
@@ -24,6 +28,18 @@ from app.schemas.auth import (
 router = APIRouter()
 
 
+def hash_token(token: str) -> str:
+    """Hash a token using SHA-256 for secure storage."""
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+class UserSelfUpdate(BaseModel):
+    """Schema for users updating their own profile."""
+    email: Optional[str] = None
+    name: Optional[str] = None
+    password: Optional[str] = None
+
+
 async def _authenticate_user(db: Session, email: str, password: str) -> Token:
     """Shared authentication logic for login endpoints."""
     user = db.query(User).filter(User.email == email).first()
@@ -45,10 +61,10 @@ async def _authenticate_user(db: Session, email: str, password: str) -> Token:
     access_token = create_access_token(data={"sub": user.id})
     refresh_token_str, expires_at = create_refresh_token()
 
-    # Store refresh token in database
+    # Store hashed refresh token in database
     refresh_token_obj = RefreshToken(
         user_id=user.id,
-        token=refresh_token_str,
+        token=hash_token(refresh_token_str),
         expires_at=expires_at
     )
     db.add(refresh_token_obj)
@@ -126,9 +142,9 @@ async def login_json(request: Request, user_data: UserLogin, db: Session = Depen
 @limiter.limit("100/minute")
 async def refresh_token(request: Request, token_data: TokenRefresh, db: Session = Depends(get_db)):
     """Get new access and refresh tokens using a refresh token (rolling refresh)"""
-    # Find the refresh token
+    # Find the refresh token by hashing the incoming token
     refresh_token_obj = db.query(RefreshToken).filter(
-        RefreshToken.token == token_data.refresh_token
+        RefreshToken.token == hash_token(token_data.refresh_token)
     ).first()
 
     if not refresh_token_obj:
@@ -162,10 +178,10 @@ async def refresh_token(request: Request, token_data: TokenRefresh, db: Session 
     access_token = create_access_token(data={"sub": user.id})
     new_refresh_token_str, expires_at = create_refresh_token()
 
-    # Store new refresh token
+    # Store new hashed refresh token
     new_refresh_token_obj = RefreshToken(
         user_id=user.id,
-        token=new_refresh_token_str,
+        token=hash_token(new_refresh_token_str),
         expires_at=expires_at
     )
     db.add(new_refresh_token_obj)
@@ -184,9 +200,9 @@ async def logout(
     db: Session = Depends(get_db)
 ):
     """Logout by invalidating the refresh token"""
-    # Find and delete the refresh token
+    # Find and delete the refresh token (hash before lookup)
     refresh_token_obj = db.query(RefreshToken).filter(
-        RefreshToken.token == token_data.refresh_token,
+        RefreshToken.token == hash_token(token_data.refresh_token),
         RefreshToken.user_id == current_user.id
     ).first()
 
@@ -207,13 +223,13 @@ async def get_current_user_info(
 
 @router.put("/me", response_model=UserResponse)
 async def update_current_user(
-    user_update: UserCreate,
+    user_update: UserSelfUpdate,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Update current user's profile"""
-    # Check if email is being changed and if it's already taken
-    if user_update.email and user_update.email != current_user.email:
+    # Only update fields that are not None
+    if user_update.email is not None and user_update.email != current_user.email:
         existing = db.query(User).filter(User.email == user_update.email).first()
         if existing:
             raise HTTPException(
@@ -225,7 +241,7 @@ async def update_current_user(
     if user_update.name is not None:
         current_user.name = user_update.name
 
-    if user_update.password:
+    if user_update.password is not None:
         current_user.hashed_password = get_password_hash(user_update.password)
 
     db.commit()

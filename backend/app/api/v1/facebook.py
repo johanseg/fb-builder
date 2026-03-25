@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
+from pydantic import BaseModel
 from app.services.facebook_service import FacebookService
 from app.models import FacebookAd, FacebookAdSet, FacebookCampaign, User
 from app.database import get_db
@@ -8,13 +9,129 @@ from sqlalchemy.orm import Session
 
 router = APIRouter()
 
+
+# --- Pydantic request schemas ---
+
+class CampaignCreateRequest(BaseModel):
+    name: str
+    objective: str
+    status: Optional[str] = "PAUSED"
+    budget_type: Optional[str] = None
+    budgetType: Optional[str] = None
+    daily_budget: Optional[float] = None
+    dailyBudget: Optional[float] = None
+    bid_strategy: Optional[str] = None
+    bidStrategy: Optional[str] = None
+
+
+class AdSetCreateRequest(BaseModel):
+    name: str
+    campaign_id: Optional[str] = None
+    optimization_goal: Optional[str] = None
+    optimizationGoal: Optional[str] = None
+    status: Optional[str] = "PAUSED"
+    targeting: Optional[dict] = None
+    daily_budget: Optional[float] = None
+    dailyBudget: Optional[float] = None
+    bid_strategy: Optional[str] = None
+    bidStrategy: Optional[str] = None
+    bid_amount: Optional[float] = None
+    bidAmount: Optional[float] = None
+    budget_type: Optional[str] = None
+    budgetType: Optional[str] = None
+    start_time: Optional[str] = None
+    startTime: Optional[str] = None
+    advantage_audience: Optional[int] = 0
+    pixelId: Optional[str] = None
+    pixel_id: Optional[str] = None
+    conversionEvent: Optional[str] = None
+    conversion_event: Optional[str] = None
+
+
+class CreativeCreateRequest(BaseModel):
+    name: Optional[str] = None
+    page_id: Optional[str] = None
+    image_hash: Optional[str] = None
+    video_id: Optional[str] = None
+    primary_text: Optional[str] = None
+    headline: Optional[str] = None
+    description: Optional[str] = None
+    cta: Optional[str] = "LEARN_MORE"
+    website_url: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    instagram_actor_id: Optional[str] = None
+
+
+class AdCreateRequest(BaseModel):
+    name: str
+    adset_id: str
+    creative_id: str
+    status: Optional[str] = "ACTIVE"
+
+
+class CampaignSaveRequest(BaseModel):
+    id: Optional[str] = None
+    name: Optional[str] = None
+    objective: Optional[str] = None
+    budgetType: Optional[str] = "ABO"
+    dailyBudget: Optional[float] = None
+    bidStrategy: Optional[str] = None
+    status: Optional[str] = None
+    fbCampaignId: Optional[str] = None
+
+
+class AdSetSaveRequest(BaseModel):
+    id: Optional[str] = None
+    campaignId: str
+    name: Optional[str] = None
+    optimizationGoal: Optional[str] = None
+    dailyBudget: Optional[float] = None
+    bidStrategy: Optional[str] = None
+    bidAmount: Optional[float] = None
+    targeting: Optional[dict] = None
+    pixelId: Optional[str] = None
+    conversionEvent: Optional[str] = None
+    status: Optional[str] = None
+    fbAdsetId: Optional[str] = None
+
+
+class AdSaveRequest(BaseModel):
+    id: Optional[str] = None
+    adsetId: Optional[str] = None
+    name: Optional[str] = None
+    creativeName: Optional[str] = None
+    imageUrl: Optional[str] = None
+    mediaType: Optional[str] = "image"
+    videoUrl: Optional[str] = None
+    videoId: Optional[str] = None
+    thumbnailUrl: Optional[str] = None
+    bodies: Optional[List[str]] = None
+    headlines: Optional[List[str]] = None
+    description: Optional[str] = None
+    cta: Optional[str] = None
+    websiteUrl: Optional[str] = None
+    status: Optional[str] = None
+    fbAdId: Optional[str] = None
+    fbCreativeId: Optional[str] = None
+
+
+class ImageUploadRequest(BaseModel):
+    image_url: str
+
+
+class VideoUploadRequest(BaseModel):
+    video_url: str
+    wait_for_ready: Optional[bool] = True
+    timeout: Optional[int] = 600
+
 def get_facebook_service():
     service = FacebookService()
     try:
         if not service.api:
             service.initialize()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
     return service
 
 @router.get("/accounts")
@@ -25,7 +142,8 @@ def get_ad_accounts(
     try:
         return service.get_ad_accounts()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/campaigns")
 def read_campaigns(
@@ -38,22 +156,22 @@ def read_campaigns(
         # Convert FB objects to dicts
         return [dict(c) for c in campaigns]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/campaigns")
 def create_campaign(
-    campaign: Dict[str, Any],
+    campaign: CampaignCreateRequest,
     ad_account_id: Optional[str] = None,
     service: FacebookService = Depends(get_facebook_service),
     current_user: User = Depends(require_permission("campaigns:write"))
 ):
     try:
-        # Check if ad_account_id is in query or body (body takes precedence if we structured it that way, but here we use query or separate param)
-        # For POST, usually better to have it in the body or query. Let's support query for consistency with GET
-        result = service.create_campaign(campaign, ad_account_id)
+        result = service.create_campaign(campaign.model_dump(exclude_none=True), ad_account_id)
         return dict(result)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/pixels")
 def read_pixels(
@@ -66,7 +184,8 @@ def read_pixels(
         # Convert FB objects to dicts
         return [dict(p) for p in pixels]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/pages")
 def read_pages(
@@ -77,7 +196,8 @@ def read_pages(
         pages = service.get_pages()
         return pages
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/adsets")
@@ -91,46 +211,50 @@ def read_adsets(
         adsets = service.get_adsets(ad_account_id, campaign_id)
         return [dict(a) for a in adsets]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/adsets")
 def create_adset(
-    adset: Dict[str, Any],
+    adset: AdSetCreateRequest,
     ad_account_id: Optional[str] = None,
     service: FacebookService = Depends(get_facebook_service),
     current_user: User = Depends(require_permission("campaigns:write"))
 ):
     try:
-        result = service.create_adset(adset, ad_account_id)
+        result = service.create_adset(adset.model_dump(exclude_none=True), ad_account_id)
         return dict(result)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/creatives")
 def create_creative(
-    creative: Dict[str, Any],
+    creative: CreativeCreateRequest,
     ad_account_id: Optional[str] = None,
     service: FacebookService = Depends(get_facebook_service),
     current_user: User = Depends(require_permission("campaigns:write"))
 ):
     try:
-        result = service.create_creative(creative, ad_account_id)
+        result = service.create_creative(creative.model_dump(exclude_none=True), ad_account_id)
         return dict(result)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/ads")
 def create_ad(
-    ad: Dict[str, Any],
+    ad: AdCreateRequest,
     ad_account_id: Optional[str] = None,
     service: FacebookService = Depends(get_facebook_service),
     current_user: User = Depends(require_permission("campaigns:write"))
 ):
     try:
-        result = service.create_ad(ad, ad_account_id)
+        result = service.create_ad(ad.model_dump(exclude_none=True), ad_account_id)
         return dict(result)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/ads")
 def read_ads(
@@ -142,124 +266,120 @@ def read_ads(
         ads = service.get_ads(adset_id)
         return [dict(a) for a in ads]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/campaigns/save")
 def save_campaign_locally(
-    campaign_data: Dict[str, Any],
+    campaign_data: CampaignSaveRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("campaigns:write"))
 ):
     try:
         # Check if exists
-        existing = db.query(FacebookCampaign).filter(FacebookCampaign.id == campaign_data.get('id')).first()
+        existing = db.query(FacebookCampaign).filter(FacebookCampaign.id == campaign_data.id).first()
         if existing:
             return {"message": "Campaign already exists", "id": existing.id}
 
         # Handle daily_budget casting
-        daily_budget = campaign_data.get('dailyBudget')
+        daily_budget = campaign_data.dailyBudget
         if daily_budget is not None:
             daily_budget = int(float(daily_budget))
 
         new_campaign = FacebookCampaign(
-            id=campaign_data.get('id'),
-            name=campaign_data.get('name'),
-            objective=campaign_data.get('objective'),
-            budget_type=campaign_data.get('budgetType', 'ABO'),
+            id=campaign_data.id,
+            name=campaign_data.name,
+            objective=campaign_data.objective,
+            budget_type=campaign_data.budgetType or 'ABO',
             daily_budget=daily_budget,
-            bid_strategy=campaign_data.get('bidStrategy'),
-            status=campaign_data.get('status'),
-            fb_campaign_id=campaign_data.get('fbCampaignId')
+            bid_strategy=campaign_data.bidStrategy,
+            status=campaign_data.status,
+            fb_campaign_id=campaign_data.fbCampaignId
         )
         db.add(new_campaign)
         db.commit()
         db.refresh(new_campaign)
         return {"message": "Campaign saved locally", "id": new_campaign.id}
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
-        print(f"Error saving campaign locally: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/adsets/save")
 def save_adset_locally(
-    adset_data: Dict[str, Any],
+    adset_data: AdSetSaveRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("campaigns:write"))
 ):
     try:
         # Check if exists
-        existing = db.query(FacebookAdSet).filter(FacebookAdSet.id == adset_data.get('id')).first()
+        existing = db.query(FacebookAdSet).filter(FacebookAdSet.id == adset_data.id).first()
         if existing:
             return {"message": "AdSet already exists", "id": existing.id}
-            
-        # Ensure campaign exists (FK check)
-        campaign_id = adset_data.get('campaignId')
-        if not campaign_id:
-             raise HTTPException(status_code=400, detail="campaignId is required")
-             
+
         # We assume campaign is already saved by the frontend calling /campaigns/save first
 
         # Handle numeric fields casting
-        daily_budget = adset_data.get('dailyBudget')
+        daily_budget = adset_data.dailyBudget
         if daily_budget is not None:
             daily_budget = int(float(daily_budget))
-            
-        bid_amount = adset_data.get('bidAmount')
+
+        bid_amount = adset_data.bidAmount
         if bid_amount is not None:
             bid_amount = int(float(bid_amount))
 
         new_adset = FacebookAdSet(
-            id=adset_data.get('id'),
-            campaign_id=campaign_id,
-            name=adset_data.get('name'),
-            optimization_goal=adset_data.get('optimizationGoal'),
+            id=adset_data.id,
+            campaign_id=adset_data.campaignId,
+            name=adset_data.name,
+            optimization_goal=adset_data.optimizationGoal,
             daily_budget=daily_budget,
-            bid_strategy=adset_data.get('bidStrategy'),
+            bid_strategy=adset_data.bidStrategy,
             bid_amount=bid_amount,
-            targeting=adset_data.get('targeting'),
-            pixel_id=adset_data.get('pixelId'),
-            conversion_event=adset_data.get('conversionEvent'),
-            status=adset_data.get('status'),
-            fb_adset_id=adset_data.get('fbAdsetId')
+            targeting=adset_data.targeting,
+            pixel_id=adset_data.pixelId,
+            conversion_event=adset_data.conversionEvent,
+            status=adset_data.status,
+            fb_adset_id=adset_data.fbAdsetId
         )
         db.add(new_adset)
         db.commit()
         db.refresh(new_adset)
         return {"message": "AdSet saved locally", "id": new_adset.id}
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
-        print(f"Error saving adset locally: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/ads/save")
 def save_ad_locally(
-    ad_data: Dict[str, Any],
+    ad_data: AdSaveRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("campaigns:write"))
 ):
     try:
-        # Check if adset exists locally, if not we might need to create it or handle error
-        # For now, assuming adset exists or we just save the ID
-
         new_ad = FacebookAd(
-            id=ad_data.get('id'),
-            adset_id=ad_data.get('adsetId'),
-            name=ad_data.get('name'),
-            creative_name=ad_data.get('creativeName'),
-            image_url=ad_data.get('imageUrl'),
-            # Video support fields
-            media_type=ad_data.get('mediaType', 'image'),
-            video_url=ad_data.get('videoUrl'),
-            video_id=ad_data.get('videoId'),
-            thumbnail_url=ad_data.get('thumbnailUrl'),
-            bodies=ad_data.get('bodies'),
-            headlines=ad_data.get('headlines'),
-            description=ad_data.get('description'),
-            cta=ad_data.get('cta'),
-            website_url=ad_data.get('websiteUrl'),
-            status=ad_data.get('status'),
-            fb_ad_id=ad_data.get('fbAdId'),
-            fb_creative_id=ad_data.get('fbCreativeId')
+            id=ad_data.id,
+            adset_id=ad_data.adsetId,
+            name=ad_data.name,
+            creative_name=ad_data.creativeName,
+            image_url=ad_data.imageUrl,
+            media_type=ad_data.mediaType or 'image',
+            video_url=ad_data.videoUrl,
+            video_id=ad_data.videoId,
+            thumbnail_url=ad_data.thumbnailUrl,
+            bodies=ad_data.bodies,
+            headlines=ad_data.headlines,
+            description=ad_data.description,
+            cta=ad_data.cta,
+            website_url=ad_data.websiteUrl,
+            status=ad_data.status,
+            fb_ad_id=ad_data.fbAdId,
+            fb_creative_id=ad_data.fbCreativeId
         )
         db.add(new_ad)
         db.commit()
@@ -267,28 +387,28 @@ def save_ad_locally(
         return {"message": "Ad saved locally", "id": new_ad.id}
     except Exception as e:
         db.rollback()
-        print(f"Error saving ad locally: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/upload-image")
 def upload_image(
-    data: Dict[str, str],
+    data: ImageUploadRequest,
     ad_account_id: Optional[str] = None,
     service: FacebookService = Depends(get_facebook_service),
     current_user: User = Depends(require_permission("campaigns:write"))
 ):
     try:
-        image_url = data.get("image_url")
-        if not image_url:
-            raise HTTPException(status_code=400, detail="image_url is required")
-        image_hash = service.upload_image(image_url, ad_account_id)
+        image_hash = service.upload_image(data.image_url, ad_account_id)
         return {"image_hash": image_hash}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/upload-video")
 def upload_video(
-    data: Dict[str, Any],
+    data: VideoUploadRequest,
     ad_account_id: Optional[str] = None,
     service: FacebookService = Depends(get_facebook_service),
     current_user: User = Depends(require_permission("campaigns:write"))
@@ -305,25 +425,19 @@ def upload_video(
         status: 'processing', 'ready', or 'error'
         thumbnails: List of auto-generated thumbnail URLs (if ready)
     """
-    video_url = data.get("video_url")
-    if not video_url:
-        raise HTTPException(status_code=400, detail="video_url is required")
-
     try:
-        wait_for_ready = data.get("wait_for_ready", True)
-        timeout = data.get("timeout", 600)
-
         result = service.upload_video(
-            video_url,
+            data.video_url,
             ad_account_id,
-            wait_for_ready=wait_for_ready,
-            timeout=timeout
+            wait_for_ready=data.wait_for_ready,
+            timeout=data.timeout
         )
         return result
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/video-status/{video_id}")
 def get_video_status(
@@ -341,7 +455,8 @@ def get_video_status(
     try:
         return service.get_video_status(video_id)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/video-thumbnails/{video_id}")
 def get_video_thumbnails(
@@ -358,7 +473,8 @@ def get_video_thumbnails(
         thumbnails = service.get_video_thumbnails(video_id)
         return {"thumbnails": thumbnails}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/locations/search")
 def search_locations(
@@ -373,5 +489,6 @@ def search_locations(
         locations = service.search_locations(q, type, limit, ad_account_id)
         return [dict(loc) for loc in locations]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 

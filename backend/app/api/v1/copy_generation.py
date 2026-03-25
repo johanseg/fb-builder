@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from app.models import User
 from app.core.deps import get_current_active_user
+from app.core.rate_limit import limiter
 import google.generativeai as genai
 import os
 import json
@@ -33,7 +34,8 @@ class FieldRegenerationRequest(BaseModel):
     campaignDetails: Dict[str, str]
 
 @router.post("/generate")
-async def generate_copy(request: CopyGenerationRequest, current_user: User = Depends(get_current_active_user)):
+@limiter.limit("20/minute")
+async def generate_copy(request: Request, body: CopyGenerationRequest, current_user: User = Depends(get_current_active_user)):
     """Generate ad copy variations using Gemini AI"""
     
     if not GEMINI_API_KEY:
@@ -41,24 +43,24 @@ async def generate_copy(request: CopyGenerationRequest, current_user: User = Dep
     
     try:
         # Build the prompt
-        count = request.variationCount
+        count = body.variationCount
         prompt = f"""You are an expert ad copywriter. Generate {count} variations of ad copy for a Facebook/Instagram ad campaign.
 
-BRAND VOICE: {request.brand.get('voice', 'Professional and friendly')}
+BRAND VOICE: {body.brand.get('voice', 'Professional and friendly')}
 
-PRODUCT: {request.product.get('name')}
-{f"Description: {request.product.get('description')}" if request.product.get('description') else ''}
+PRODUCT: {body.product.get('name')}
+{f"Description: {body.product.get('description')}" if body.product.get('description') else ''}
 
 TARGET AUDIENCE:
-- Demographics: {request.profile.get('demographics', 'General audience')}
-- Pain Points: {request.profile.get('pain_points', 'Not specified')}
-- Goals: {request.profile.get('goals', 'Not specified')}
+- Demographics: {body.profile.get('demographics', 'General audience')}
+- Pain Points: {body.profile.get('pain_points', 'Not specified')}
+- Goals: {body.profile.get('goals', 'Not specified')}
 
 CAMPAIGN DETAILS:
-- Offer: {request.campaignDetails.get('offer')}
-- Key Messaging: {request.campaignDetails.get('messaging')}
+- Offer: {body.campaignDetails.get('offer')}
+- Key Messaging: {body.campaignDetails.get('messaging')}
 
-TEMPLATE STYLE: {request.template.get('design_style', 'Modern and clean') if request.template else 'Modern and clean'}
+TEMPLATE STYLE: {body.template.get('design_style', 'Modern and clean') if body.template else 'Modern and clean'}
 
 BODY COPY STYLES (vary across variations):
 1. BULLET POINTS WITH EMOJIS: Use 2-4 bullet points with emojis at the start
@@ -99,8 +101,8 @@ Return ONLY valid JSON in this exact format:
 }}"""
 
         # Use custom prompt if provided
-        if request.customPrompt:
-            prompt = request.customPrompt
+        if body.customPrompt:
+            prompt = body.customPrompt
         
         # Generate with Gemini
         model = genai.GenerativeModel('gemini-flash-latest')
@@ -127,13 +129,15 @@ Return ONLY valid JSON in this exact format:
     except json.JSONDecodeError as e:
         print(f"JSON Parse Error: {e}")
         print(f"Response text: {response_text}")
-        raise HTTPException(status_code=500, detail=f"Failed to parse AI response as JSON: {str(e)}")
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
     except Exception as e:
-        print(f"Copy generation error: {e}")
-        raise HTTPException(status_code=500, detail=f"Copy generation failed: {str(e)}")
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/regenerate-field")
-async def regenerate_field(request: FieldRegenerationRequest, current_user: User = Depends(get_current_active_user)):
+@limiter.limit("20/minute")
+async def regenerate_field(request: Request, body: FieldRegenerationRequest, current_user: User = Depends(get_current_active_user)):
     """Regenerate a specific field (headline, body, or cta)"""
     
     if not GEMINI_API_KEY:
@@ -145,22 +149,22 @@ async def regenerate_field(request: FieldRegenerationRequest, current_user: User
             "body": "Generate new body copy (under 125 characters for bullets, or up to 200 for storytelling)",
             "cta": "Generate a new call-to-action (under 20 characters)"
         }
-        
-        prompt = f"""You are an expert ad copywriter. {field_prompts.get(request.field, 'Generate new copy')}.
 
-BRAND VOICE: {request.brand.get('voice', 'Professional and friendly')}
-PRODUCT: {request.product.get('name')}
-TARGET AUDIENCE: {request.profile.get('demographics', 'General audience')}
-CAMPAIGN: {request.campaignDetails.get('offer')}
+        prompt = f"""You are an expert ad copywriter. {field_prompts.get(body.field, 'Generate new copy')}.
 
-Current {request.field}: {request.currentValue}
+BRAND VOICE: {body.brand.get('voice', 'Professional and friendly')}
+PRODUCT: {body.product.get('name')}
+TARGET AUDIENCE: {body.profile.get('demographics', 'General audience')}
+CAMPAIGN: {body.campaignDetails.get('offer')}
+
+Current {body.field}: {body.currentValue}
 
 Generate a DIFFERENT, fresh variation that:
 1. Matches the brand voice
 2. Is compelling and conversion-focused
 3. Follows the character limits
 
-Return ONLY the new {request.field} text, nothing else."""
+Return ONLY the new {body.field} text, nothing else."""
 
         model = genai.GenerativeModel('gemini-flash-latest')
         response = model.generate_content(prompt)
@@ -170,5 +174,5 @@ Return ONLY the new {request.field} text, nothing else."""
         return {"newValue": new_value}
         
     except Exception as e:
-        print(f"Field regeneration error: {e}")
-        raise HTTPException(status_code=500, detail=f"Field regeneration failed: {str(e)}")
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")

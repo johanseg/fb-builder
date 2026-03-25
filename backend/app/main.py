@@ -19,11 +19,13 @@ from slowapi.errors import RateLimitExceeded
 from app.core.config import settings
 from app.core.rate_limit import limiter
 
+_is_dev = os.getenv("ENVIRONMENT", "production") != "production"
+
 app = FastAPI(
     title="Facebook Ad Automation API",
     version="1.0.0",
-    openapi_url="/api/v1/openapi.json",
-    docs_url="/api/v1/docs",
+    openapi_url="/api/v1/openapi.json" if _is_dev else None,
+    docs_url="/api/v1/docs" if _is_dev else None,
 )
 
 # Register rate limiter
@@ -36,11 +38,11 @@ async def add_security_headers(request: Request, call_next):
     response: Response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
-    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["X-XSS-Protection"] = "0"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:;"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-    if request.url.scheme == "https":
+    if not _is_dev:
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 
@@ -50,11 +52,11 @@ trusted_proxies_env = os.getenv("TRUSTED_PROXIES")
 trusted_hosts = [p.strip() for p in trusted_proxies_env.split(",") if p.strip()] if trusted_proxies_env else ["127.0.0.1"]
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=trusted_hosts)
 
-# CORS origins from env var or defaults
+# CORS origins from env var; localhost origins only in non-production
 default_origins = [
     "http://localhost:5173",
     "http://localhost:3000",
-]
+] if _is_dev else []
 extra_origins = os.getenv("ALLOWED_ORIGINS", "").split(",")
 allowed_origins = default_origins + [o.strip() for o in extra_origins if o.strip()]
 

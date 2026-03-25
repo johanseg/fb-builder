@@ -14,6 +14,10 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   wait-for-deploy:
     runs-on: ubuntu-latest
@@ -34,7 +38,7 @@ jobs:
           fi
           echo "Checking backend health at $BACKEND_URL..."
           for i in {1..10}; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BACKEND_URL/api/v1/docs" || echo "000")
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BACKEND_URL/health" || echo "000")
             if [ "$STATUS" = "200" ]; then
               echo "Backend is healthy (HTTP 200)"
               exit 0

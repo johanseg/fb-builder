@@ -9,7 +9,7 @@ from app.schemas.research import (
 )
 from app.services.research_service import ResearchService
 from app.services.rate_limiter import rate_limiter
-from app.core.deps import get_current_active_user
+from app.core.deps import get_current_active_user, require_permission
 
 router = APIRouter()
 
@@ -112,7 +112,7 @@ def get_blacklist(db: Session = Depends(get_db), current_user: User = Depends(ge
     ]
 
 @router.post("/blacklist")
-def add_to_blacklist(page_name: str, reason: str = None, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+def add_to_blacklist(page_name: str, reason: str = None, db: Session = Depends(get_db), current_user: User = Depends(require_permission("research:write"))):
     """Add page to blacklist"""
     from app.models import PageBlacklist
 
@@ -134,7 +134,7 @@ def add_to_blacklist(page_name: str, reason: str = None, db: Session = Depends(g
     }
 
 @router.delete("/blacklist/{blacklist_id}")
-def remove_from_blacklist(blacklist_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+def remove_from_blacklist(blacklist_id: str, db: Session = Depends(get_db), current_user: User = Depends(require_permission("research:write"))):
     """Remove page from blacklist"""
     from app.models import PageBlacklist
 
@@ -162,7 +162,7 @@ def get_keyword_blacklist(db: Session = Depends(get_db), current_user: User = De
     ]
 
 @router.post("/keyword-blacklist")
-def add_to_keyword_blacklist(keyword: str, reason: str = None, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+def add_to_keyword_blacklist(keyword: str, reason: str = None, db: Session = Depends(get_db), current_user: User = Depends(require_permission("research:write"))):
     """Add keyword to blacklist"""
     from app.models import KeywordBlacklist
 
@@ -184,7 +184,7 @@ def add_to_keyword_blacklist(keyword: str, reason: str = None, db: Session = Dep
     }
 
 @router.delete("/keyword-blacklist/{blacklist_id}")
-def remove_from_keyword_blacklist(blacklist_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+def remove_from_keyword_blacklist(blacklist_id: str, db: Session = Depends(get_db), current_user: User = Depends(require_permission("research:write"))):
     """Remove keyword from blacklist"""
     from app.models import KeywordBlacklist
 
@@ -269,7 +269,7 @@ def get_verticals(db: Session = Depends(get_db), current_user: User = Depends(ge
     ]
 
 @router.post("/run-scheduled-searches")
-async def run_scheduled_searches(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+async def run_scheduled_searches(db: Session = Depends(get_db), current_user: User = Depends(require_permission("research:admin"))):
     """Manually trigger scheduled searches (called by cron job)"""
     from app.services.scheduler_service import SchedulerService
 
@@ -279,7 +279,7 @@ async def run_scheduled_searches(db: Session = Depends(get_db), current_user: Us
     return {"message": "Scheduled searches completed"}
 
 @router.post("/verticals")
-def create_vertical(name: str, description: str = None, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+def create_vertical(name: str, description: str = None, db: Session = Depends(get_db), current_user: User = Depends(require_permission("research:write"))):
     """Create a new vertical"""
     from app.models import Vertical
 
@@ -357,7 +357,7 @@ def get_vertical_aggregated_ads(vertical_id: str, db: Session = Depends(get_db),
         import traceback
         print(f"Error in get_vertical_aggregated_ads: {str(e)}")
         print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Error fetching aggregated ads: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/verticals/{vertical_id}/pages/{page_id}/ads")
 def get_vertical_page_ads(vertical_id: str, page_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
@@ -415,7 +415,7 @@ def get_vertical_page_ads(vertical_id: str, page_id: str, db: Session = Depends(
         import traceback
         print(f"Error in get_vertical_page_ads: {str(e)}")
         print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Error fetching page ads: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ============= Brand Scrape Endpoints =============

@@ -1,4 +1,6 @@
 import os
+import ipaddress
+from urllib.parse import urlparse
 from facebook_business.api import FacebookAdsApi
 from facebook_business.adobjects.adaccount import AdAccount
 from facebook_business.adobjects.campaign import Campaign
@@ -12,17 +14,44 @@ from pathlib import Path
 from facebook_business.adobjects.user import User
 import time
 
+
+def _validate_url(url: str, allowed_domains: list[str] | None = None) -> bool:
+    """Validate URL is safe - not pointing to internal networks."""
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ('http', 'https'):
+            return False
+        hostname = parsed.hostname
+        if not hostname:
+            return False
+        # Block private/internal IPs
+        try:
+            ip = ipaddress.ip_address(hostname)
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                return False
+        except ValueError:
+            pass  # It's a hostname, not an IP — that's fine
+        # Block common internal hostnames
+        if hostname in ('localhost', '127.0.0.1', '0.0.0.0', '169.254.169.254', 'metadata.google.internal'):
+            return False
+        # Check allowed domains if specified
+        if allowed_domains:
+            if not any(hostname == d or hostname.endswith('.' + d) for d in allowed_domains):
+                return False
+        return True
+    except Exception:
+        return False
+
 # Load .env from project root (parent of backend)
 env_path = Path(__file__).resolve().parent.parent.parent.parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
 class FacebookService:
     def __init__(self):
-        # Try standard names first, then VITE_ prefixed names (common in this project)
-        self.access_token = os.getenv("FACEBOOK_ACCESS_TOKEN") or os.getenv("VITE_FACEBOOK_ACCESS_TOKEN")
-        self.ad_account_id = os.getenv("FACEBOOK_AD_ACCOUNT_ID") or os.getenv("VITE_FACEBOOK_AD_ACCOUNT_ID")
-        self.app_id = os.getenv("FACEBOOK_APP_ID") or os.getenv("VITE_FACEBOOK_APP_ID")
-        self.app_secret = os.getenv("FACEBOOK_APP_SECRET") or os.getenv("VITE_FACEBOOK_APP_SECRET")
+        self.access_token = os.getenv("FACEBOOK_ACCESS_TOKEN")
+        self.ad_account_id = os.getenv("FACEBOOK_AD_ACCOUNT_ID")
+        self.app_id = os.getenv("FACEBOOK_APP_ID")
+        self.app_secret = os.getenv("FACEBOOK_APP_SECRET")
         self.api = None
         self.account = None
         
@@ -320,6 +349,10 @@ class FacebookService:
 
         # Check if it's a URL or local file path
         if image_path_or_url.startswith('http://') or image_path_or_url.startswith('https://'):
+            # Validate URL to prevent SSRF
+            if not _validate_url(image_path_or_url):
+                raise ValueError("Invalid or disallowed URL provided for image upload")
+
             # Download the image to a temp file
             response = requests.get(image_path_or_url, timeout=30)
             response.raise_for_status()
@@ -370,6 +403,10 @@ class FacebookService:
 
         # Check if it's a URL or local file path
         if video_path_or_url.startswith('http://') or video_path_or_url.startswith('https://'):
+            # Validate URL to prevent SSRF
+            if not _validate_url(video_path_or_url):
+                raise ValueError("Invalid or disallowed URL provided for video upload")
+
             # Download the video to a temp file
             print(f"Downloading video from URL: {video_path_or_url[:100]}...")
             response = requests.get(video_path_or_url, timeout=120, stream=True)

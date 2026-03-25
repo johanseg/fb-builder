@@ -66,6 +66,9 @@ import os
 UPLOAD_DIR = Path(__file__).parent.parent.parent.parent / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+ALLOWED_TEMPLATE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp', '.gif'}
+MAX_TEMPLATE_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+
 @router.post("/upload")
 async def upload_winning_ad(
     images: List[UploadFile] = File(...),
@@ -74,17 +77,31 @@ async def upload_winning_ad(
 ):
     saved_ads = []
     for image in images:
-        # Generate unique filename
-        filename = f"template_{uuid.uuid4()}_{image.filename}"
+        # Validate file extension
+        ext = os.path.splitext(image.filename or "")[1].lower()
+        if ext not in ALLOWED_TEMPLATE_EXTENSIONS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid file type '{ext}'. Allowed types: {', '.join(ALLOWED_TEMPLATE_EXTENSIONS)}"
+            )
+
+        # Read file content to validate size
+        file_content = await image.read()
+        if len(file_content) > MAX_TEMPLATE_FILE_SIZE:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File too large. Maximum size: {MAX_TEMPLATE_FILE_SIZE / (1024 * 1024)}MB"
+            )
+
+        # Sanitize filename: use only UUID-based name
+        filename = f"template_{uuid.uuid4()}{ext}"
         file_path = UPLOAD_DIR / filename
-        
+
         # Save file
         with file_path.open("wb") as buffer:
-            shutil.copyfileobj(image.file, buffer)
-            
+            buffer.write(file_content)
+
         # Create DB record
-        # Note: In a real app, we'd probably analyze the image here or let the user fill in details
-        # For now, we create a basic record
         new_ad = WinningAdModel(
             name=image.filename,
             image_url=f"/uploads/{filename}",
@@ -96,5 +113,5 @@ async def upload_winning_ad(
         db.commit()
         db.refresh(new_ad)
         saved_ads.append(new_ad)
-        
+
     return {"message": f"Successfully uploaded {len(saved_ads)} templates", "ads": saved_ads}

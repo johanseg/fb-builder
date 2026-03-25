@@ -7,9 +7,39 @@ from app.core.deps import get_current_active_user, require_permission
 from fastapi.responses import StreamingResponse
 import io
 import csv
+import ipaddress
+from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field
 from typing import Dict, Any
+
+
+def _validate_url(url: str, allowed_domains: list[str] | None = None) -> bool:
+    """Validate URL is safe - not pointing to internal networks."""
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ('http', 'https'):
+            return False
+        hostname = parsed.hostname
+        if not hostname:
+            return False
+        # Block private/internal IPs
+        try:
+            ip = ipaddress.ip_address(hostname)
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                return False
+        except ValueError:
+            pass  # It's a hostname, not an IP — that's fine
+        # Block common internal hostnames
+        if hostname in ('localhost', '127.0.0.1', '0.0.0.0', '169.254.169.254', 'metadata.google.internal'):
+            return False
+        # Check allowed domains if specified
+        if allowed_domains:
+            if not any(hostname == d or hostname.endswith('.' + d) for d in allowed_domains):
+                return False
+        return True
+    except Exception:
+        return False
 
 class ImageGenerationRequest(BaseModel):
     model_config = {"populate_by_name": True}
@@ -131,6 +161,12 @@ async def download_and_save_image(image_url: str, prefix: str = "generated") -> 
     Download image from external URL and save it locally.
     Returns the local URL path.
     """
+    # Validate URL to prevent SSRF - only allow known Fal.ai CDN domains
+    allowed_domains = ['fal.media', 'v3.fal.media', 'cdn.fal.ai', 'storage.googleapis.com']
+    if not _validate_url(image_url, allowed_domains=allowed_domains):
+        print(f"Warning: Skipping download from disallowed URL: {image_url}")
+        return image_url
+
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(image_url, timeout=30.0)
@@ -164,7 +200,7 @@ async def generate_image(
     
     if use_fal:
         os.environ["FAL_KEY"] = settings.FAL_AI_API_KEY
-        print(f"Generating images with Fal.ai using key: {settings.FAL_AI_API_KEY[:5]}...")
+        print("Generating images with Fal.ai...")
     
     for i in range(request.count):
         for size in request.imageSizes:
@@ -391,4 +427,5 @@ def batch_save_ads(
         return {"message": f"Saved {len(saved_ads)} ads", "count": len(saved_ads)}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")

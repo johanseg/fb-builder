@@ -1,3 +1,10 @@
+# Version control
+.git
+
+# Environment
+.env
+.env*
+
 # Python
 __pycache__/
 *.py[cod]
@@ -8,16 +15,21 @@ venv/
 env/
 ENV/
 .pytest_cache/
+.mypy_cache/
+
+# Test
+tests/
+test-results/
+.coverage
+htmlcov/
+
+# Dev dependencies
+requirements-dev.txt
 
 # Database
 *.db
 *.sqlite
 *.sqlite3
-
-# Environment
-.env
-.env.local
-.env.*.local
 
 # IDE
 .vscode/
@@ -35,13 +47,6 @@ Thumbs.db
 server.log
 server_debug.log
 
-# Test
-test-results/
-.pytest_cache/
-
 # Uploads (don't include in image, use volumes)
 uploads/*
 !uploads/.gitkeep
-
-# Migration files (optional - include if you want them in image)
-# migrations/

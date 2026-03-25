@@ -5,8 +5,8 @@
 <h1 align="center">Facebook Ad Builder</h1>
 
 <p align="center">
-  <strong>AI-powered modular creative intelligence platform</strong><br>
-  From competitor research to modular ad generation, performance tracking, and campaign management
+  <strong>AI-powered Facebook ad automation platform</strong><br>
+  From competitor research to ad generation and campaign management
 </p>
 
 <p align="center">
@@ -25,54 +25,28 @@
 </p>
 
 <p align="center">
-  Created by <strong>Johan Garcia</strong><br>
-  <a href="https://johangarcia.com">johangarcia.com</a> • <a href="https://digitaloptimizer.agency">digitaloptimizer.agency</a><br>
-  <a href="https://t.me/johanseg">Telegram</a> • <a href="mailto:info@johangarcia.com">info@johangarcia.com</a>
+  Created by <strong>Jason Akatiff</strong><br>
+  <a href="https://iscale.com">iSCALE.com</a> • <a href="https://a4d.com">A4D.com</a><br>
+  <a href="https://t.me/jasonakatiff">Telegram</a> • <a href="mailto:jason@jasonakatiff.com">jason@jasonakatiff.com</a>
 </p>
 
 ---
 
 ## Overview
 
-Facebook Ad Builder is a full-stack creative intelligence platform that streamlines the entire Facebook advertising workflow. Built on the Inceptly Modular Creative System, it generates structurally diverse ad variations from reusable blocks — each tagged with tracking codes that feed a performance learning loop.
+Facebook Ad Builder is a full-stack application that streamlines the entire Facebook advertising workflow. Use AI to research competitors, generate compelling ad copy and images, and manage campaigns—all from one platform.
 
 ### Key Capabilities
 
-- **Modular Script Factory** — Generate Intro/Bridge/Core/CTA blocks via 5 specialized AI agents, assemble into 100+ unique ad variations
-- **Performance Intelligence** — Import Facebook CSV data, auto-score modules (0-5 Fit Score), kill underperformers, iterate winners
 - **Competitor Intelligence** — Scrape and analyze ads from the Facebook Ad Library
 - **AI Content Generation** — Create ad copy and images using Google Gemini and Fal.ai
-- **Micro-Movie Mode** — Generate 30-60 second story scripts with 12 emotional avatars
-- **Brand Management** — Structured product briefs (pain points, proof points, mechanisms) injected into every generation
+- **Brand Management** — Maintain consistent brand voice, colors, and assets
 - **Template System** — Deconstruct winning ads into reusable blueprints
-- **Campaign Management** — PDCA export by Bridge type, create and manage Facebook campaigns via API
+- **Campaign Management** — Create and manage Facebook campaigns via API
 
 ---
 
 ## Features
-
-### 🧩 Modular Script Factory
-Generate ad scripts as composable blocks using the Inceptly 4-layer taxonomy:
-- **Intro** (0-7s) — Pattern-interrupt hooks with 5 psychology triggers × 6 execution formats = 30 combinations
-- **Bridge** (7-20s) — Belief-transition layer: Reframe, Mechanism, Permission, Contrast, Proof, Gradualization
-- **Core** (20-40s) — Decision stage: Logic Lock or Identity Close pathways
-- **CTA** (40-50s) — 6 CTA styles: Reason-Why, Risk-Reversal, Urgency, Free Content, Value-Stack, Premium-Anchor
-- **Assembly** — Combine any Intro + Bridge + Core + CTA; auto-generates tracking code (e.g. `I-PAIN-Q-03_B-MEC-A_C-LOGIC_CTA-RISKREV-01`)
-- **Ad Modules Library** — Browse, filter, and reuse all saved blocks with performance scores
-
-### 🎬 Micro-Movie Mode
-Generate 30-60 second brand storytelling scripts:
-- 12 emotional avatars (Avoider, Protector, Builder, Achiever, Connector, Explorer, etc.)
-- Product-drop rule enforced at 40-50% through the story
-- Custom AI Persona Manager for voice/visual continuity
-
-### 📊 Performance Intelligence
-Close the learning loop with data-driven creative decisions:
-- **CSV Import** — Upload Facebook Ads performance exports
-- **Fit Score** — Auto-maps funnel events to 0-5 score (5 = AddPaymentInfo, 0 = CompleteRegistration)
-- **7-Day Kill Rule** — Flags underperformers (score ≤1, spend > threshold) for replacement
-- **Winner Iteration** — Generate variations of top performers, keeping winning modules intact
-- **PDCA Export** — Cartesian product of all modules grouped by Bridge type for structured testing
 
 ### 🔍 Competitor Research
 Scrape ads directly from Facebook's Ad Library. Analyze competitor strategies, track active campaigns, and identify winning ad formats.
@@ -81,15 +55,14 @@ Scrape ads directly from Facebook's Ad Library. Analyze competitor strategies, t
 Create and manage brand profiles with:
 - Brand voice and messaging guidelines
 - Color palettes (primary, secondary, highlight)
-- Structured product briefs: pain points, desired outcomes, root causes, proof points, differentiators, risk reversals
-- Custom AI Personas with voice guidelines and visual references
+- Logo and visual assets
+- Multiple products per brand
 
 ### 🤖 AI-Powered Ad Generation
 Generate high-converting ads using AI:
-- **Copy Generation** — Compelling headlines, body text, and CTAs via Gemini
+- **Copy Generation** — Compelling headlines, body text, and CTAs
 - **Image Generation** — AI-created visuals via Fal.ai
-- **Ad Remix** — Deconstruct winning ads into blueprints, reconstruct with your brand
-- **Safe Zone Preview** — TikTok/Reels UI overlay to check text placement compliance
+- **Ad Remix** — Transform winning competitor ads into your brand style
 
 ### 📋 Template Library
 Build a library of proven ad structures:
@@ -97,10 +70,9 @@ Build a library of proven ad structures:
 - Reuse templates across brands and products
 - Track performance by template type
 
-### 📈 Campaign Management
+### 📊 Campaign Management
 Manage Facebook campaigns directly:
 - Create campaigns, ad sets, and ads
-- PDCA-structured campaign export by Bridge type
 - Upload creative assets
 - Monitor campaign status
 - Sync with Facebook Ads Manager
@@ -292,17 +264,14 @@ Navigate to **Brands** → **New Brand**
 - Set brand colors (primary, secondary, highlight)
 - Define brand voice/tone guidelines
 
-### 2. Add Products with Creative Brief
+### 2. Add Products
 
 Navigate to **Products** → **New Product**
 
 - Select the parent brand
 - Add product name and description
 - Upload product images
-- Expand "Creative Brief" section and fill in:
-  - Pain points, desired outcomes, root causes
-  - Proof points, differentiators, risk reversals
-- These fields are injected into every AI generation call
+- Set default landing page URL
 
 ### 3. Research Competitors
 
@@ -313,38 +282,19 @@ Navigate to **Research** → **Scrape Brand Ads**
 - Save interesting ads for reference
 - Analyze ad copy and creative patterns
 
-### 4. Generate Modular Scripts
+### 4. Generate Ads
 
-Navigate to **Script Factory** → **Modular Matrix**
+Navigate to **Create Ads**
 
 - Select brand and product
-- Generate Intro blocks: choose psychology trigger + execution format
-- Generate Bridge, Core, and CTA blocks
-- Assemble blocks into complete scripts with auto-generated tracking codes
-- Export all combinations as PDCA-structured CSV
-
-### 5. Generate Image/Video Ads
-
-Navigate to **Script Factory** → **Build Creatives**
-
-- Select brand, product, and customer profile
 - Choose a template or start fresh
 - AI generates multiple ad variations
 - Edit and refine as needed
+- Export or push to Facebook
 
-### 6. Track Performance
+### 5. Manage Campaigns
 
-Navigate to **Analytics** → **Reporting**
-
-- Import Facebook Ads CSV export
-- View Fit Score analysis (0-5 scale)
-- Identify winners (score ≥ 4) and losers (score ≤ 1)
-- Iterate winning modules with one click
-- Kill underperformers and generate replacements
-
-### 7. Manage Campaigns
-
-Navigate to **Facebook Campaigns**
+Navigate to **Campaigns**
 
 - Create new campaigns
 - Set up ad sets with targeting
@@ -383,8 +333,6 @@ graph TB
             R_Templates[templates]
             R_Dashboard[dashboard]
             R_Users[users]
-            R_Modular[modular-generation<br/>ad-modules · naming]
-            R_Perf[performance · personas]
         end
 
         subgraph Services["Business Logic Services"]
@@ -393,7 +341,6 @@ graph TB
             S_Research[ResearchService<br/>Search & Dedup]
             S_Remix[AdRemixService<br/>Deconstruct/Reconstruct]
             S_BrandScraper[BrandScraper<br/>Competitor Monitoring]
-            S_Agents[AgentOrchestrator<br/>5 AI Agents]
         end
     end
 
@@ -416,8 +363,6 @@ graph TB
     R_Research --> S_BrandScraper
     R_AdRemix --> S_Remix
     R_CopyGen --> GEMINI
-    R_Modular --> S_Agents
-    S_Agents --> GEMINI
     S_FB --> FB_API
     S_Scraper --> FB_ADS
     S_Research --> S_Scraper
@@ -499,13 +444,9 @@ erDiagram
     Brand ||--o{ Product : contains
     Brand }o--o{ CustomerProfile : targets
     Brand ||--o{ GeneratedAd : produces
-    Brand ||--o{ AIPersona : has
-
-    Product ||--o{ AdModule : has
 
     GeneratedAd }o--|| Product : for
     GeneratedAd }o--o| WinningAd : "based on template"
-    GeneratedAd }o--o| GeneratedAd : "iterated from (parent_ad_id)"
 
     WinningAd ||--|| ScrapedAd : "derived from"
 
@@ -525,7 +466,6 @@ erDiagram
 | Frontend | React 19, Vite 7, TailwindCSS |
 | Backend | Python 3.11+, FastAPI 0.104, SQLAlchemy 2.0 |
 | Database | PostgreSQL 15+ (Railway) |
-| AI Agents | 5 specialized Gemini agents (Intro, Bridge, Core, CTA, MicroMovie) |
 | AI | Google Gemini (copy & vision), Fal.ai (images) |
 | Storage | Cloudflare R2 (production), local uploads (dev) |
 | Auth | JWT access tokens (30min) + refresh tokens (7 days) |
@@ -543,13 +483,8 @@ Interactive API documentation is available at `/api/v1/docs` when running the ba
 |--------|----------|-------------|
 | `POST` | `/api/v1/auth/login` | Authenticate user |
 | `GET` | `/api/v1/brands` | List all brands |
-| `POST` | `/api/v1/products` | Create product with brief fields |
-| `POST` | `/api/v1/modular-generation/generate` | Generate modular script blocks |
-| `POST` | `/api/v1/modular-generation/iterate` | Iterate winning modules |
-| `POST` | `/api/v1/naming/assemble` | Assemble modules into bundle code |
-| `GET` | `/api/v1/naming/export-combinations/{id}` | PDCA campaign export |
-| `POST` | `/api/v1/performance/import` | Import Facebook CSV data |
-| `GET` | `/api/v1/performance/kill-rule` | Get kill/scale flags |
+| `POST` | `/api/v1/brands` | Create a brand |
+| `GET` | `/api/v1/products` | List all products |
 | `POST` | `/api/v1/research/scrape` | Scrape competitor ads |
 | `POST` | `/api/v1/ad-remix/generate` | Generate ad variations |
 | `POST` | `/api/v1/facebook/campaigns` | Create Facebook campaign |
@@ -671,16 +606,13 @@ Contributions are welcome! Please:
 
 ## Author
 
-**Johan Garcia**
-
----
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
 <p align="center">
-  Built with ❤️ by Johan  & Claude & Codex & Antigravity.
+  Built with ❤️ by <a href="https://iscale.com">iSCALE</a> using FastAPI, React, and AI
 </p>

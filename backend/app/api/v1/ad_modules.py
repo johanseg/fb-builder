@@ -5,7 +5,7 @@ from typing import List
 from app.database import get_db
 from app.models import AdModule
 from app.schemas.ad_module import AdModuleCreate, AdModuleUpdate, AdModule as AdModuleSchema
-from app.core.deps import get_current_user
+from app.core.deps import get_current_active_user
 
 router = APIRouter()
 
@@ -13,7 +13,7 @@ router = APIRouter()
 def create_ad_module(
     ad_module: AdModuleCreate,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user = Depends(get_current_active_user)
 ):
     db_module = AdModule(
         product_id=ad_module.product_id,
@@ -32,7 +32,7 @@ def create_ad_module(
 def get_ad_modules(
     product_id: str = None,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user = Depends(get_current_active_user)
 ):
     query = db.query(AdModule)
     if product_id:
@@ -43,7 +43,7 @@ def get_ad_modules(
 def get_ad_module(
     module_id: str,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user = Depends(get_current_active_user)
 ):
     db_module = db.query(AdModule).filter(AdModule.id == module_id).first()
     if not db_module:
@@ -55,7 +55,7 @@ def update_ad_module(
     module_id: str,
     update_data: AdModuleUpdate,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user = Depends(get_current_active_user)
 ):
     db_module = db.query(AdModule).filter(AdModule.id == module_id).first()
     if not db_module:
@@ -73,7 +73,7 @@ def update_ad_module(
 def delete_ad_module(
     module_id: str,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user = Depends(get_current_active_user)
 ):
     db_module = db.query(AdModule).filter(AdModule.id == module_id).first()
     if not db_module:
