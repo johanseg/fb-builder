@@ -1,7 +1,9 @@
-# Facebook Ad Automation App - Architecture Specifications
+# Townsquare Interactive Ad Creative Studio — Architecture Specifications
 
 ## 1. Overview
-This document serves as the Source of Truth for the Facebook Ad Automation App. The application is designed to automate the lifecycle of Facebook video ads, from competitor research to ad creation, launching, and performance reporting.
+This document serves as the Source of Truth for the Townsquare Interactive Ad Creative Studio (TSI). The application is designed to automate the lifecycle of Facebook video ads, from competitor research to ad creation, launching, and performance reporting.
+
+> **Note:** Brand and Product management APIs exist in the backend but have been removed from the frontend UI. The app operates as a single-brand system (Townsquare Interactive), auto-selected on login.
 
 ## 2. Tech Stack
 
@@ -126,9 +128,10 @@ The project follows a modular structure. API routes are versioned (`/api/v1`).
 
 ## 5. Module Specifications
 
-### Module 1: Brand & Product Management
+### Module 1: Brand & Product Management (Backend API only)
 - **Endpoints**: `/api/v1/brands`, `/api/v1/products`
 - **Features**: Manage brand voice, assets, and product details.
+- **Note**: These API routes still exist but there is no frontend UI for them. The app is single-brand (Townsquare Interactive), auto-selected.
 
 ### Module 2: Research (Scraping)
 - **Endpoints**: `/api/v1/research`

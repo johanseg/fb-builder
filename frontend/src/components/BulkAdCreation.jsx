@@ -45,7 +45,6 @@ const BulkAdCreation = ({ onNext, onBack }) => {
             setAdsData(permutations);
             const imageCount = creativeData.creatives.filter(c => c.mediaType !== 'video').length;
             const videoCount = creativeData.creatives.filter(c => c.mediaType === 'video').length;
-            console.log(`Generated ${permutations.length} ad permutations (${imageCount} images + ${videoCount} videos × ${validHeadlines.length} headlines × ${validBodies.length} bodies)`);
         } else {
             // Fallback if no creatives (shouldn't happen due to validation)
             setAdsData([]);
@@ -182,8 +181,6 @@ const BulkAdCreation = ({ onNext, onBack }) => {
                     if (!creativeData.pageId) {
                         throw new Error('Page ID is missing. Please go back to the Creative step and select a Facebook Page.');
                     }
-
-                    console.log(`Submitting ${isVideo ? 'Video' : 'Image'} Ad with Page ID:`, creativeData.pageId);
 
                     // Update progress with video-specific message
                     if (isVideo) {

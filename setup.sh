@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Facebook Ad Builder - Interactive Setup Script
+# Townsquare Interactive Ad Creative Studio - Interactive Setup Script
 # This script walks you through setting up the application
 #
 # Created by Jason Akatiff
@@ -108,12 +108,12 @@ echo ""
 echo -e "${BOLD}${CYAN}"
 echo "  ╔═══════════════════════════════════════════════════════════╗"
 echo "  ║                                                           ║"
-echo "  ║          🚀 Facebook Ad Builder Setup Wizard 🚀           ║"
+echo "  ║      🚀 TSI Ad Creative Studio Setup Wizard 🚀             ║"
 echo "  ║                                                           ║"
 echo "  ╚═══════════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 echo ""
-echo "  This wizard will help you set up the Facebook Ad Builder."
+echo "  This wizard will help you set up the TSI Ad Creative Studio."
 echo "  It will check prerequisites, configure environment variables,"
 echo "  and initialize the database."
 echo ""
@@ -413,10 +413,10 @@ echo "    Email:    $ADMIN_EMAIL"
 echo "    Password: (the password you set)"
 echo ""
 echo -e "${BOLD}Next steps:${NC}"
-echo "    1. Create your first Brand"
-echo "    2. Add Products to your Brand"
-echo "    3. Research competitor ads"
-echo "    4. Generate AI-powered ads"
+echo "    1. Research competitor ads"
+echo "    2. Generate AI-powered ads via Script Factory"
+echo "    3. Set up Audience profiles and personas"
+echo "    4. Launch Facebook campaigns"
 echo ""
 echo -e "${BOLD}Ready to deploy?${NC}"
 echo "    See RAILWAY_DEPLOYMENT.md for production deployment instructions"

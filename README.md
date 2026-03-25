@@ -34,48 +34,52 @@
 
 ## Overview
 
-Facebook Ad Builder is a full-stack application that streamlines the entire Facebook advertising workflow. Use AI to research competitors, generate compelling ad copy and images, and manage campaigns—all from one platform.
+Townsquare Interactive Ad Creative Studio (TSI) is a full-stack application that streamlines the entire Facebook advertising workflow. Use AI to research competitors, generate compelling ad copy and images, and manage campaigns—all from one platform.
 
 ### Key Capabilities
 
 - **Competitor Intelligence** — Scrape and analyze ads from the Facebook Ad Library
 - **AI Content Generation** — Create ad copy and images using Google Gemini and Fal.ai
-- **Brand Management** — Maintain consistent brand voice, colors, and assets
+- **Script Factory** — Modular creative strategist with 4-block taxonomy for video ad scripts
+- **Audience Management** — Customer profiles and AI personas for targeting
 - **Template System** — Deconstruct winning ads into reusable blueprints
 - **Campaign Management** — Create and manage Facebook campaigns via API
+- **Analytics** — Performance intelligence with kill/scale rules
 
 ---
 
 ## Features
 
-### 🔍 Competitor Research
+### Research
 Scrape ads directly from Facebook's Ad Library. Analyze competitor strategies, track active campaigns, and identify winning ad formats.
 
-### 🎨 Brand Management
-Create and manage brand profiles with:
-- Brand voice and messaging guidelines
-- Color palettes (primary, secondary, highlight)
-- Logo and visual assets
-- Multiple products per brand
+### Script Factory
+Modular creative strategist with 4-block taxonomy (Intro, Bridge, Core, CTA) for generating video ad scripts. Includes Micro-Movie mode with 12 emotional avatars.
 
-### 🤖 AI-Powered Ad Generation
+### Audience
+Manage customer profiles and AI personas for precise ad targeting and personalized creative generation.
+
+### AI-Powered Ad Generation
 Generate high-converting ads using AI:
 - **Copy Generation** — Compelling headlines, body text, and CTAs
 - **Image Generation** — AI-created visuals via Fal.ai
 - **Ad Remix** — Transform winning competitor ads into your brand style
 
-### 📋 Template Library
+### Winning Ads & Templates
 Build a library of proven ad structures:
 - Deconstruct successful ads into blueprints
-- Reuse templates across brands and products
+- Reuse templates for new ad generation
 - Track performance by template type
 
-### 📊 Campaign Management
+### Campaign Management
 Manage Facebook campaigns directly:
 - Create campaigns, ad sets, and ads
 - Upload creative assets
 - Monitor campaign status
 - Sync with Facebook Ads Manager
+
+### Analytics
+Performance intelligence dashboard with CSV import, Fit Score (0-5), and automated kill/scale rules for ad optimization.
 
 ---
 
@@ -255,51 +259,39 @@ See `.env.example` for all available options.
 
 ## Usage Guide
 
-### 1. Create a Brand
+### 1. Research Competitors
 
-Navigate to **Brands** → **New Brand**
+Navigate to **Research**
 
-- Enter brand name and description
-- Upload logo
-- Set brand colors (primary, secondary, highlight)
-- Define brand voice/tone guidelines
-
-### 2. Add Products
-
-Navigate to **Products** → **New Product**
-
-- Select the parent brand
-- Add product name and description
-- Upload product images
-- Set default landing page URL
-
-### 3. Research Competitors
-
-Navigate to **Research** → **Scrape Brand Ads**
-
-- Enter a competitor's Facebook Page ID or URL
-- View their active ads
+- Search the Facebook Ads Library by keyword or page
+- View competitor active ads
 - Save interesting ads for reference
 - Analyze ad copy and creative patterns
 
-### 4. Generate Ads
+### 2. Generate Ads
 
-Navigate to **Create Ads**
+Navigate to **Script Factory** or build image/video creatives
 
-- Select brand and product
-- Choose a template or start fresh
-- AI generates multiple ad variations
+- Choose a winning ad template or start fresh
+- AI generates multiple ad variations (copy + images)
 - Edit and refine as needed
 - Export or push to Facebook
 
-### 5. Manage Campaigns
+### 3. Manage Campaigns
 
-Navigate to **Campaigns**
+Navigate to **Facebook Campaigns**
 
-- Create new campaigns
-- Set up ad sets with targeting
-- Add ads with your generated creative
-- Monitor performance
+- Create campaigns, ad sets, and ads via the 6-step wizard
+- Set up targeting, budgets, and creatives
+- Monitor campaign status
+
+### 4. Analyze Performance
+
+Navigate to **Analytics**
+
+- Import Facebook performance CSV data
+- View Fit Scores and kill/scale recommendations
+- Optimize your ad creative based on real data
 
 ---
 

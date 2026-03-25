@@ -71,7 +71,6 @@ const Research = () => {
             fetchKeywordBlacklist();
         }
         if (activeTab === 'vertical-detail' && selectedVertical) {
-            console.log('vertical-detail tab active, fetching data for vertical:', selectedVertical.name);
             fetchBlacklist();
             fetchKeywordBlacklist();
             fetchSavedSearches();
@@ -100,14 +99,11 @@ const Research = () => {
 
     const fetchAggregatedAds = async () => {
         if (!selectedVertical) {
-            console.log('No selected vertical, skipping aggregated ads fetch');
             return;
         }
 
         try {
-            console.log('Fetching aggregated ads for vertical:', selectedVertical.id);
             const data = await getVerticalAggregatedAds(selectedVertical.id);
-            console.log('Aggregated ads data:', data);
             setAggregatedAds(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error('Failed to load aggregated ads', error);

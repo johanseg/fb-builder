@@ -75,8 +75,6 @@ const WinningAds = () => {
             }
 
             const result = await response.json();
-            console.log('Upload successful:', result);
-
             // Refresh the template selector to show new uploads
             setRefreshKey(prev => prev + 1);
 
@@ -140,7 +138,6 @@ const WinningAds = () => {
                 <ImageTemplateSelector
                     key={refreshKey}
                     onSelect={(template) => {
-                        console.log('Selected template:', template);
                         setSelectedTemplate(template);
                     }}
                     onClose={() => { }}

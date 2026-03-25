@@ -1,6 +1,6 @@
 # Railway Deployment Guide
 
-This guide walks you through deploying the Facebook Ad Builder to Railway.
+This guide walks you through deploying the Townsquare Interactive Ad Creative Studio to Railway.
 
 ## Overview
 
@@ -125,7 +125,7 @@ If you need to manually trigger a deployment:
 
 ### Test Database Connection
 
-1. Try creating a brand or product in the application
+1. Try performing a research search or navigating the dashboard
 2. Check the backend logs to ensure database operations are working
 3. You can also connect to the PostgreSQL database using the connection string from Railway
 

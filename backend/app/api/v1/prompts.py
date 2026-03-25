@@ -58,7 +58,7 @@ def create_prompt(prompt: PromptCreate, db: Session = Depends(get_db), current_u
     if existing:
         raise HTTPException(status_code=400, detail="Prompt with this ID already exists")
 
-    db_prompt = Prompt(**prompt.dict())
+    db_prompt = Prompt(**prompt.model_dump())
     db.add(db_prompt)
     db.commit()
     db.refresh(db_prompt)

@@ -1,10 +1,10 @@
-# TSI-FB Architecture Diagram
+# Townsquare Interactive Ad Creative Studio — Architecture Diagram
 
 ## System Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                              TSI-FB — Facebook Ad Builder                           │
+│                  Townsquare Interactive Ad Creative Studio (TSI)                     │
 │                    AI-Powered Full-Stack Ad Lifecycle Automation                     │
 └─────────────────────────────────────────────────────────────────────────────────────┘
 
@@ -43,16 +43,17 @@ flowchart TB
         Campaign["CampaignContext<br/>Campaign Wizard State"]
         Toast["ToastContext<br/>Notifications"]
 
-        subgraph PAGES["19 Pages"]
+        subgraph PAGES["Pages"]
             P1["Dashboard"]
-            P2["Brands / Products / Profiles"]
-            P3["Research / Brand Scrapes"]
-            P4["Build Creatives (Image/Video)"]
-            P5["Winning Ads / Ad Remix"]
-            P6["Generated Ads"]
-            P7["Facebook Campaigns (6-step wizard)"]
-            P8["Reporting / Analytics"]
-            P9["Settings / User Management"]
+            P2["Research / Brand Scrapes"]
+            P3["Script Factory / Ad Modules"]
+            P4["Audience (Profiles / AI Personas)"]
+            P5["Build Creatives (Image/Video)"]
+            P6["Winning Ads / Ad Remix"]
+            P7["Generated Ads"]
+            P8["Facebook Campaigns (6-step wizard)"]
+            P9["Analytics / Reporting"]
+            P10["Settings / User Management"]
         end
     end
 
@@ -442,9 +443,7 @@ App.jsx
         │
         ├── /                    Dashboard ────────── Stats, quick actions, recent activity
         │
-        ├── BRAND MANAGEMENT
-        │   ├── /brands          Brands ──────────── CRUD, color coding, grid/list view
-        │   ├── /products        Products ────────── Flat catalog, search/filter
+        ├── AUDIENCE
         │   ├── /profiles        CustomerProfiles ── Audience segments, brand linking
         │   └── /personas        AIPersonas ──────── Custom AI personas per brand
         │

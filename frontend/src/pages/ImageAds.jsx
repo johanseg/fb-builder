@@ -186,8 +186,6 @@ export default function ImageAds() {
             }
 
             const data = await response.json();
-            console.log('📸 Image generation response:', data);
-
             // Generate a unique bundle ID for this set of images
             const bundleId = `bundle_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -226,7 +224,6 @@ export default function ImageAds() {
                     throw new Error(`Batch save failed: ${saveResponse.statusText}`);
                 }
 
-                console.log('✅ Saved generated ads to database with bundle ID:', bundleId);
             } catch (saveError) {
                 console.error('Failed to save ads to database:', saveError);
                 // Don't fail the whole operation if saving fails

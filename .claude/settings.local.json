@@ -18,7 +18,9 @@
       "Bash(psql:*)",
       "WebSearch",
       "WebFetch(domain:www.eraser.io)",
-      "Bash(wc -l /Users/johan/AI/cursor/TSI-FB-builder/frontend/src/pages/*.jsx)"
+      "Bash(wc -l /Users/johan/AI/cursor/TSI-FB-builder/frontend/src/pages/*.jsx)",
+      "Bash(TESTING=true DATABASE_URL=\"postgresql://test:test@localhost:5432/test\" SECRET_KEY=\"test-secret-key\" python3 -m pytest tests/ -x -v)",
+      "Bash(find /Users/johan/AI/cursor/TSI-FB-builder -type f \\\\\\(-name *rand* -o -name *Brand* \\\\\\))"
     ],
     "deny": [],
     "ask": []

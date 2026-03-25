@@ -35,7 +35,7 @@ def create_product(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("products:write"))
 ):
-    db_product = ProductModel(**product.dict())
+    db_product = ProductModel(**product.model_dump())
     db.add(db_product)
     db.commit()
     db.refresh(db_product)

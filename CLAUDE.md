@@ -69,7 +69,7 @@ railway service logs --service <name>       # view logs
 
 ### Backend (`backend/app/`)
 
-- **Entry**: `main.py` — FastAPI app, CORS setup, security headers, rate limiting, registers 15 routers under `/api/v1/`
+- **Entry**: `main.py` — FastAPI app, CORS setup, security headers, rate limiting, registers 20 routers under `/api/v1/`
 - **Models**: `models.py` — single file with ~20 SQLAlchemy models
 - **Routes**: `api/v1/` — auth, users, brands, products, research, generated_ads, templates, facebook, uploads, dashboard, copy_generation, profiles, ad_remix, prompts, ad_styles
 - **Services**: `services/` — facebook_service.py (Marketing API via `facebook-business` SDK), research_service.py, ad_remix_service.py (Gemini Vision), brand_scraper.py, scraper.py
@@ -85,7 +85,7 @@ railway service logs --service <name>       # view logs
   - `BrandContext` — selected brand shared across pages
   - `CampaignContext` — campaign management state
   - `ToastContext` — `useToast()` → `showSuccess/showError/showWarning/showInfo`
-- **Pages**: `pages/` — Dashboard, Brands, Products, Research, BrandScrapes, CreateAds, ImageAds, VideoAds, GeneratedAds, WinningAds, AdRemix, FacebookCampaigns, UserManagement, Login, Register, Settings
+- **Pages**: `pages/` — Dashboard, Research, BrandScrapes, CreateAds, ImageAds, VideoAds, GeneratedAds, WinningAds, AdRemix, ModularAds, AdModulesLibrary, FacebookCampaigns, Reporting, CustomerProfiles, AIPersonas, UserManagement, Login, Register, Settings (Note: Brands and Products pages have been removed from the frontend UI; those API routes still exist as legacy backend endpoints)
 - **API pattern**: All backend calls use `authFetch()` from AuthContext, which injects Bearer token and handles refresh
 
 ### Key Database Relationships

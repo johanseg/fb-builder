@@ -105,7 +105,16 @@ export const CampaignProvider = ({ children }) => {
             targeting: {
                 genders: [],
                 publisher_platforms: ['facebook', 'instagram'],
-                countries: ['US'],
+                geo_locations: {
+                    countries: ['US'],
+                    excluded_countries: [],
+                    regions: [],
+                    excluded_regions: [],
+                    cities: [],
+                    excluded_cities: [],
+                    geo_markets: [],
+                    excluded_geo_markets: []
+                },
                 ageMin: 18,
                 ageMax: 65
             },
@@ -123,6 +132,7 @@ export const CampaignProvider = ({ children }) => {
             })(),
             pixelId: '',
             conversionEvent: 'PURCHASE',
+            attributionSetting: '7d_click',
             status: 'PAUSED',
             fbAdsetId: null,
             isExisting: false

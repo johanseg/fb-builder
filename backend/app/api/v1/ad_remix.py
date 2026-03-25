@@ -3,8 +3,8 @@ Ad Remix API Endpoints
 """
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
-from sqlalchemy.sql import func
 from typing import List
+from datetime import datetime, timezone
 import json
 
 from app.database import get_db
@@ -53,7 +53,7 @@ async def deconstruct_ad_template(
         
         # Save the blueprint to the template
         template.blueprint_json = blueprint.model_dump()
-        template.blueprint_analyzed_at = func.now()
+        template.blueprint_analyzed_at = datetime.now(timezone.utc)
         db.commit()
         
         return blueprint

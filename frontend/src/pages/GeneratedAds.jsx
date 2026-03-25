@@ -17,7 +17,6 @@ export default function GeneratedAds() {
     const [searchTerm, setSearchTerm] = useState('');
     const [viewMode, setViewMode] = useState(() => {
         try {
-            console.log('Initializing GeneratedAds viewMode');
             return localStorage.getItem('generatedAdsViewMode') || 'grid';
         } catch (e) {
             console.error('Error accessing localStorage:', e);
@@ -109,8 +108,6 @@ export default function GeneratedAds() {
     const handleDelete = (bundleId, e) => {
         e.stopPropagation();
 
-        console.log('Delete clicked for bundle:', bundleId);
-
         // Find all ads in this bundle
         const bundleAds = ads.filter(ad => (ad.ad_bundle_id || `legacy_${ad.id}`) === bundleId);
 
@@ -128,12 +125,9 @@ export default function GeneratedAds() {
         // Close modal immediately
         setDeleteConfirmation({ show: false, bundleId: null, bundleAds: [] });
 
-        console.log(`Deleting ${bundleAds.length} ads from bundle ${bundleId}`);
-
         try {
             // Delete all ads in the bundle
             const deletePromises = bundleAds.map(ad => {
-                console.log(`Deleting ad ${ad.id}`);
                 return authFetch(`${API_URL}/generated-ads/${ad.id}`, {
                     method: 'DELETE'
                 }).then(response => {
@@ -145,8 +139,6 @@ export default function GeneratedAds() {
             });
 
             await Promise.all(deletePromises);
-
-            console.log('All ads deleted successfully');
 
             // Show success message first
             showSuccess(`Successfully deleted ${bundleAds.length} ad${bundleAds.length > 1 ? 's' : ''}`);
@@ -172,7 +164,6 @@ export default function GeneratedAds() {
     };
 
     const cancelDelete = () => {
-        console.log('Delete cancelled by user');
         setDeleteConfirmation({ show: false, bundleId: null, bundleAds: [] });
     };
 
@@ -260,8 +251,6 @@ export default function GeneratedAds() {
     const currentBundle = selectedBundleId
         ? bundles.find(b => (b[0].ad_bundle_id || `legacy_${b[0].id}`) === selectedBundleId)
         : null;
-
-    console.log('Rendering GeneratedAds', { brands, adsCount: ads.length, viewMode });
 
     return (
         <div className="max-w-7xl mx-auto">

@@ -115,7 +115,7 @@ class ResearchService:
                         self.db.flush()
 
                 # Create ad with FacebookPage link and content_hash
-                ad_dict = ad_data.dict()
+                ad_dict = ad_data.model_dump()
                 ad_dict['content_hash'] = content_hash
                 if fb_page:
                     ad_dict['facebook_page_id'] = fb_page.id

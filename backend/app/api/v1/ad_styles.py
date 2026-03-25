@@ -103,7 +103,7 @@ def create_ad_style(style: AdStyleCreate, db: Session = Depends(get_db), current
     if existing:
         raise HTTPException(status_code=400, detail="Ad style with this ID already exists")
 
-    db_style = AdStyle(**style.dict())
+    db_style = AdStyle(**style.model_dump())
     db.add(db_style)
     db.commit()
     db.refresh(db_style)
