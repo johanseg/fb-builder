@@ -42,9 +42,14 @@ COPY . .
 # Create uploads directory
 RUN mkdir -p uploads
 
-# Create non-root user and set ownership
+# Create non-root user and set ownership (include Playwright browser cache)
 RUN useradd --create-home --shell /bin/bash appuser \
-    && chown -R appuser:appuser /app
+    && chown -R appuser:appuser /app \
+    && if [ -d /root/.cache/ms-playwright ]; then \
+         mkdir -p /home/appuser/.cache && \
+         cp -r /root/.cache/ms-playwright /home/appuser/.cache/ && \
+         chown -R appuser:appuser /home/appuser/.cache; \
+       fi
 
 # Playwright needs --no-sandbox when running as non-root
 ENV PLAYWRIGHT_CHROMIUM_SANDBOX=0
@@ -54,5 +59,5 @@ USER appuser
 # Expose port (Railway uses dynamic $PORT)
 EXPOSE 8000
 
-# Run migrations and start the application
-CMD alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+# Start the application (railway.toml startCommand overrides this)
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
