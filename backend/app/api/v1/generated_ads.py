@@ -31,7 +31,7 @@ def _validate_url(url: str, allowed_domains: list[str] | None = None) -> bool:
         except ValueError:
             pass  # It's a hostname, not an IP — that's fine
         # Block common internal hostnames
-        if hostname in ('localhost', '127.0.0.1', '0.0.0.0', '169.254.169.254', 'metadata.google.internal'):
+        if hostname in ('localhost', '127.0.0.1', '0.0.0.0', '169.254.169.254', 'metadata.google.internal'):  # nosec B104
             return False
         # Check allowed domains if specified
         if allowed_domains:
