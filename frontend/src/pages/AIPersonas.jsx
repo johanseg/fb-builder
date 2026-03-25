@@ -9,7 +9,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 export default function AIPersonas() {
     const { authFetch } = useAuth();
     const { showError, showSuccess } = useToast();
-    const { activeBrand } = useBrands();
+    const { activeBrand, loading: brandsLoading } = useBrands();
 
     const [personas, setPersonas] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -109,8 +109,8 @@ export default function AIPersonas() {
         setIsModalOpen(true);
     };
 
-    if (!activeBrand) {
-        return <div className="p-8 text-center text-muted-foreground">Please select a brand to manage AI Personas.</div>;
+    if (brandsLoading || !activeBrand) {
+        return <div className="flex justify-center py-12"><Loader className="animate-spin text-purple-600" size={32} /></div>;
     }
 
     return (
