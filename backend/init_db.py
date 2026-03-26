@@ -228,6 +228,17 @@ def backfill_product_brief():
     """Backfill pain_points and other brief fields on existing products that are missing them."""
     db = SessionLocal()
     try:
+        # Ensure columns exist (they may be in the model but not yet in the DB)
+        from sqlalchemy import text, inspect
+        inspector = inspect(db.bind)
+        existing_cols = {c["name"] for c in inspector.get_columns("products")}
+        brief_columns = ["pain_points", "desired_outcomes", "root_causes", "proof_points", "differentiators", "risk_reversals"]
+        for col in brief_columns:
+            if col not in existing_cols:
+                db.execute(text(f'ALTER TABLE products ADD COLUMN {col} JSON'))
+                print(f"  Added missing column: products.{col}")
+        db.commit()
+
         products = db.query(Product).filter(Product.pain_points.is_(None)).all()
         if not products:
             print("  All products already have brief data")
