@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from '../context/ToastContext';
-import { createBrandScrape, getBrandScrapes, getBrandScrape, deleteBrandScrape } from '../api/research';
+import { useResearchApi } from '../api/research';
 import { Search, Trash2, ChevronDown, ChevronRight, ExternalLink, Image, Video, Loader2, RefreshCw } from 'lucide-react';
 
 const BrandScrapes = () => {
     const { showSuccess, showError, showInfo } = useToast();
+    const { createBrandScrape, getBrandScrapes, getBrandScrape, deleteBrandScrape } = useResearchApi();
     const [brandName, setBrandName] = useState('');
     const [pageInput, setPageInput] = useState('');
 
@@ -73,7 +74,7 @@ const BrandScrapes = () => {
             setPageInput('');
             fetchScrapes();
         } catch (error) {
-            const message = error.response?.data?.detail || 'Failed to start scrape';
+            const message = error.message || 'Failed to start scrape';
             showError(message);
         } finally {
             setLoading(false);

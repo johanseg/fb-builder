@@ -121,10 +121,14 @@ def generate_modular_scripts(
 
         return db_modules
 
-    except Exception as e:
-        print(f"Error: {e}")
+    except ValueError as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"Generation error: {e}")
+        db.rollback()
+        detail = str(e) if "API key" in str(e) else "Generation failed. Check that GEMINI_API_KEY is configured."
+        raise HTTPException(status_code=500, detail=detail)
 
 @router.post("/iterate", response_model=List[AdModuleSchema])
 @limiter.limit("20/minute")
@@ -192,7 +196,11 @@ def iterate_winning_module(
             db.refresh(m)
             
         return db_modules
-    except Exception as e:
-        print(f"Error: {e}")
+    except ValueError as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"Iteration error: {e}")
+        db.rollback()
+        detail = str(e) if "API key" in str(e) else "Iteration failed. Check that GEMINI_API_KEY is configured."
+        raise HTTPException(status_code=500, detail=detail)

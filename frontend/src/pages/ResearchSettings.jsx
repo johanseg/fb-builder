@@ -1,9 +1,10 @@
 import { useToast } from '../context/ToastContext';
 import React, { useState, useEffect } from 'react';
-import { getBlacklist, addToBlacklist, removeFromBlacklist, getKeywordBlacklist, addToKeywordBlacklist, removeFromKeywordBlacklist } from '../api/research';
+import { useResearchApi } from '../api/research';
 
 const ResearchSettings = () => {
     const { showSuccess, showError } = useToast();
+    const { getBlacklist, addToBlacklist, removeFromBlacklist, getKeywordBlacklist, addToKeywordBlacklist, removeFromKeywordBlacklist } = useResearchApi();
     const [blacklist, setBlacklist] = useState([]);
     const [keywordBlacklist, setKeywordBlacklist] = useState([]);
     const [showBlacklistModal, setShowBlacklistModal] = useState(false);

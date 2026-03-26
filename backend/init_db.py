@@ -30,6 +30,9 @@ def seed_roles_and_permissions():
             ("templates:delete", "Delete templates"),
             ("users:read", "View users"),
             ("users:write", "Manage users"),
+            ("research:read", "View research data"),
+            ("research:write", "Create searches and manage blacklists"),
+            ("research:admin", "Run scheduled searches"),
         ]
 
         # Create permissions if they don't exist
@@ -59,6 +62,7 @@ def seed_roles_and_permissions():
                     "ads:read", "ads:write",
                     "campaigns:read", "campaigns:write",
                     "templates:read", "templates:write",
+                    "research:read", "research:write",
                 ]
             },
             "editor": {
@@ -68,6 +72,7 @@ def seed_roles_and_permissions():
                     "products:read",
                     "ads:read", "ads:write",
                     "templates:read", "templates:write",
+                    "research:read", "research:write",
                 ]
             },
             "viewer": {
@@ -78,6 +83,7 @@ def seed_roles_and_permissions():
                     "ads:read",
                     "campaigns:read",
                     "templates:read",
+                    "research:read",
                 ]
             }
         }
@@ -163,6 +169,48 @@ def seed_default_brand():
             brand_id=brand.id,
             name="Local Marketing & Digital Presence",
             description="Done-for-you local marketing execution: website presence, local SEO, Google Business Profile optimization, blog/content support, local search visibility, CRM, email/SMS marketing, online bookings, payments, and lead capture tools. Built for established local businesses that already do good work offline but are invisible, inconsistent, or weak online.",
+            pain_points=[
+                "Invisible online despite doing great work offline",
+                "Losing customers to competitors with better digital presence",
+                "Wasting money on marketing that doesn't generate measurable leads",
+                "No time to manage website, social media, and online listings",
+                "Inconsistent brand presence across Google, Facebook, and directories"
+            ],
+            desired_outcomes=[
+                "Show up first when locals search for their services",
+                "Consistent stream of qualified leads from online channels",
+                "Professional digital presence that matches their real-world reputation",
+                "More time running their business instead of figuring out marketing",
+                "Clear ROI visibility on every marketing dollar spent"
+            ],
+            root_causes=[
+                "Local businesses lack the time and expertise to manage digital marketing",
+                "DIY marketing tools are overwhelming and produce mediocre results",
+                "Most agencies overpromise and underdeliver with vague metrics",
+                "Google and Facebook algorithms change constantly, requiring dedicated attention",
+                "Disconnected tools create fragmented customer experiences"
+            ],
+            proof_points=[
+                "Serving thousands of local businesses across the US",
+                "Dedicated local marketing specialists assigned to each account",
+                "Proprietary technology platform built specifically for local business needs",
+                "Measurable results with transparent monthly performance reporting",
+                "Part of Townsquare Media with deep local market expertise"
+            ],
+            differentiators=[
+                "All-in-one platform replacing 5-7 separate marketing tools",
+                "Local market specialists who understand small business challenges",
+                "Done-for-you execution, not another DIY tool to learn",
+                "Transparent pricing with no long-term contracts",
+                "Performance-based approach with real ROI tracking"
+            ],
+            risk_reversals=[
+                "No long-term contracts — month-to-month flexibility",
+                "Dedicated account manager you can actually reach",
+                "Transparent reporting so you see exactly what you're paying for",
+                "Free initial consultation and digital presence audit",
+                "Cancel anytime if you're not seeing results"
+            ],
         )
         db.add(product)
         db.commit()
@@ -176,6 +224,73 @@ def seed_default_brand():
         db.close()
 
 
+def backfill_product_brief():
+    """Backfill pain_points and other brief fields on existing products that are missing them."""
+    db = SessionLocal()
+    try:
+        products = db.query(Product).filter(Product.pain_points.is_(None)).all()
+        if not products:
+            print("  All products already have brief data")
+            return
+
+        default_brief = {
+            "pain_points": [
+                "Invisible online despite doing great work offline",
+                "Losing customers to competitors with better digital presence",
+                "Wasting money on marketing that doesn't generate measurable leads",
+                "No time to manage website, social media, and online listings",
+                "Inconsistent brand presence across Google, Facebook, and directories"
+            ],
+            "desired_outcomes": [
+                "Show up first when locals search for their services",
+                "Consistent stream of qualified leads from online channels",
+                "Professional digital presence that matches their real-world reputation",
+                "More time running their business instead of figuring out marketing",
+                "Clear ROI visibility on every marketing dollar spent"
+            ],
+            "root_causes": [
+                "Local businesses lack the time and expertise to manage digital marketing",
+                "DIY marketing tools are overwhelming and produce mediocre results",
+                "Most agencies overpromise and underdeliver with vague metrics",
+                "Google and Facebook algorithms change constantly, requiring dedicated attention",
+                "Disconnected tools create fragmented customer experiences"
+            ],
+            "proof_points": [
+                "Serving thousands of local businesses across the US",
+                "Dedicated local marketing specialists assigned to each account",
+                "Proprietary technology platform built specifically for local business needs",
+                "Measurable results with transparent monthly performance reporting",
+                "Part of Townsquare Media with deep local market expertise"
+            ],
+            "differentiators": [
+                "All-in-one platform replacing 5-7 separate marketing tools",
+                "Local market specialists who understand small business challenges",
+                "Done-for-you execution, not another DIY tool to learn",
+                "Transparent pricing with no long-term contracts",
+                "Performance-based approach with real ROI tracking"
+            ],
+            "risk_reversals": [
+                "No long-term contracts — month-to-month flexibility",
+                "Dedicated account manager you can actually reach",
+                "Transparent reporting so you see exactly what you're paying for",
+                "Free initial consultation and digital presence audit",
+                "Cancel anytime if you're not seeing results"
+            ],
+        }
+
+        for product in products:
+            for field, value in default_brief.items():
+                setattr(product, field, value)
+            print(f"  Backfilled brief data for product: {product.name}")
+
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"Error backfilling product brief: {e}")
+    finally:
+        db.close()
+
+
 if __name__ == "__main__":
     init_db()
     print("\nSeeding roles and permissions...")
@@ -184,6 +299,10 @@ if __name__ == "__main__":
     # Seed default Townsquare Interactive brand
     print("\nSeeding default brand...")
     seed_default_brand()
+
+    # Backfill product brief data on existing products
+    print("\nBackfilling product brief data...")
+    backfill_product_brief()
 
     # Optionally create a default superuser (requires env vars)
     import os

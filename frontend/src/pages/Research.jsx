@@ -1,7 +1,7 @@
 import { useToast } from '../context/ToastContext';
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { searchAndSave, getSavedSearches, deleteSavedSearch, getApiUsage, getBlacklist, addToBlacklist, removeFromBlacklist, getKeywordBlacklist, addToKeywordBlacklist, removeFromKeywordBlacklist, getRateLimit, getVerticals, createVertical, getVerticalAggregatedAds, getVerticalPageAds } from '../api/research';
+import { useResearchApi } from '../api/research';
 
 const COUNTRIES = [
     { code: 'US', name: 'United States' },
@@ -25,6 +25,7 @@ const LIMIT_OPTIONS = [
 const Research = () => {
     const { showSuccess, showError, showInfo } = useToast();
     const location = useLocation();
+    const { searchAndSave, getSavedSearches, deleteSavedSearch, getApiUsage, getBlacklist, addToBlacklist, removeFromBlacklist, getKeywordBlacklist, addToKeywordBlacklist, removeFromKeywordBlacklist, getRateLimit, getVerticals, createVertical, getVerticalAggregatedAds, getVerticalPageAds } = useResearchApi();
     const [query, setQuery] = useState('');
     const [country, setCountry] = useState('US');
     const [negativeKeywords, setNegativeKeywords] = useState('');
@@ -243,7 +244,7 @@ const Research = () => {
             }
         } catch (error) {
             console.error('Scrape failed', error);
-            showError(error.response?.data?.detail || 'Scrape failed. Try again.');
+            showError(error.message || 'Scrape failed. Try again.');
         } finally {
             setLoading(false);
             setProgressMessage('');
@@ -324,7 +325,7 @@ const Research = () => {
                 });
             }
         } catch (error) {
-            const errorMsg = error.response?.data?.detail || 'Failed to add to blacklist';
+            const errorMsg = error.message || 'Failed to add to blacklist';
             showError(errorMsg);
         }
     };
