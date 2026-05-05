@@ -87,6 +87,14 @@ def test_railway_http_request_origin_is_upgraded_to_https():
     assert url == "https://fb-builder-production.up.railway.app/uploads/generated_123.png"
 
 
+def test_schemeless_public_origin_is_normalized_to_https(monkeypatch):
+    monkeypatch.setenv("RAILWAY_SERVICE_FB_BUILDER_URL", "fb-builder-production.up.railway.app")
+
+    url = to_public_asset_url("/uploads/generated_123.png")
+
+    assert url == "https://fb-builder-production.up.railway.app/uploads/generated_123.png"
+
+
 def test_absolute_asset_urls_are_not_rewritten(monkeypatch):
     monkeypatch.setenv("BACKEND_PUBLIC_URL", "https://fb-builder-production.up.railway.app")
 

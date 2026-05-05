@@ -144,6 +144,9 @@ def to_public_asset_url(asset_url: Optional[str], base_url: Optional[str] = None
     if not public_base_url:
         return asset_url
 
+    if not public_base_url.startswith(("http://", "https://")):
+        public_base_url = f"https://{public_base_url}"
+
     parsed_base_url = urlparse(public_base_url)
     if parsed_base_url.scheme == "http" and parsed_base_url.netloc.endswith(
         (".railway.app", ".up.railway.app")
