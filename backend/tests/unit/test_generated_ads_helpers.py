@@ -67,6 +67,26 @@ def test_upload_paths_prefer_request_origin():
     assert url == "https://fb-builder-production.up.railway.app/uploads/generated_123.png"
 
 
+def test_configured_public_origin_overrides_internal_request_origin(monkeypatch):
+    monkeypatch.setenv("BACKEND_PUBLIC_URL", "https://fb-builder-production.up.railway.app")
+
+    url = to_public_asset_url(
+        "/uploads/generated_123.png",
+        "http://internal-service.railway.internal/",
+    )
+
+    assert url == "https://fb-builder-production.up.railway.app/uploads/generated_123.png"
+
+
+def test_railway_http_request_origin_is_upgraded_to_https():
+    url = to_public_asset_url(
+        "/uploads/generated_123.png",
+        "http://fb-builder-production.up.railway.app/",
+    )
+
+    assert url == "https://fb-builder-production.up.railway.app/uploads/generated_123.png"
+
+
 def test_absolute_asset_urls_are_not_rewritten(monkeypatch):
     monkeypatch.setenv("BACKEND_PUBLIC_URL", "https://fb-builder-production.up.railway.app")
 

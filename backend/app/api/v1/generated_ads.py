@@ -7,7 +7,7 @@ import uuid
 from math import gcd
 from pathlib import Path
 from typing import List, Optional, Dict, Any
-from urllib.parse import quote_plus, urljoin
+from urllib.parse import quote_plus, urljoin, urlparse, urlunparse
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -140,9 +140,15 @@ def to_public_asset_url(asset_url: Optional[str], base_url: Optional[str] = None
     if not asset_url or not asset_url.startswith("/uploads/"):
         return asset_url
 
-    public_base_url = (base_url or get_public_backend_base_url() or "").strip()
+    public_base_url = (get_public_backend_base_url() or base_url or "").strip()
     if not public_base_url:
         return asset_url
+
+    parsed_base_url = urlparse(public_base_url)
+    if parsed_base_url.scheme == "http" and parsed_base_url.netloc.endswith(
+        (".railway.app", ".up.railway.app")
+    ):
+        public_base_url = urlunparse(parsed_base_url._replace(scheme="https"))
 
     return urljoin(f"{public_base_url.rstrip('/')}/", asset_url.lstrip("/"))
 
