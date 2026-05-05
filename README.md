@@ -600,6 +600,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-<p align="center">
-  Built with ❤️ by <a href="https://iscale.com">iSCALE</a> using FastAPI, React, and AI
-</p>
+
+
