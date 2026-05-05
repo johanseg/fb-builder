@@ -6,6 +6,6 @@ buildCommand = "npm install && npm run build"
 NIXPACKS_NODE_VERSION = "22"
 
 [deploy]
-startCommand = "sh -c 'npx serve dist -l ${PORT:-3000}'"
+startCommand = "node server.js"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10

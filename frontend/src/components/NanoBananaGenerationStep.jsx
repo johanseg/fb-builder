@@ -9,7 +9,7 @@ const NanoBananaGenerationStep = ({ copyData, selectedTemplate, onImagesGenerate
     const handleGenerate = () => {
         setGenerating(true);
 
-        // Mock API call to Nano Banana Pro
+        // Mock API call to Nano Banana 2
         setTimeout(() => {
             const newImages = Array.from({ length: 4 }).map((_, i) => ({
                 id: `nb_${Date.now()}_${i}`,
@@ -39,7 +39,7 @@ const NanoBananaGenerationStep = ({ copyData, selectedTemplate, onImagesGenerate
     return (
         <div>
             <h2 className="text-2xl font-bold mb-2">Generate Images</h2>
-            <p className="text-muted-foreground mb-8">Create stunning visuals using Nano Banana Pro AI.</p>
+            <p className="text-muted-foreground mb-8">Create stunning visuals using Nano Banana 2 AI.</p>
 
             {/* Generation Controls */}
             <div className="bg-card border border-border rounded-xl p-6 mb-8">
@@ -126,7 +126,7 @@ const NanoBananaGenerationStep = ({ copyData, selectedTemplate, onImagesGenerate
                         <ImageIcon size={32} />
                     </div>
                     <h3 className="text-lg font-medium text-foreground mb-1">Ready to Generate</h3>
-                    <p className="text-muted-foreground">Click the generate button to create images with Nano Banana Pro.</p>
+                    <p className="text-muted-foreground">Click the generate button to create images with Nano Banana 2.</p>
                 </div>
             )}
 

@@ -1,16 +1,35 @@
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronRight, ChevronLeft, Check, Briefcase, Package, Users, Image, Hash, FileText, Sparkles, Download, ChevronDown, ChevronUp, Settings, CheckCircle2, ArrowRight } from 'lucide-react';
 import { useBrands } from '../context/BrandContext';
 import ImageTemplateSelector from '../components/ImageTemplateSelector';
 import ProfileSelectionStep from '../components/steps/ProfileSelectionStep';
 import StyleSelector from '../components/StyleSelector';
+import { buildImageGenerationPrompt, getTemplateIdForGeneratedAd } from '../lib/imageAdPrompt';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
+const GENERAL_AUDIENCE_PROFILE = {
+    id: 'general-audience',
+    name: 'General audience',
+    demographics: 'Broad local service audience',
+    painPoints: 'Finding a provider they can trust',
+    pain_points: 'Finding a provider they can trust',
+    goals: 'Get clear help and take the next step',
+};
+
+async function getApiErrorMessage(response, fallback) {
+    try {
+        const data = await response.json();
+        return data?.detail || data?.message || fallback;
+    } catch {
+        return fallback;
+    }
+}
+
 export default function ImageAds() {
-    const { brands, customerProfiles } = useBrands();
+    const { activeBrand, customerProfiles, loading: brandsLoading = false } = useBrands();
     const { showError } = useToast();
     const { authFetch } = useAuth();
     const [currentStep, setCurrentStep] = useState(1);
@@ -18,6 +37,7 @@ export default function ImageAds() {
     const [generatedCopy, setGeneratedCopy] = useState(null);
     const [generatedImages, setGeneratedImages] = useState([]);
     const [selectedCopy, setSelectedCopy] = useState(null);
+    const [copyPrompt, setCopyPrompt] = useState('');
     const [customImagePrompt, setCustomImagePrompt] = useState('');
     const [templateMode, setTemplateMode] = useState('style'); // 'style' or 'template'
 
@@ -31,8 +51,6 @@ export default function ImageAds() {
         };
 
         return {
-            brand: null,
-            product: null,
             profile: null,
             template: null,
             variationCount: 3,
@@ -46,19 +64,52 @@ export default function ImageAds() {
             campaignDetails: savedCampaignDetails
                 ? JSON.parse(savedCampaignDetails)
                 : defaultCampaignDetails,
-            model: 'nano-banana-pro',
+            model: 'nano-banana-2',
             useProductShots: false
         };
     });
 
-    // Auto-populate brand and product from first available brand
-    useEffect(() => {
-        if (brands.length > 0 && !wizardData.brand) {
-            const brand = brands[0];
-            const product = brand?.products?.[0] || null;
-            setWizardData(prev => ({ ...prev, brand, product }));
+    const activeProduct = useMemo(
+        () => activeBrand?.products?.[0] || null,
+        [activeBrand]
+    );
+
+    const effectiveWizardData = useMemo(() => ({
+        ...wizardData,
+        brand: activeBrand,
+        product: activeProduct,
+    }), [wizardData, activeBrand, activeProduct]);
+
+    const availableProfiles = useMemo(() => {
+        if (brandsLoading) {
+            return [];
         }
-    }, [brands]);
+
+        return customerProfiles.length > 0
+            ? customerProfiles
+            : [GENERAL_AUDIENCE_PROFILE];
+    }, [brandsLoading, customerProfiles]);
+
+    useEffect(() => {
+        if (brandsLoading) {
+            return;
+        }
+
+        setWizardData(prev => {
+            const currentProfileIsAvailable = prev.profile
+                && availableProfiles.some(profile => profile.id === prev.profile.id);
+
+            if (currentProfileIsAvailable) {
+                return prev;
+            }
+
+            if (customerProfiles.length === 0) {
+                return { ...prev, profile: GENERAL_AUDIENCE_PROFILE };
+            }
+
+            return prev.profile ? { ...prev, profile: null } : prev;
+        });
+    }, [availableProfiles, brandsLoading, customerProfiles.length]);
 
     // Save campaign details to localStorage whenever they change
     useEffect(() => {
@@ -140,7 +191,10 @@ export default function ImageAds() {
             const response = await authFetch(`${API_URL}/copy-generation/generate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(wizardData)
+                body: JSON.stringify({
+                    ...effectiveWizardData,
+                    customPrompt: copyPrompt || undefined,
+                })
             });
 
             if (!response.ok) {
@@ -159,7 +213,7 @@ export default function ImageAds() {
         }
     };
 
-    const handleImageGeneration = async (copy) => {
+    const handleImageGeneration = async (copy, imagePrompt) => {
         setSelectedCopy(copy);
         setGenerating(true);
         try {
@@ -167,22 +221,22 @@ export default function ImageAds() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    template: wizardData.template,
-                    brand: wizardData.brand,
-                    product: wizardData.product,
+                    template: effectiveWizardData.template,
+                    brand: effectiveWizardData.brand,
+                    product: effectiveWizardData.product,
                     copy: copy,
-                    count: wizardData.variationCount,
-                    imageSizes: wizardData.imageSizes,
-                    resolution: wizardData.resolution,
-                    model: wizardData.model,
-                    productShots: wizardData.useProductShots ? wizardData.product?.product_shots : [],
-                    useProductImage: wizardData.useProductShots,
-                    customPrompt: customImagePrompt
+                    count: effectiveWizardData.variationCount,
+                    imageSizes: effectiveWizardData.imageSizes,
+                    resolution: effectiveWizardData.resolution,
+                    model: effectiveWizardData.model,
+                    productShots: effectiveWizardData.useProductShots ? effectiveWizardData.product?.product_shots : [],
+                    useProductImage: effectiveWizardData.useProductShots,
+                    customPrompt: imagePrompt
                 })
             });
 
             if (!response.ok) {
-                throw new Error('Image generation failed');
+                throw new Error(await getApiErrorMessage(response, 'Image generation failed'));
             }
 
             const data = await response.json();
@@ -201,9 +255,9 @@ export default function ImageAds() {
             try {
                 const adsToSave = imagesWithBundle.map(img => ({
                     id: `ga_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                    brandId: wizardData.brand?.id,
-                    productId: wizardData.product?.id,
-                    templateId: wizardData.template?.id,
+                    brandId: effectiveWizardData.brand?.id,
+                    productId: effectiveWizardData.product?.id,
+                    templateId: getTemplateIdForGeneratedAd(effectiveWizardData.template),
                     imageUrl: img.url,
                     headline: copy.headline,
                     body: copy.body,
@@ -232,7 +286,7 @@ export default function ImageAds() {
             setCurrentStep(8); // Move to image result step
         } catch (error) {
             console.error('Image generation error:', error);
-            showError('Failed to generate images. Please try again.');
+            showError(error.message || 'Failed to generate images. Please try again.');
         } finally {
             setGenerating(false);
         }
@@ -253,7 +307,7 @@ export default function ImageAds() {
             <div className="mb-8 bg-card rounded-xl shadow-sm border border-border p-6">
                 <div className="flex items-center justify-between relative">
                     <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-full h-1 bg-muted -z-10"></div>
-                    {steps.map((step, index) => {
+                    {steps.map((step) => {
                         const Icon = step.icon;
                         const isActive = step.id === currentStep;
                         const isCompleted = step.id < currentStep;
@@ -306,12 +360,12 @@ export default function ImageAds() {
                 )}
 
                 {/* Step 1: Profile Selection */}
-                {currentStep === 1 && (
-                    <ProfileSelectionStep
-                        profiles={customerProfiles}
-                        selectedProfile={wizardData.profile}
-                        onSelect={(profile) => {
-                            updateData('profile', profile);
+	                {currentStep === 1 && (
+	                    <ProfileSelectionStep
+	                        profiles={availableProfiles}
+	                        selectedProfile={wizardData.profile}
+	                        onSelect={(profile) => {
+	                            updateData('profile', profile);
                             nextStep();
                         }}
                     />
@@ -410,17 +464,19 @@ export default function ImageAds() {
 
                 {/* Step 6: Review */}
                 {currentStep === 6 && (
-                    <ReviewStep wizardData={wizardData} />
+                    <ReviewStep
+                        wizardData={effectiveWizardData}
+                        customPrompt={copyPrompt}
+                        setCustomPrompt={setCopyPrompt}
+                    />
                 )}
 
                 {/* Step 7: Copy Selection (after generation) */}
                 {currentStep === 7 && generatedCopy && (
                     <CopySelectionStep
                         generatedCopy={generatedCopy}
-                        wizardData={wizardData}
+                        wizardData={effectiveWizardData}
                         onBack={() => setCurrentStep(6)}
-                        onRegenerate={handleGenerate}
-                        isRegenerating={generating}
                         onProceed={handleImageGeneration}
                         customImagePrompt={customImagePrompt}
                         setCustomImagePrompt={setCustomImagePrompt}
@@ -433,7 +489,6 @@ export default function ImageAds() {
                     generatedImages.length > 0 ? (
                         <ImageGenerationStep
                             generatedImages={generatedImages}
-                            wizardData={wizardData}
                             selectedCopy={selectedCopy}
                             onBack={() => setCurrentStep(7)}
                             onRestart={() => window.location.reload()}
@@ -520,8 +575,8 @@ function VariationCountStep({ count, onChange }) {
                     </div>
                 </div>
 
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                    <p className="text-sm text-amber-800">
+                <div className="bg-amber-950/30 border border-amber-700/40 rounded-lg p-4">
+                    <p className="text-sm text-amber-100">
                         <strong>Tip:</strong> More variations give you more options to choose from, but will take longer to generate.
                     </p>
                 </div>
@@ -596,9 +651,9 @@ function ImageSizeStep({ selectedSizes = [], onSelect, resolution, onResolutionC
                             key={size.name}
                             onClick={() => !isDisabled && toggleSize(size)}
                             className={`p-6 rounded-xl border-2 transition-all relative ${isRequired
-                                ? 'border-amber-600 bg-amber-50 shadow-lg cursor-default'
+                                ? 'border-amber-600 bg-amber-950/30 shadow-lg cursor-default'
                                 : isSelected
-                                    ? 'border-amber-600 bg-amber-50 shadow-lg cursor-pointer'
+                                    ? 'border-amber-600 bg-amber-950/30 shadow-lg cursor-pointer'
                                     : isDisabled
                                         ? 'border-border opacity-50 cursor-not-allowed'
                                         : 'border-border hover:border-amber-300 hover:shadow-md cursor-pointer'
@@ -661,7 +716,7 @@ function ImageSizeStep({ selectedSizes = [], onSelect, resolution, onResolutionC
                                         key={res}
                                         onClick={() => onResolutionChange(res)}
                                         className={`p-4 rounded-lg border-2 transition-all ${resolution === res
-                                            ? 'border-amber-600 bg-amber-50 text-foreground'
+                                            ? 'border-amber-600 bg-amber-950/30 text-foreground'
                                             : 'border-border hover:border-amber-300 text-foreground'
                                             }`}
                                     >
@@ -675,8 +730,8 @@ function ImageSizeStep({ selectedSizes = [], onSelect, resolution, onResolutionC
                                 ))}
                             </div>
 
-                            <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                                <p className="text-sm text-amber-800">
+                            <div className="mt-4 bg-amber-950/30 border border-amber-700/40 rounded-lg p-3">
+                                <p className="text-sm text-amber-100">
                                     <strong>Tip:</strong> Higher resolutions produce better quality but take longer to generate. 1K is recommended for quick previews.
                                 </p>
                             </div>
@@ -685,35 +740,35 @@ function ImageSizeStep({ selectedSizes = [], onSelect, resolution, onResolutionC
                         {/* Model Selection */}
                         <div className="bg-card rounded-xl shadow-sm border border-border p-6">
                             <h3 className="text-xl font-bold mb-4">Select AI Model (Primary Image)</h3>
-                            <p className="text-muted-foreground mb-4">Choose the model used to generate the initial square image. Resizing always uses Nano Banana Pro Edit.</p>
+                            <p className="text-muted-foreground mb-4">Choose the model used to generate the initial square image.</p>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div
-                                    onClick={() => onModelChange('nano-banana-pro')}
-                                    className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${model === 'nano-banana-pro'
-                                        ? 'border-amber-600 bg-amber-50'
+                                    onClick={() => onModelChange('nano-banana-2')}
+                                    className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${model === 'nano-banana-2'
+                                        ? 'border-amber-600 bg-amber-950/30'
                                         : 'border-border hover:border-amber-300'
                                         }`}
                                 >
                                     <div className="flex items-center justify-between mb-2">
-                                        <span className="font-bold text-lg">Nano Banana Pro</span>
-                                        {model === 'nano-banana-pro' && <Check className="text-amber-600" size={20} />}
+                                        <span className="font-bold text-lg">Nano Banana 2</span>
+                                        {model === 'nano-banana-2' && <Check className="text-amber-600" size={20} />}
                                     </div>
-                                    <p className="text-sm text-muted-foreground">Fast, efficient, and great for most styles. (Default)</p>
+                                    <p className="text-sm text-muted-foreground">Fast Fal.ai generation for production volume. Uses Nano Banana 2 Edit when product images are enabled. Default model.</p>
                                 </div>
 
                                 <div
                                     onClick={() => onModelChange('imagen4')}
                                     className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${model === 'imagen4'
-                                        ? 'border-amber-600 bg-amber-50'
+                                        ? 'border-amber-600 bg-amber-950/30'
                                         : 'border-border hover:border-amber-300'
                                         }`}
                                 >
                                     <div className="flex items-center justify-between mb-2">
-                                        <span className="font-bold text-lg">Google Imagen 3</span>
+                                        <span className="font-bold text-lg">Google Imagen 4</span>
                                         {model === 'imagen4' && <Check className="text-amber-600" size={20} />}
                                     </div>
-                                    <p className="text-sm text-muted-foreground">High fidelity, photorealistic quality. Slower generation time.</p>
+                                    <p className="text-sm text-muted-foreground">High fidelity fallback option for photorealistic output.</p>
                                 </div>
                             </div>
                         </div>
@@ -799,12 +854,10 @@ function CampaignDetailsStep({ details, onChange }) {
     );
 }
 
-function ReviewStep({ wizardData }) {
+function ReviewStep({ wizardData, customPrompt, setCustomPrompt }) {
     const [showPrompt, setShowPrompt] = useState(false);
-    const [customPrompt, setCustomPrompt] = useState('');
 
-    // Build the default prompt
-    const buildPrompt = () => {
+    const buildPrompt = useCallback(() => {
         const count = wizardData.variationCount || 3;
         return `You are an expert ad copywriter. Generate ${count} variations of ad copy for a Facebook/Instagram ad campaign.
 
@@ -858,14 +911,13 @@ Return ONLY valid JSON in this exact format:
     }
   ]
 }`;
-    };
+    }, [wizardData]);
 
-    // Initialize prompt when component mounts or data changes
     React.useEffect(() => {
         if (!customPrompt) {
             setCustomPrompt(buildPrompt());
         }
-    }, [wizardData]);
+    }, [buildPrompt, customPrompt, setCustomPrompt]);
 
     return (
         <div>
@@ -954,7 +1006,7 @@ Return ONLY valid JSON in this exact format:
                 )}
             </div>
 
-            <div className="mt-6 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg p-4 max-w-3xl">
+            <div className="mt-6 bg-gradient-to-r from-amber-950/30 to-orange-950/20 border border-amber-700/40 rounded-lg p-4 max-w-3xl">
                 <p className="text-sm text-foreground">
                     <strong>Ready to generate!</strong> Click "Generate Ad Copy" to create {wizardData.variationCount} AI-powered ad{wizardData.variationCount > 1 ? 's' : ''} based on your selections.
                 </p>
@@ -966,7 +1018,7 @@ Return ONLY valid JSON in this exact format:
 function ReviewItem({ label, value, icon: Icon }) {
     return (
         <div className="flex items-center gap-2 p-3 bg-secondary rounded-lg">
-            <Icon className="text-amber-600 flex-shrink-0" size={18} />
+            {React.createElement(Icon, { className: 'text-amber-600 flex-shrink-0', size: 18 })}
             <div className="min-w-0">
                 <div className="text-xs font-medium text-muted-foreground">{label}</div>
                 <div className="text-sm text-foreground truncate">{value}</div>
@@ -975,134 +1027,21 @@ function ReviewItem({ label, value, icon: Icon }) {
     );
 }
 
-function CopySelectionStep({ generatedCopy, wizardData, onBack, onRegenerate, isRegenerating, onProceed, customImagePrompt, setCustomImagePrompt, authFetch }) {
+function CopySelectionStep({ generatedCopy, wizardData, onBack, onProceed, customImagePrompt, setCustomImagePrompt, authFetch }) {
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [editedCopy, setEditedCopy] = useState(null);
     const [regeneratingField, setRegeneratingField] = useState(null);
     const [showPrompt, setShowPrompt] = useState(false);
-
-    // Build comprehensive prompt (matching backend logic)
-    const buildComprehensivePrompt = () => {
-        const currentCopy = editedCopy || generatedCopy.variations[selectedIndex];
-
-        // Extract all context
-        const productName = wizardData.product?.name || 'Product';
-        const productDesc = wizardData.product?.description || '';
-        const brandName = wizardData.brand?.name || '';
-        const brandVoice = wizardData.brand?.voice || 'Professional';
-        const brandColor = wizardData.brand?.colors?.primary || '';
-
-        // Get template metadata
-        const templateType = wizardData.template?.type;
-        let mood, lighting, composition, designStyle;
-
-        if (templateType === 'style') {
-            // Style archetype - has metadata fields
-            mood = wizardData.template?.mood || 'Engaging';
-            lighting = wizardData.template?.lighting || 'Professional lighting';
-            composition = wizardData.template?.composition || 'Balanced';
-            designStyle = wizardData.template?.design_style || 'Modern';
-        } else {
-            // Regular template
-            mood = wizardData.template?.mood || 'Engaging';
-            lighting = wizardData.template?.lighting || 'Professional lighting';
-            composition = wizardData.template?.composition || 'Balanced';
-            designStyle = wizardData.template?.design_style || 'Modern';
-        }
-
-        // Build comprehensive prompt with Markdown-style sections
-        const sections = [];
-
-        // 1. SUBJECT MATTER & COMPOSITION (Priority)
-        const subjectSection = [];
-        const userAngle = wizardData.campaignDetails?.angle;
-
-        if (userAngle) {
-            subjectSection.push(`**Subject Matter:** ${userAngle}`);
-        } else {
-            const template = wizardData.template;
-            if (template) {
-                // Combine template subject details
-                const details = [];
-                if (template.subject_matter) details.push(template.subject_matter);
-                if (template.subject) details.push(template.subject);
-                if (template.topHalf && template.bottomHalf) details.push(`Top: ${template.topHalf}, Bottom: ${template.bottomHalf}`);
-                if (template.leftSide && template.rightSide) details.push(`Left: ${template.leftSide}, Right: ${template.rightSide}`);
-                if (template.visualLayout) details.push(`Layout: ${template.visualLayout}`);
-
-                if (details.length > 0) subjectSection.push(`**Subject Matter:** ${details.join('. ')}`);
-
-                // Visual Elements
-                const visualElements = [];
-                if (template.visual_elements) {
-                    const elements = typeof template.visual_elements === 'string' ? template.visual_elements :
-                        Array.isArray(template.visual_elements) ? template.visual_elements.join(', ') :
-                            JSON.stringify(template.visual_elements);
-                    visualElements.push(elements);
-                }
-                if (template.visualAnchors) {
-                    visualElements.push(Array.isArray(template.visualAnchors) ? template.visualAnchors.join(', ') : template.visualAnchors);
-                }
-                if (template.overlays) {
-                    visualElements.push(`Overlays: ${Array.isArray(template.overlays) ? template.overlays.join(', ') : template.overlays}`);
-                }
-
-                if (visualElements.length > 0) subjectSection.push(`**Visual Elements:** ${visualElements.join('. ')}`);
-
-                // Special handling for iPhone Note style to prevent overcrowding
-                if (template.id === 'iphone-note') {
-                    subjectSection.push(`**Constraint:** KEEP TEXT SHORT. Maximum 15 words total. Use short, punchy bullet points for legibility.`);
-                }
-            }
-        }
-
-        if (composition) subjectSection.push(`**Composition:** ${composition}`);
-        if (subjectSection.length > 0) sections.push(subjectSection.join('\n'));
-
-        // 2. PRODUCT & BRAND
-        const productBrandSection = [];
-        productBrandSection.push(`**Product:** ${productName}${productDesc ? ` - ${productDesc}` : ''}`);
-        productBrandSection.push(`**Brand:** ${brandName ? `${brandName} (${brandVoice})` : brandVoice}`);
-        if (brandColor) productBrandSection.push(`**Primary Color:** ${brandColor}`);
-        sections.push(productBrandSection.join('\n'));
-
-        // 3. CONTEXT & COPY
-        if (currentCopy?.headline) {
-            if (wizardData.template?.id === 'iphone-note') {
-                const truncatedHeadline = currentCopy.headline.split(' ').slice(0, 10).join(' ');
-                sections.push(`**Context:** Visual representation of a handwritten note based on: "${truncatedHeadline}".
-**IMPORTANT:** SUMMARIZE text to under 10 words for legibility.`);
-            } else {
-                sections.push(`**Context:** Visual representation of "${currentCopy.headline}"`);
-            }
-        }
-
-        // 4. ART DIRECTION & STYLE
-        sections.push(`**Art Direction:**
-Mood: ${mood}
-Lighting: ${lighting}
-Style: ${designStyle}`);
-
-        // 5. QUALITY STANDARDS
-        sections.push(`**Quality:** High quality, photorealistic, 4k, advertising standard`);
-
-        // Join with double newlines for clear separation
-        return sections.join('\n\n');
-    };
-
-    // Auto-populate prompt on mount if empty
-    React.useEffect(() => {
-        if (!customImagePrompt) {
-            setCustomImagePrompt(buildComprehensivePrompt());
-        }
-    }, []);
+    const currentCopy = editedCopy || generatedCopy.variations[selectedIndex];
+    const generatedImagePrompt = useMemo(
+        () => buildImageGenerationPrompt({ wizardData, copy: currentCopy }),
+        [currentCopy, wizardData]
+    );
+    const imagePromptToUse = customImagePrompt.trim() || generatedImagePrompt;
 
     const handleResetPrompt = () => {
-        setCustomImagePrompt(buildComprehensivePrompt());
+        setCustomImagePrompt('');
     };
-
-    const currentCopy = editedCopy || generatedCopy.variations[selectedIndex];
-
     const handleEdit = (field, value) => {
         setEditedCopy({
             ...currentCopy,
@@ -1139,16 +1078,14 @@ Style: ${designStyle}`);
     };
 
     const handleProceed = async () => {
-        // Save selected copy to wizardData or state if needed
-        // For now we just pass it to the next step
-        onProceed(currentCopy);
+        onProceed(currentCopy, imagePromptToUse);
     };
 
     const RegenerateButton = ({ field }) => (
         <button
             onClick={() => handleRegenerateField(field)}
             disabled={regeneratingField === field}
-            className="ml-2 p-1 text-muted-foreground hover:text-amber-600 hover:bg-amber-50 rounded-full transition-colors"
+            className="ml-2 p-1 text-muted-foreground hover:text-amber-600 hover:bg-amber-950/30 rounded-full transition-colors"
             title="Regenerate this field"
         >
             <Sparkles size={14} className={regeneratingField === field ? 'animate-spin text-amber-600' : ''} />
@@ -1239,9 +1176,9 @@ Style: ${designStyle}`);
 
                 {/* Preview */}
                 <div>
-                    <div className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 rounded-xl p-6">
+                    <div className="bg-gradient-to-br from-amber-950/30 to-orange-950/20 border-2 border-amber-700/40 rounded-xl p-6">
                         <div className="text-xs font-medium text-amber-600 mb-3">PREVIEW</div>
-                        <div className="bg-card rounded-lg p-4 shadow-sm">
+                        <div className="bg-secondary rounded-lg p-4 shadow-sm border border-border">
                             <div className="font-bold text-lg text-foreground mb-2">
                                 {currentCopy.headline}
                             </div>
@@ -1277,10 +1214,10 @@ Style: ${designStyle}`);
                 {showPrompt && (
                     <div className="p-4 animate-in slide-in-from-top-2 duration-200">
                         <p className="text-xs text-muted-foreground mb-3">
-                            <strong>Optional:</strong> Override the AI-generated prompt. Leave empty to automatically build a comprehensive prompt using your brand, product, copy, and template details.
+                            <strong>Optional:</strong> Override the AI-generated prompt. The default updates automatically when you switch copy variations and includes the selected template blueprint.
                         </p>
                         <textarea
-                            value={customImagePrompt}
+                            value={customImagePrompt || generatedImagePrompt}
                             onChange={(e) => setCustomImagePrompt(e.target.value)}
                             placeholder="Leave empty to auto-generate comprehensive prompt from your brand, product, and copy..."
                             className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm font-mono"
@@ -1291,12 +1228,12 @@ Style: ${designStyle}`);
                                 onClick={handleResetPrompt}
                                 className="text-xs text-amber-600 hover:text-amber-700 font-medium"
                             >
-                                ↺ Reset to Generated Prompt
+                                Reset to Template Prompt
                             </button>
                             <span className="text-xs text-muted-foreground">
-                                {customImagePrompt.length > 0
-                                    ? `${customImagePrompt.length} characters`
-                                    : '✨ Auto-generating comprehensive prompt'}
+                                {customImagePrompt.trim()
+                                    ? `${customImagePrompt.length} custom characters`
+                                    : `${generatedImagePrompt.length} auto-generated characters`}
                             </span>
                         </div>
                     </div>
@@ -1324,36 +1261,34 @@ Style: ${designStyle}`);
     );
 }
 
-function ImageGenerationStep({ generatedImages, wizardData, selectedCopy, onBack, onRestart }) {
+function ImageGenerationStep({ generatedImages, selectedCopy, onBack, onRestart }) {
     const [selectedImageIndex, setSelectedImageIndex] = useState(null);
     const [imgError, setImgError] = useState(false);
-
-    if (!generatedImages || generatedImages.length === 0) {
-        return <div className="text-center p-8 text-red-600">Error: No image data available.</div>;
-    }
-
-    // Filter to show only square images in the main grid
-    const squareImages = generatedImages.filter(img => img.size.includes('Square'));
-
-    // If no square images found (fallback), use all images
-    const displayImages = squareImages.length > 0 ? squareImages : generatedImages;
-
-    const selectedImage = selectedImageIndex !== null ? displayImages[selectedImageIndex] : null;
-
-    // Get all images in the same bundle as the selected image
-    const bundleImages = selectedImage
-        ? generatedImages.filter(img => img.adBundleId === selectedImage.adBundleId)
-        : [];
-
-    // Current image being viewed in the modal (defaults to the selected square image)
     const [viewedImage, setViewedImage] = useState(null);
 
-    // Update viewed image when selection changes
+    const safeGeneratedImages = Array.isArray(generatedImages) ? generatedImages : [];
+
+    const squareImages = safeGeneratedImages.filter(img => img.size.includes('Square'));
+
+    const displayImages = squareImages.length > 0 ? squareImages : safeGeneratedImages;
+
+    const selectedImage = selectedImageIndex !== null ? displayImages[selectedImageIndex] : null;
+    const bundleImages = selectedImage
+        ? safeGeneratedImages.filter(img => img.adBundleId === selectedImage.adBundleId)
+        : [];
+
     React.useEffect(() => {
         if (selectedImage) {
             setViewedImage(selectedImage);
+            setImgError(false);
+        } else {
+            setViewedImage(null);
         }
     }, [selectedImage]);
+
+    if (displayImages.length === 0) {
+        return <div className="text-center p-8 text-red-600">Error: No image data available.</div>;
+    }
 
     const displayCopy = selectedCopy || { headline: '', body: '', cta: '' };
 
@@ -1443,7 +1378,7 @@ function ImageGenerationStep({ generatedImages, wizardData, selectedCopy, onBack
                                     {/* Main Image */}
                                     <div className="bg-secondary rounded-xl overflow-hidden aspect-square flex items-center justify-center">
                                         {imgError ? (
-                                            <div className="p-8 text-center text-red-500 bg-red-50">
+                                            <div className="p-8 text-center text-red-300 bg-red-950/30">
                                                 <p className="font-bold mb-2">Failed to load image</p>
                                             </div>
                                         ) : (
@@ -1491,22 +1426,22 @@ function ImageGenerationStep({ generatedImages, wizardData, selectedCopy, onBack
                                 {/* Details Panel */}
                                 <div className="space-y-6">
                                     {/* Ad Copy */}
-                                    <div className="bg-amber-50 p-5 rounded-xl border border-amber-200">
+                                    <div className="bg-amber-950/20 p-5 rounded-xl border border-amber-700/40">
                                         <h4 className="font-bold text-foreground mb-4 flex items-center gap-2">
                                             <FileText size={20} className="text-amber-600" />
                                             Ad Copy
                                         </h4>
                                         <div className="space-y-3">
                                             <div>
-                                                <label className="text-xs font-medium text-amber-700 uppercase">Headline</label>
+                                                <label className="text-xs font-medium text-amber-300 uppercase">Headline</label>
                                                 <p className="font-bold text-foreground mt-1">{displayCopy.headline}</p>
                                             </div>
                                             <div>
-                                                <label className="text-xs font-medium text-amber-700 uppercase">Body Text</label>
+                                                <label className="text-xs font-medium text-amber-300 uppercase">Body Text</label>
                                                 <p className="text-foreground text-sm whitespace-pre-line mt-1">{displayCopy.body}</p>
                                             </div>
                                             <div>
-                                                <label className="text-xs font-medium text-amber-700 uppercase">Call to Action</label>
+                                                <label className="text-xs font-medium text-amber-300 uppercase">Call to Action</label>
                                                 <div className="mt-1">
                                                     <span className="inline-block px-3 py-1 bg-amber-600 text-white rounded-full text-sm font-medium">
                                                         {displayCopy.cta}
@@ -1541,7 +1476,7 @@ function ImageGenerationStep({ generatedImages, wizardData, selectedCopy, onBack
                                     {/* Download Button */}
                                     <a
                                         href={viewedImage.url}
-                                        download={`ad-${viewedImage.size}-${Date.now()}.png`}
+                                        download={`ad-${viewedImage.size.replace(/\s+/g, '-').toLowerCase()}.png`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="w-full py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-bold flex items-center justify-center gap-2 transition-colors"

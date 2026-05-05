@@ -144,7 +144,7 @@ const Wizard = () => {
                     />
                 )}
 
-                {/* Step 4: Generate Images (Nano Banana Pro) */}
+                {/* Step 4: Generate Images (Nano Banana 2) */}
                 {step === 4 && (
                     <NanoBananaGenerationStep
                         copyData={copyData}
