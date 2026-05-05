@@ -2,6 +2,7 @@ from app.api.v1.generated_ads import (
     build_prompt_variation,
     get_persistable_template_id,
     is_configured_fal_api_key,
+    to_public_asset_url,
 )
 
 
@@ -47,3 +48,28 @@ def test_prompt_variation_adds_distinct_generation_direction():
     assert "Variation 1 of 3" in first
     assert "Variation 2 of 3" in second
     assert first != second
+
+
+def test_upload_paths_are_returned_with_public_backend_origin(monkeypatch):
+    monkeypatch.setenv("BACKEND_PUBLIC_URL", "https://fb-builder-production.up.railway.app")
+
+    url = to_public_asset_url("/uploads/generated_123.png")
+
+    assert url == "https://fb-builder-production.up.railway.app/uploads/generated_123.png"
+
+
+def test_upload_paths_prefer_request_origin():
+    url = to_public_asset_url(
+        "/uploads/generated_123.png",
+        "https://fb-builder-production.up.railway.app/",
+    )
+
+    assert url == "https://fb-builder-production.up.railway.app/uploads/generated_123.png"
+
+
+def test_absolute_asset_urls_are_not_rewritten(monkeypatch):
+    monkeypatch.setenv("BACKEND_PUBLIC_URL", "https://fb-builder-production.up.railway.app")
+
+    url = to_public_asset_url("https://fal.media/generated.png")
+
+    assert url == "https://fal.media/generated.png"

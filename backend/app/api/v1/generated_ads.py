@@ -7,10 +7,10 @@ import uuid
 from math import gcd
 from pathlib import Path
 from typing import List, Optional, Dict, Any
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urljoin
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -117,6 +117,34 @@ def is_configured_fal_api_key(api_key: Optional[str]) -> bool:
     """Return False for empty or scaffold placeholder Fal keys."""
     normalized = (api_key or "").strip()
     return bool(normalized) and normalized not in FAL_API_KEY_PLACEHOLDERS and not normalized.startswith("your-")
+
+
+def get_public_backend_base_url() -> Optional[str]:
+    """Return a configured public backend origin for serving generated upload assets."""
+    for key in ("BACKEND_PUBLIC_URL", "API_PUBLIC_URL", "RAILWAY_SERVICE_FB_BUILDER_URL"):
+        value = (os.getenv(key) or "").strip()
+        if value:
+            return value.rstrip("/")
+
+    railway_domain = (os.getenv("RAILWAY_PUBLIC_DOMAIN") or "").strip()
+    if railway_domain:
+        if railway_domain.startswith(("http://", "https://")):
+            return railway_domain.rstrip("/")
+        return f"https://{railway_domain}".rstrip("/")
+
+    return None
+
+
+def to_public_asset_url(asset_url: Optional[str], base_url: Optional[str] = None) -> Optional[str]:
+    """Convert backend-local upload paths into URLs the frontend host can load."""
+    if not asset_url or not asset_url.startswith("/uploads/"):
+        return asset_url
+
+    public_base_url = (base_url or get_public_backend_base_url() or "").strip()
+    if not public_base_url:
+        return asset_url
+
+    return urljoin(f"{public_base_url.rstrip('/')}/", asset_url.lstrip("/"))
 
 
 def get_fal_api_key() -> str:
@@ -295,6 +323,7 @@ async def download_and_save_image(image_url: str, prefix: str = "generated") -> 
 @router.post("/generate-image")
 async def generate_image(
     request: ImageGenerationRequest,
+    http_request: Request,
     current_user: User = Depends(require_permission("ads:write"))
 ):
     """Generate ad images using Fal.ai."""
@@ -359,7 +388,10 @@ async def generate_image(
 
                     # Download and save image locally
                     logger.info("Downloading image from Fal.ai")
-                    image_url = await download_and_save_image(external_url, prefix="generated")
+                    image_url = to_public_asset_url(
+                        await download_and_save_image(external_url, prefix="generated"),
+                        str(http_request.base_url),
+                    )
                     logger.info("Saved generated image locally: %s", image_url)
 
                 except Exception as e:
@@ -384,6 +416,7 @@ async def generate_image(
 
 @router.get("/")
 def get_generated_ads(
+    http_request: Request,
     brand_id: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -401,7 +434,7 @@ def get_generated_ads(
         "brand_id": ad.brand_id,
         "product_id": ad.product_id,
         "template_id": ad.template_id,
-        "image_url": ad.image_url,
+        "image_url": to_public_asset_url(ad.image_url, str(http_request.base_url)),
         "headline": ad.headline,
         "body": ad.body,
         "cta": ad.cta,
@@ -487,6 +520,7 @@ def export_ads_csv(
 @router.post("/batch")
 def batch_save_ads(
     request: BatchSaveRequest,
+    http_request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("ads:write"))
 ):
@@ -506,7 +540,7 @@ def batch_save_ads(
             brand_id=ad_data.brandId,
             product_id=ad_data.productId,
             template_id=template_id,
-            image_url=ad_data.imageUrl,
+            image_url=to_public_asset_url(ad_data.imageUrl, str(http_request.base_url)),
             headline=ad_data.headline,
             body=ad_data.body,
             cta=ad_data.cta,

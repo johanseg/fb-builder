@@ -7,6 +7,7 @@ import ImageTemplateSelector from '../components/ImageTemplateSelector';
 import ProfileSelectionStep from '../components/steps/ProfileSelectionStep';
 import StyleSelector from '../components/StyleSelector';
 import { buildImageGenerationPrompt, getTemplateIdForGeneratedAd } from '../lib/imageAdPrompt';
+import { resolveMediaUrl } from '../lib/mediaUrl';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -246,6 +247,7 @@ export default function ImageAds() {
             // Add bundle ID to images
             const imagesWithBundle = (data.images || []).map(img => ({
                 ...img,
+                url: resolveMediaUrl(img.url, API_URL),
                 adBundleId: bundleId
             }));
 
