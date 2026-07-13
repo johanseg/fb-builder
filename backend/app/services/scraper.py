@@ -11,18 +11,23 @@ Note: The API has limitations:
 """
 
 import httpx
+import logging
 import os
+import re
 from typing import List, Optional
 from app.schemas.research import ScrapedAdCreate
+from app.core.utils import GRAPH_API_VERSION
 from datetime import datetime
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 
 class FacebookAdsLibraryAPI:
     """Official Facebook Ads Library API client."""
 
     def __init__(self, db: Session = None):
-        self.base_url = "https://graph.facebook.com/v21.0/ads_archive"
+        self.base_url = f"https://graph.facebook.com/{GRAPH_API_VERSION}/ads_archive"
         self.access_token = os.getenv("FACEBOOK_ADS_LIBRARY_TOKEN") or os.getenv("VITE_FACEBOOK_ACCESS_TOKEN")
         self.db = db
 
@@ -45,7 +50,7 @@ class FacebookAdsLibraryAPI:
             - filtered_by_keyword_blacklist: Count filtered by keywords
             - api_calls_made: Number of API calls
         """
-        print(f"Searching Facebook Ads Library for '{query}' in {country} (offset={offset}, negative_keywords={negative_keywords})")
+        logger.info(f"Searching Facebook Ads Library for '{query}' in {country} (offset={offset}, negative_keywords={negative_keywords})")
 
         # Try API first if token available
         if self.access_token:
@@ -58,10 +63,10 @@ class FacebookAdsLibraryAPI:
                 #    This catches keywords like "semaglutide" that are severely limited
                 should_fallback = False
                 if len(ads) == 0:
-                    print(f"API returned 0 ads for '{query}', falling back to Chromium scraper")
+                    logger.info(f"API returned 0 ads for '{query}', falling back to Chromium scraper")
                     should_fallback = True
                 elif limit >= 100 and len(ads) < limit * 0.5:
-                    print(f"API returned only {len(ads)} ads (requested {limit}), falling back to Chromium for full results")
+                    logger.info(f"API returned only {len(ads)} ads (requested {limit}), falling back to Chromium for full results")
                     should_fallback = True
 
                 if should_fallback:
@@ -69,7 +74,7 @@ class FacebookAdsLibraryAPI:
 
                 return ads
             except Exception as e:
-                print(f"API search failed: {e}, falling back to scraper")
+                logger.error(f"API search failed: {e}, falling back to scraper")
 
         # Fallback to scraper
         return await self._fallback_search(query, limit, country, offset, exclude_ids or [], negative_keywords or [])
@@ -115,9 +120,9 @@ class FacebookAdsLibraryAPI:
             blacklisted_keywords = [k.keyword.lower() for k in keyword_blacklist]
 
             if blacklisted_pages:
-                print(f"Filtering {len(blacklisted_pages)} blacklisted pages")
+                logger.info(f"Filtering {len(blacklisted_pages)} blacklisted pages")
             if blacklisted_keywords:
-                print(f"Filtering {len(blacklisted_keywords)} blacklisted keywords")
+                logger.info(f"Filtering {len(blacklisted_keywords)} blacklisted keywords")
 
         # Combine negative keywords from request with persistent blacklisted keywords
         all_negative_keywords = negative_keywords_lower + blacklisted_keywords
@@ -141,7 +146,7 @@ class FacebookAdsLibraryAPI:
                 if after_cursor:
                     params["after"] = after_cursor
 
-                print(f"Calling API: {self.base_url} (batch {total_api_calls + 1}, requesting {batch_size} ads)")
+                logger.info(f"Calling API: {self.base_url} (batch {total_api_calls + 1}, requesting {batch_size} ads)")
                 response = await client.get(self.base_url, params=params)
                 response.raise_for_status()
 
@@ -149,12 +154,12 @@ class FacebookAdsLibraryAPI:
                 total_api_calls += 1
 
                 if not data.get("data"):
-                    print("No more ads returned from API")
+                    logger.info("No more ads returned from API")
                     break
 
                 batch_ads = data["data"]
                 total_ads_returned += len(batch_ads)
-                print(f"API returned {len(batch_ads)} ads in this batch")
+                logger.info(f"API returned {len(batch_ads)} ads in this batch")
 
                 for ad_data in batch_ads:
                     ad_id = ad_data.get("id")
@@ -183,11 +188,9 @@ class FacebookAdsLibraryAPI:
                             parsed_ad.cta_text or ''
                         ]).lower()
 
-                        # Use whole word matching with word boundaries
-                        import re
+                        # Use pre-compiled regex for whole-word matching
                         should_filter = False
                         for kw in all_negative_keywords:
-                            # Match whole word only (surrounded by word boundaries)
                             pattern = r'\b' + re.escape(kw) + r'\b'
                             if re.search(pattern, text_to_check):
                                 should_filter = True
@@ -206,7 +209,7 @@ class FacebookAdsLibraryAPI:
                 if data.get("paging", {}).get("next"):
                     after_cursor = data["paging"].get("cursors", {}).get("after")
                 else:
-                    print("No more pages available")
+                    logger.info("No more pages available")
                     break
 
                 remaining -= batch_size
@@ -215,7 +218,7 @@ class FacebookAdsLibraryAPI:
                 if len(ads) >= limit:
                     break
 
-            print(f"Total: {total_api_calls} API calls, {total_ads_returned} ads returned, {blacklist_filtered} blacklisted, {filtered_count} filtered, {parse_failed_count} failed, kept {len(ads)} ads")
+            logger.info(f"Total: {total_api_calls} API calls, {total_ads_returned} ads returned, {blacklist_filtered} blacklisted, {filtered_count} filtered, {parse_failed_count} failed, kept {len(ads)} ads")
 
         # Log API usage
         self._log_api_usage(query, total_api_calls, total_ads_returned, len(ads))
@@ -313,14 +316,14 @@ class FacebookAdsLibraryAPI:
                 }
                 url = f"https://www.facebook.com/ads/library/?{urllib.parse.urlencode(params)}"
 
-                print(f"Scraping: {url}")
+                logger.info(f"Scraping: {url}")
 
                 await page.goto(url, timeout=60000, wait_until="domcontentloaded")
                 # Wait for ads to load - look for Library ID text
                 try:
                     await page.wait_for_selector('text=Library ID:', timeout=15000)
-                except:
-                    print("No ads found or page didn't load properly")
+                except Exception:
+                    logger.info("No ads found or page didn't load properly")
                 await page.wait_for_timeout(3000)
 
                 # Scroll to load more ads and trigger lazy loading
@@ -328,7 +331,7 @@ class FacebookAdsLibraryAPI:
                 base_scrolls = min(5, (limit // 3) + 1)
                 total_scrolls = base_scrolls + (offset * 3)  # Each "page" = 3 more scrolls
 
-                print(f"Scrolling {total_scrolls} times (base={base_scrolls}, offset={offset})")
+                logger.info(f"Scrolling {total_scrolls} times (base={base_scrolls}, offset={offset})")
 
                 for i in range(total_scrolls):
                     await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
@@ -482,12 +485,12 @@ class FacebookAdsLibraryAPI:
                     }
                 """)
 
-                print(f"Found {len(ads_data)} ads from DOM")
+                logger.info(f"Found {len(ads_data)} ads from DOM")
 
                 # Filter out excluded IDs
                 if exclude_ids:
                     ads_data = [ad for ad in ads_data if ad.get('external_id') not in exclude_ids]
-                    print(f"After filtering excludes: {len(ads_data)} ads")
+                    logger.info(f"After filtering excludes: {len(ads_data)} ads")
 
                 # Filter out negative keywords
                 if negative_keywords:
@@ -507,7 +510,7 @@ class FacebookAdsLibraryAPI:
                             filtered.append(ad_data)
 
                     ads_data = filtered
-                    print(f"After filtering negative keywords: {len(ads_data)} ads")
+                    logger.info(f"After filtering negative keywords: {len(ads_data)} ads")
 
                 # Build ScrapedAdCreate objects
                 for i, ad_data in enumerate(ads_data[:limit]):
@@ -529,18 +532,12 @@ class FacebookAdsLibraryAPI:
                         ads.append(ad)
 
                     except Exception as e:
-                        print(f"Error parsing ad: {e}")
+                        logger.warning(f"Error parsing ad: {e}")
                         continue
 
                 await browser.close()
 
         except Exception as e:
-            print(f"Scraper error: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.exception("Scraper error")
 
         return ads
-
-
-# Singleton instance
-scraper = FacebookAdsLibraryAPI()

@@ -5,8 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime, timezone
-import json
+import logging
 
+from app.core.api_errors import log_and_raise_http_error
 from app.database import get_db
 from app.models import WinningAd, Brand, Product, CustomerProfile, User
 from app.core.deps import get_current_active_user
@@ -22,6 +23,7 @@ from app.schemas.ad_blueprint import (
 from app.services.ad_remix_service import deconstruct_template, reconstruct_ad
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/deconstruct", response_model=AdBlueprint)
@@ -59,8 +61,7 @@ async def deconstruct_ad_template(
         return blueprint
         
     except Exception as e:
-        print(f"Error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        log_and_raise_http_error(logger, "Template deconstruction failed", e, expose_detail=True)
 
 
 @router.post("/reconstruct", response_model=AdConcept)
@@ -123,8 +124,7 @@ async def reconstruct_ad_from_blueprint(
         return ad_concept
         
     except Exception as e:
-        print(f"Error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        log_and_raise_http_error(logger, "Ad reconstruction failed", e, expose_detail=True)
 
 
 @router.get("/blueprints/{template_id}", response_model=AdBlueprint)

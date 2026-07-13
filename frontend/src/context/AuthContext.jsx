@@ -25,7 +25,7 @@ export const AuthProvider = ({ children }) => {
             if (accessToken) {
                 try {
                     await fetchUser();
-                } catch (err) {
+                } catch {
                     // Token might be expired, try to refresh
                     if (refreshToken) {
                         try {
@@ -45,6 +45,7 @@ export const AuthProvider = ({ children }) => {
             setLoading(false);
         };
         initAuth();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Auto-refresh token every 6 days to prevent expiration (tokens last 7 days)
@@ -54,19 +55,24 @@ export const AuthProvider = ({ children }) => {
         const refreshInterval = setInterval(async () => {
             try {
                 await refreshAccessToken();
-            } catch (err) {
-                // Silently fail - will retry on next interval or next API call
+            } catch {
                 // Silently retry on next interval or next API call
             }
         }, 6 * 24 * 60 * 60 * 1000); // 6 days in ms
 
         return () => clearInterval(refreshInterval);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [refreshToken]);
 
-    const fetchUser = async () => {
+    const fetchUser = async (tokenOverride = null) => {
+        const authToken = tokenOverride || localStorage.getItem('accessToken') || accessToken;
+        if (!authToken) {
+            throw new Error('No access token available');
+        }
+
         const response = await fetch(`${API_URL}/auth/me`, {
             headers: {
-                'Authorization': `Bearer ${accessToken}`,
+                'Authorization': `Bearer ${authToken}`,
             },
         });
 
@@ -100,48 +106,9 @@ export const AuthProvider = ({ children }) => {
             setRefreshToken(data.refresh_token);
             localStorage.setItem('accessToken', data.access_token);
             localStorage.setItem('refreshToken', data.refresh_token);
-
-            // Fetch user data
-            const userResponse = await fetch(`${API_URL}/auth/me`, {
-                headers: {
-                    'Authorization': `Bearer ${data.access_token}`,
-                },
-            });
-
-            if (userResponse.ok) {
-                const userData = await userResponse.json();
-                setUser(userData);
-            }
+            await fetchUser(data.access_token);
 
             return data;
-        } catch (err) {
-            setError(err.message);
-            throw err;
-        }
-    };
-
-    const register = async (email, password, name) => {
-        setError(null);
-        try {
-            const response = await fetch(`${API_URL}/auth/register`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ email, password, name }),
-            });
-
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.detail || 'Registration failed');
-            }
-
-            const userData = await response.json();
-
-            // Auto-login after registration
-            await login(email, password);
-
-            return userData;
         } catch (err) {
             setError(err.message);
             throw err;
@@ -160,7 +127,7 @@ export const AuthProvider = ({ children }) => {
                     },
                     body: JSON.stringify({ refresh_token: refreshToken }),
                 });
-            } catch (err) {
+            } catch {
                 // Ignore errors during logout
             }
         }
@@ -172,24 +139,19 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('refreshToken');
     }, [accessToken, refreshToken]);
 
-    const refreshAccessToken = async () => {
-        if (!refreshToken) {
+    const refreshAccessToken = useCallback(async () => {
+        const currentRefreshToken = localStorage.getItem('refreshToken') || refreshToken;
+        if (!currentRefreshToken) {
             throw new Error('No refresh token');
         }
 
-        let response;
-        try {
-            response = await fetch(`${API_URL}/auth/refresh`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ refresh_token: refreshToken }),
-            });
-        } catch (err) {
-            // Network error - rethrow but don't attach status so we don't logout
-            throw err;
-        }
+        const response = await fetch(`${API_URL}/auth/refresh`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ refresh_token: currentRefreshToken }),
+        });
 
         if (!response.ok) {
             const error = new Error('Failed to refresh token');
@@ -208,10 +170,11 @@ export const AuthProvider = ({ children }) => {
         }
 
         // Re-fetch user data with new token
-        await fetchUser();
+        await fetchUser(data.access_token);
 
         return data.access_token;
-    };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [refreshToken]);
 
     // Helper to make authenticated API calls
     const authFetch = useCallback(async (url, options = {}) => {
@@ -277,7 +240,6 @@ export const AuthProvider = ({ children }) => {
         error,
         isAuthenticated: !!user,
         login,
-        register,
         logout,
         authFetch,
         hasRole,

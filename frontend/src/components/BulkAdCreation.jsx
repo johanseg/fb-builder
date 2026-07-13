@@ -43,13 +43,11 @@ const BulkAdCreation = ({ onNext, onBack }) => {
             });
 
             setAdsData(permutations);
-            const imageCount = creativeData.creatives.filter(c => c.mediaType !== 'video').length;
-            const videoCount = creativeData.creatives.filter(c => c.mediaType === 'video').length;
         } else {
             // Fallback if no creatives (shouldn't happen due to validation)
             setAdsData([]);
         }
-    }, [creativeData.creatives, creativeData.headlines, creativeData.bodies]);
+    }, [creativeData.creatives, creativeData.headlines, creativeData.bodies, setAdsData]);
 
     const addAd = () => {
         setAdsData(prev => [

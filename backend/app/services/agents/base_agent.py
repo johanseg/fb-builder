@@ -1,18 +1,21 @@
 import google.generativeai as genai
+import logging
 import os
-import json
+from collections import defaultdict
 from typing import Dict, Any
+
+from app.core.config import settings
+from app.core.utils import extract_json_from_text
+
+logger = logging.getLogger(__name__)
 
 class BaseAgent:
     def __init__(self):
-        self.api_key = os.getenv("GEMINI_API_KEY")
-        if self.api_key:
-            genai.configure(api_key=self.api_key)
-        self.model = genai.GenerativeModel('gemini-flash-latest')
+        self.api_key = settings.GEMINI_API_KEY
+        self.model = genai.GenerativeModel(settings.GEMINI_MODEL)
         self.prompts_dir = os.path.join(os.path.dirname(__file__), 'prompts')
 
     def load_prompt(self, template_name: str, **kwargs) -> str:
-        from collections import defaultdict
         with open(os.path.join(self.prompts_dir, f"{template_name}.md"), "r") as f:
             template = f.read()
         return template.format_map(defaultdict(str, kwargs))
@@ -25,13 +28,8 @@ class BaseAgent:
 
     def generate_json(self, prompt: str) -> Dict[str, Any]:
         text = self.generate(prompt)
-        if text.startswith('```json'): text = text[7:]
-        if text.startswith('```'): text = text[3:]
-        if text.endswith('```'): text = text[:-3]
-        text = text.strip()
         try:
-            return json.loads(text)
-        except json.JSONDecodeError:
-            print(f"Failed to parse JSON for prompt: {prompt}")
-            print(f"Got: {text}")
-            raise ValueError("Agent failed to return valid JSON.")
+            return extract_json_from_text(text)
+        except Exception as exc:
+            logger.exception("Agent failed to parse JSON response")
+            raise ValueError("Agent failed to return valid JSON.") from exc

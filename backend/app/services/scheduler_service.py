@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from app.models import SavedSearch
 from app.services.research_service import ResearchService
 from app.schemas.research import AdSearchRequest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 
 logger = logging.getLogger(__name__)
@@ -17,7 +17,7 @@ class SchedulerService:
 
     def get_due_searches(self) -> list[SavedSearch]:
         """Get all scheduled searches that are due to run"""
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
 
         # Get active scheduled searches
         searches = self.db.query(SavedSearch).filter(
@@ -67,7 +67,7 @@ class SchedulerService:
             await self.research_service.search_and_save(request)
 
             # Update last_run timestamp on the template search
-            search.last_run = datetime.now()
+            search.last_run = datetime.now(timezone.utc)
             self.db.commit()
 
             logger.info(f"Successfully executed scheduled search: {search.query}")

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useBrands } from '../context/BrandContext';
@@ -24,16 +24,13 @@ export default function AIPersonas() {
         base_image_url: ''
     });
 
-    useEffect(() => {
-        if (activeBrand) {
-            fetchPersonas();
-        } else {
+    const fetchPersonas = useCallback(async () => {
+        if (!activeBrand) {
             setPersonas([]);
             setLoading(false);
+            return;
         }
-    }, [activeBrand]);
 
-    const fetchPersonas = async () => {
         setLoading(true);
         try {
             const res = await authFetch(`${API_URL}/personas/?brand_id=${activeBrand.id}`);
@@ -45,7 +42,16 @@ export default function AIPersonas() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [activeBrand, authFetch, showError]);
+
+    useEffect(() => {
+        if (activeBrand) {
+            fetchPersonas();
+        } else {
+            setPersonas([]);
+            setLoading(false);
+        }
+    }, [activeBrand, fetchPersonas]);
 
     const handleSave = async (e) => {
         e.preventDefault();

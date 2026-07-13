@@ -1,14 +1,17 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+import logging
 import os
 import uuid
 import mimetypes
 from typing import Dict
 from pathlib import Path
+from app.core.api_errors import log_and_raise_http_error
 from app.core.config import settings
 from app.models import User
 from app.core.deps import get_current_active_user
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # Security: Define allowed file types and size limits
 ALLOWED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
@@ -54,8 +57,7 @@ async def upload_to_r2(file_content: bytes, filename: str, content_type: str) ->
         )
         return f"{settings.R2_PUBLIC_URL}/{filename}"
     except Exception as e:
-        print(f"Error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        log_and_raise_http_error(logger, "Failed to upload file to R2", e, expose_detail=True)
 
 
 async def upload_to_local(file_content: bytes, filename: str) -> str:
@@ -112,5 +114,4 @@ async def upload_file(file: UploadFile = File(...), current_user: User = Depends
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        log_and_raise_http_error(logger, "File upload failed", e, expose_detail=True)

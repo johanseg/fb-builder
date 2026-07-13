@@ -1,5 +1,5 @@
 import { useToast } from '../context/ToastContext';
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ChevronRight, Loader, Building2, CreditCard, TrendingUp, Calendar, DollarSign, AlertCircle } from 'lucide-react';
 import { useCampaign } from '../context/CampaignContext';
 import { getAdAccounts } from '../lib/facebookApi';
@@ -13,11 +13,7 @@ const AdAccountStep = ({ onNext }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [showDropdown, setShowDropdown] = useState(false);
 
-    useEffect(() => {
-        fetchAdAccounts();
-    }, []);
-
-    const fetchAdAccounts = async () => {
+    const fetchAdAccounts = useCallback(async () => {
         setLoadingAccounts(true);
         setAccountsError(null);
         try {
@@ -45,7 +41,11 @@ const AdAccountStep = ({ onNext }) => {
         } finally {
             setLoadingAccounts(false);
         }
-    };
+    }, [selectedAdAccount, setSelectedAdAccount]);
+
+    useEffect(() => {
+        fetchAdAccounts();
+    }, [fetchAdAccounts]);
 
     // Filter ad accounts based on search query
     const filteredAccounts = adAccounts.filter(account =>
@@ -69,19 +69,6 @@ const AdAccountStep = ({ onNext }) => {
             return;
         }
         onNext();
-    };
-
-    const formatCurrency = (amount, currency) => {
-        if (!amount || amount === '0' || amount === 0) return null;
-        const value = parseInt(amount) / 100; // Facebook returns amounts in cents
-        return `${currency} ${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    };
-
-    const formatAge = (days) => {
-        if (!days || days === 0) return null;
-        if (days < 30) return `${days} days`;
-        if (days < 365) return `${Math.floor(days / 30)} months`;
-        return `${Math.floor(days / 365)} years`;
     };
 
     return (

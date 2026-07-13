@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Dict, Any, Optional, List
-from pydantic import BaseModel
+import logging
+from pydantic import BaseModel, ConfigDict, Field
+from app.core.api_errors import log_and_raise_http_error
 from app.services.facebook_service import FacebookService
 from app.models import FacebookAd, FacebookAdSet, FacebookCampaign, User
 from app.database import get_db
@@ -8,44 +10,39 @@ from app.core.deps import get_current_active_user, require_permission
 from sqlalchemy.orm import Session
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+_facebook_service: Optional[FacebookService] = None
 
 
 # --- Pydantic request schemas ---
 
 class CampaignCreateRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     name: str
     objective: str
     status: Optional[str] = "PAUSED"
-    budget_type: Optional[str] = None
-    budgetType: Optional[str] = None
-    daily_budget: Optional[float] = None
-    dailyBudget: Optional[float] = None
-    bid_strategy: Optional[str] = None
-    bidStrategy: Optional[str] = None
+    budget_type: Optional[str] = Field(default=None, alias="budgetType")
+    daily_budget: Optional[float] = Field(default=None, alias="dailyBudget")
+    bid_strategy: Optional[str] = Field(default=None, alias="bidStrategy")
 
 
 class AdSetCreateRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     name: str
-    campaign_id: Optional[str] = None
-    optimization_goal: Optional[str] = None
-    optimizationGoal: Optional[str] = None
+    campaign_id: Optional[str] = Field(default=None, alias="campaignId")
+    optimization_goal: Optional[str] = Field(default=None, alias="optimizationGoal")
     status: Optional[str] = "PAUSED"
     targeting: Optional[dict] = None
-    daily_budget: Optional[float] = None
-    dailyBudget: Optional[float] = None
-    bid_strategy: Optional[str] = None
-    bidStrategy: Optional[str] = None
-    bid_amount: Optional[float] = None
-    bidAmount: Optional[float] = None
-    budget_type: Optional[str] = None
-    budgetType: Optional[str] = None
-    start_time: Optional[str] = None
-    startTime: Optional[str] = None
+    daily_budget: Optional[float] = Field(default=None, alias="dailyBudget")
+    bid_strategy: Optional[str] = Field(default=None, alias="bidStrategy")
+    bid_amount: Optional[float] = Field(default=None, alias="bidAmount")
+    budget_type: Optional[str] = Field(default=None, alias="budgetType")
+    start_time: Optional[str] = Field(default=None, alias="startTime")
     advantage_audience: Optional[int] = 0
-    pixelId: Optional[str] = None
-    pixel_id: Optional[str] = None
-    conversionEvent: Optional[str] = None
-    conversion_event: Optional[str] = None
+    pixel_id: Optional[str] = Field(default=None, alias="pixelId")
+    conversion_event: Optional[str] = Field(default=None, alias="conversionEvent")
 
 
 class CreativeCreateRequest(BaseModel):
@@ -125,14 +122,21 @@ class VideoUploadRequest(BaseModel):
     timeout: Optional[int] = 600
 
 def get_facebook_service():
-    service = FacebookService()
+    global _facebook_service
+    if _facebook_service is None:
+        _facebook_service = FacebookService()
     try:
-        if not service.api:
-            service.initialize()
+        if not _facebook_service.api:
+            _facebook_service.initialize()
     except Exception as e:
-        print(f"Error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-    return service
+        _facebook_service = None
+        log_and_raise_http_error(
+            logger,
+            "Failed to initialize Facebook service",
+            e,
+            expose_detail=True,
+        )
+    return _facebook_service
 
 @router.get("/accounts")
 def get_ad_accounts(
@@ -142,8 +146,7 @@ def get_ad_accounts(
     try:
         return service.get_ad_accounts()
     except Exception as e:
-        print(f"Error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        log_and_raise_http_error(logger, "Failed to fetch ad accounts", e, expose_detail=True)
 
 @router.get("/campaigns")
 def read_campaigns(
@@ -156,8 +159,7 @@ def read_campaigns(
         # Convert FB objects to dicts
         return [dict(c) for c in campaigns]
     except Exception as e:
-        print(f"Error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        log_and_raise_http_error(logger, "Failed to fetch campaigns", e, expose_detail=True)
 
 @router.post("/campaigns")
 def create_campaign(
@@ -170,8 +172,7 @@ def create_campaign(
         result = service.create_campaign(campaign.model_dump(exclude_none=True), ad_account_id)
         return dict(result)
     except Exception as e:
-        print(f"Error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        log_and_raise_http_error(logger, "Failed to create campaign", e, expose_detail=True)
 
 @router.get("/pixels")
 def read_pixels(
@@ -184,8 +185,7 @@ def read_pixels(
         # Convert FB objects to dicts
         return [dict(p) for p in pixels]
     except Exception as e:
-        print(f"Error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        log_and_raise_http_error(logger, "Failed to fetch pixels", e, expose_detail=True)
 
 @router.get("/pages")
 def read_pages(
@@ -196,8 +196,7 @@ def read_pages(
         pages = service.get_pages()
         return pages
     except Exception as e:
-        print(f"Error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        log_and_raise_http_error(logger, "Failed to fetch pages", e, expose_detail=True)
 
 
 @router.get("/adsets")
@@ -211,8 +210,7 @@ def read_adsets(
         adsets = service.get_adsets(ad_account_id, campaign_id)
         return [dict(a) for a in adsets]
     except Exception as e:
-        print(f"Error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        log_and_raise_http_error(logger, "Failed to fetch ad sets", e, expose_detail=True)
 
 @router.post("/adsets")
 def create_adset(
@@ -225,8 +223,7 @@ def create_adset(
         result = service.create_adset(adset.model_dump(exclude_none=True), ad_account_id)
         return dict(result)
     except Exception as e:
-        print(f"Error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        log_and_raise_http_error(logger, "Failed to create ad set", e, expose_detail=True)
 
 @router.post("/creatives")
 def create_creative(
@@ -239,8 +236,7 @@ def create_creative(
         result = service.create_creative(creative.model_dump(exclude_none=True), ad_account_id)
         return dict(result)
     except Exception as e:
-        print(f"Error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        log_and_raise_http_error(logger, "Failed to create creative", e, expose_detail=True)
 
 @router.post("/ads")
 def create_ad(
@@ -253,8 +249,7 @@ def create_ad(
         result = service.create_ad(ad.model_dump(exclude_none=True), ad_account_id)
         return dict(result)
     except Exception as e:
-        print(f"Error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        log_and_raise_http_error(logger, "Failed to create ad", e, expose_detail=True)
 
 @router.get("/ads")
 def read_ads(
@@ -266,8 +261,7 @@ def read_ads(
         ads = service.get_ads(adset_id)
         return [dict(a) for a in ads]
     except Exception as e:
-        print(f"Error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        log_and_raise_http_error(logger, "Failed to fetch ads", e, expose_detail=True)
 
 @router.post("/campaigns/save")
 def save_campaign_locally(
@@ -304,8 +298,7 @@ def save_campaign_locally(
         raise
     except Exception as e:
         db.rollback()
-        print(f"Error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        log_and_raise_http_error(logger, "Failed to save campaign locally", e, expose_detail=True)
 
 @router.post("/adsets/save")
 def save_adset_locally(
@@ -352,8 +345,7 @@ def save_adset_locally(
         raise
     except Exception as e:
         db.rollback()
-        print(f"Error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        log_and_raise_http_error(logger, "Failed to save ad set locally", e, expose_detail=True)
 
 @router.post("/ads/save")
 def save_ad_locally(
@@ -387,8 +379,7 @@ def save_ad_locally(
         return {"message": "Ad saved locally", "id": new_ad.id}
     except Exception as e:
         db.rollback()
-        print(f"Error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        log_and_raise_http_error(logger, "Failed to save ad locally", e, expose_detail=True)
 
 @router.post("/upload-image")
 def upload_image(
@@ -403,8 +394,7 @@ def upload_image(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        log_and_raise_http_error(logger, "Failed to upload image", e, expose_detail=True)
 
 @router.post("/upload-video")
 def upload_video(
@@ -436,8 +426,7 @@ def upload_video(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        log_and_raise_http_error(logger, "Failed to upload video", e, expose_detail=True)
 
 @router.get("/video-status/{video_id}")
 def get_video_status(
@@ -455,8 +444,7 @@ def get_video_status(
     try:
         return service.get_video_status(video_id)
     except Exception as e:
-        print(f"Error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        log_and_raise_http_error(logger, "Failed to fetch video status", e, expose_detail=True)
 
 @router.get("/video-thumbnails/{video_id}")
 def get_video_thumbnails(
@@ -473,8 +461,7 @@ def get_video_thumbnails(
         thumbnails = service.get_video_thumbnails(video_id)
         return {"thumbnails": thumbnails}
     except Exception as e:
-        print(f"Error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        log_and_raise_http_error(logger, "Failed to fetch video thumbnails", e, expose_detail=True)
 
 @router.get("/locations/search")
 def search_locations(
@@ -489,6 +476,4 @@ def search_locations(
         locations = service.search_locations(q, type, limit, ad_account_id)
         return [dict(loc) for loc in locations]
     except Exception as e:
-        print(f"Error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
+        log_and_raise_http_error(logger, "Failed to search locations", e, expose_detail=True)

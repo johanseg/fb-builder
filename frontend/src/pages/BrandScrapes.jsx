@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useToast } from '../context/ToastContext';
 import { useResearchApi } from '../api/research';
 import { Search, Trash2, ChevronDown, ChevronRight, ExternalLink, Image, Video, Loader2, RefreshCw } from 'lucide-react';
 
 const BrandScrapes = () => {
-    const { showSuccess, showError, showInfo } = useToast();
+    const { showSuccess, showError } = useToast();
     const { createBrandScrape, getBrandScrapes, getBrandScrape, deleteBrandScrape } = useResearchApi();
     const [brandName, setBrandName] = useState('');
     const [pageInput, setPageInput] = useState('');
@@ -34,11 +34,7 @@ const BrandScrapes = () => {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [scrapeToDelete, setScrapeToDelete] = useState(null);
 
-    useEffect(() => {
-        fetchScrapes();
-    }, []);
-
-    const fetchScrapes = async () => {
+    const fetchScrapes = useCallback(async () => {
         try {
             const data = await getBrandScrapes();
             setScrapes(Array.isArray(data) ? data : []);
@@ -46,7 +42,11 @@ const BrandScrapes = () => {
             showError('Failed to load brand scrapes');
             setScrapes([]);
         }
-    };
+    }, [getBrandScrapes, showError]);
+
+    useEffect(() => {
+        fetchScrapes();
+    }, [fetchScrapes]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();

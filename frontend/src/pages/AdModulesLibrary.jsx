@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useBrands } from '../context/BrandContext';
 import { useToast } from '../context/ToastContext';
@@ -27,11 +27,7 @@ export default function AdModulesLibrary() {
 
     const products = activeBrand?.products || [];
 
-    useEffect(() => {
-        fetchModules();
-    }, [selectedProductId]);
-
-    const fetchModules = async () => {
+    const fetchModules = useCallback(async () => {
         setLoading(true);
         try {
             const params = selectedProductId ? `?product_id=${selectedProductId}` : '';
@@ -44,7 +40,11 @@ export default function AdModulesLibrary() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [authFetch, selectedProductId, showError]);
+
+    useEffect(() => {
+        fetchModules();
+    }, [fetchModules]);
 
     const handleDelete = async (id) => {
         try {

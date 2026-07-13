@@ -1,14 +1,11 @@
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Download, Trash2, Search, Filter, CheckSquare, Square, FileDown, ExternalLink, FileText, Image, LayoutGrid, List, Film, Sparkles, Loader } from 'lucide-react';
-import { useBrands } from '../context/BrandContext';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 export default function GeneratedAds() {
-    // Force rebuild
-    const { brands } = useBrands();
     const { showError, showWarning, showSuccess } = useToast();
     const { authFetch } = useAuth();
     const [ads, setAds] = useState([]);
@@ -31,11 +28,7 @@ export default function GeneratedAds() {
     const [deleteConfirmation, setDeleteConfirmation] = useState({ show: false, bundleId: null, bundleAds: [] });
     const [scaleWinner, setScaleWinner] = useState({ show: false, ad: null, keepModules: { intro: true, bridge: true, core: true, cta: true }, generating: false });
 
-    useEffect(() => {
-        fetchAds();
-    }, []);
-
-    const fetchAds = async () => {
+    const fetchAds = useCallback(async () => {
         try {
             setLoading(true);
             const response = await authFetch(`${API_URL}/generated-ads`);
@@ -51,7 +44,11 @@ export default function GeneratedAds() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [authFetch]);
+
+    useEffect(() => {
+        fetchAds();
+    }, [fetchAds]);
 
     // Group ads by bundle
     const bundles = useMemo(() => {

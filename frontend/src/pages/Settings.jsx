@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Settings as SettingsIcon, Plus, Sparkles, Edit, Trash2, Save, X, FileText, Code, AlertTriangle } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
@@ -18,16 +18,9 @@ export default function Settings() {
     const [showAddModal, setShowAddModal] = useState(false);
     const [showAIModal, setShowAIModal] = useState(false);
     const [generating, setGenerating] = useState(false);
-    const [loading, setLoading] = useState(true);
     const [styleToDelete, setStyleToDelete] = useState(null);
 
-    // Load prompts and styles from API
-    useEffect(() => {
-        loadSettings();
-    }, []);
-
-    const loadSettings = async () => {
-        setLoading(true);
+    const loadSettings = useCallback(async () => {
         try {
             const [promptsRes, stylesRes] = await Promise.all([
                 authFetch(`${API_BASE}/prompts`),
@@ -51,10 +44,13 @@ export default function Settings() {
             showError('Failed to load settings');
             // Fallback to local data
             setStyles(initialStyles);
-        } finally {
-            setLoading(false);
         }
-    };
+    }, [authFetch, showError]);
+
+    // Load prompts and styles from API
+    useEffect(() => {
+        loadSettings();
+    }, [loadSettings]);
 
     const tabs = [
         { id: 'styles', label: 'Ad Styles', count: styles.length },

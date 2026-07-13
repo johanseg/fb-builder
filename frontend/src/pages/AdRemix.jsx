@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ChevronLeft, Sparkles, Check, Image, FileText, Users } from 'lucide-react';
 import { useBrands } from '../context/BrandContext';
 import { useToast } from '../context/ToastContext';
@@ -9,18 +9,15 @@ import ProfileSelectionStep from '../components/steps/ProfileSelectionStep';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 export default function AdRemix() {
-    const { brands, customerProfiles } = useBrands();
+    const { activeBrand, customerProfiles } = useBrands();
     const { showError } = useToast();
     const { authFetch } = useAuth();
     const [currentStep, setCurrentStep] = useState(1);
     const [loading, setLoading] = useState(false);
-    const [blueprint, setBlueprint] = useState(null);
     const [adConcept, setAdConcept] = useState(null);
 
     const [wizardData, setWizardData] = useState({
         template: null,
-        brand: null,
-        product: null,
         profile: null,
         campaignDetails: {
             offer: '',
@@ -29,14 +26,11 @@ export default function AdRemix() {
         }
     });
 
-    // Auto-populate brand and product from first available
-    useEffect(() => {
-        if (brands.length > 0 && !wizardData.brand) {
-            const brand = brands[0];
-            const product = brand.products?.[0] || null;
-            setWizardData(prev => ({ ...prev, brand, product }));
-        }
-    }, [brands]);
+    const effectiveWizardData = useMemo(() => ({
+        ...wizardData,
+        brand: activeBrand,
+        product: activeBrand?.products?.[0] || null,
+    }), [wizardData, activeBrand]);
 
     const steps = [
         { id: 1, name: 'Template', icon: Image },
@@ -56,27 +50,6 @@ export default function AdRemix() {
         }));
     };
 
-    const handleDeconstruct = async () => {
-        setLoading(true);
-        try {
-            const response = await authFetch(`${API_URL}/ad-remix/deconstruct`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ template_id: wizardData.template.id })
-            });
-
-            if (!response.ok) throw new Error('Deconstruction failed');
-
-            const data = await response.json();
-            setBlueprint(data);
-        } catch (error) {
-            console.error('Deconstruction error:', error);
-            showError('Failed to deconstruct template. Please try again.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
     const handleReconstruct = async () => {
         setLoading(true);
         try {
@@ -84,13 +57,13 @@ export default function AdRemix() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    template_id: wizardData.template.id,
-                    brand_id: wizardData.brand.id,
-                    product_id: wizardData.product.id,
-                    profile_id: wizardData.profile.id,
-                    campaign_offer: wizardData.campaignDetails.offer,
-                    campaign_urgency: wizardData.campaignDetails.urgency,
-                    campaign_messaging: wizardData.campaignDetails.messaging
+                    template_id: effectiveWizardData.template.id,
+                    brand_id: effectiveWizardData.brand.id,
+                    product_id: effectiveWizardData.product.id,
+                    profile_id: effectiveWizardData.profile.id,
+                    campaign_offer: effectiveWizardData.campaignDetails.offer,
+                    campaign_urgency: effectiveWizardData.campaignDetails.urgency,
+                    campaign_messaging: effectiveWizardData.campaignDetails.messaging
                 })
             });
 
@@ -179,7 +152,7 @@ export default function AdRemix() {
                 {currentStep === 2 && (
                     <ProfileSelectionStep
                         profiles={customerProfiles}
-                        selectedProfile={wizardData.profile}
+                        selectedProfile={effectiveWizardData.profile}
                         onSelect={(profile) => {
                             updateData('profile', profile);
                             setCurrentStep(3);
@@ -200,7 +173,7 @@ export default function AdRemix() {
                                 </label>
                                 <input
                                     type="text"
-                                    value={wizardData.campaignDetails.offer}
+                                    value={effectiveWizardData.campaignDetails.offer}
                                     onChange={(e) => updateCampaignDetails('offer', e.target.value)}
                                     placeholder="e.g., 50% off Black Friday, Buy 2 Get 1 Free"
                                     className="w-full px-4 py-3 border border-border rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
@@ -213,7 +186,7 @@ export default function AdRemix() {
                                 </label>
                                 <input
                                     type="text"
-                                    value={wizardData.campaignDetails.urgency}
+                                    value={effectiveWizardData.campaignDetails.urgency}
                                     onChange={(e) => updateCampaignDetails('urgency', e.target.value)}
                                     placeholder="e.g., Limited time, Ends tonight"
                                     className="w-full px-4 py-3 border border-border rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
@@ -225,7 +198,7 @@ export default function AdRemix() {
                                     Key Messaging *
                                 </label>
                                 <textarea
-                                    value={wizardData.campaignDetails.messaging}
+                                    value={effectiveWizardData.campaignDetails.messaging}
                                     onChange={(e) => updateCampaignDetails('messaging', e.target.value)}
                                     placeholder="e.g., Science-backed results, Trusted by 10,000+ customers"
                                     rows={3}
@@ -245,31 +218,31 @@ export default function AdRemix() {
                         <div className="space-y-4 max-w-2xl">
                             <div className="bg-secondary p-4 rounded-lg">
                                 <h4 className="font-bold text-foreground mb-2">Template</h4>
-                                <p className="text-foreground">{wizardData.template?.name}</p>
+                                <p className="text-foreground">{effectiveWizardData.template?.name}</p>
                             </div>
 
                             <div className="bg-secondary p-4 rounded-lg">
                                 <h4 className="font-bold text-foreground mb-2">Brand</h4>
-                                <p className="text-foreground">{wizardData.brand?.name}</p>
+                                <p className="text-foreground">{effectiveWizardData.brand?.name}</p>
                             </div>
 
                             <div className="bg-secondary p-4 rounded-lg">
                                 <h4 className="font-bold text-foreground mb-2">Product</h4>
-                                <p className="text-foreground">{wizardData.product?.name}</p>
+                                <p className="text-foreground">{effectiveWizardData.product?.name}</p>
                             </div>
 
                             <div className="bg-secondary p-4 rounded-lg">
                                 <h4 className="font-bold text-foreground mb-2">Audience</h4>
-                                <p className="text-foreground">{wizardData.profile?.name}</p>
+                                <p className="text-foreground">{effectiveWizardData.profile?.name}</p>
                             </div>
 
                             <div className="bg-secondary p-4 rounded-lg">
                                 <h4 className="font-bold text-foreground mb-2">Campaign</h4>
-                                <p className="text-foreground"><strong>Offer:</strong> {wizardData.campaignDetails.offer}</p>
-                                {wizardData.campaignDetails.urgency && (
-                                    <p className="text-foreground"><strong>Urgency:</strong> {wizardData.campaignDetails.urgency}</p>
+                                <p className="text-foreground"><strong>Offer:</strong> {effectiveWizardData.campaignDetails.offer}</p>
+                                {effectiveWizardData.campaignDetails.urgency && (
+                                    <p className="text-foreground"><strong>Urgency:</strong> {effectiveWizardData.campaignDetails.urgency}</p>
                                 )}
-                                <p className="text-foreground"><strong>Messaging:</strong> {wizardData.campaignDetails.messaging}</p>
+                                <p className="text-foreground"><strong>Messaging:</strong> {effectiveWizardData.campaignDetails.messaging}</p>
                             </div>
                         </div>
                     </div>
@@ -346,7 +319,7 @@ export default function AdRemix() {
                     {currentStep === 4 && (
                         <button
                             onClick={handleReconstruct}
-                            disabled={!wizardData.campaignDetails.offer || !wizardData.campaignDetails.messaging}
+                            disabled={!effectiveWizardData.campaignDetails.offer || !effectiveWizardData.campaignDetails.messaging}
                             className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 font-medium shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <Sparkles size={20} />

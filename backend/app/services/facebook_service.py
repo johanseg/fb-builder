@@ -1,6 +1,12 @@
+import logging
 import os
-import ipaddress
+import tempfile
+import time
+from pathlib import Path
 from urllib.parse import urlparse
+
+import requests
+from dotenv import load_dotenv
 from facebook_business.api import FacebookAdsApi
 from facebook_business.adobjects.adaccount import AdAccount
 from facebook_business.adobjects.campaign import Campaign
@@ -9,42 +15,18 @@ from facebook_business.adobjects.adimage import AdImage
 from facebook_business.adobjects.adcreative import AdCreative
 from facebook_business.adobjects.ad import Ad
 from facebook_business.adobjects.advideo import AdVideo
-from dotenv import load_dotenv
-from pathlib import Path
 from facebook_business.adobjects.user import User
-import time
 
+from app.core.utils import GRAPH_API_VERSION, resolve_managed_upload_path, validate_url
 
-def _validate_url(url: str, allowed_domains: list[str] | None = None) -> bool:
-    """Validate URL is safe - not pointing to internal networks."""
-    try:
-        parsed = urlparse(url)
-        if parsed.scheme not in ('http', 'https'):
-            return False
-        hostname = parsed.hostname
-        if not hostname:
-            return False
-        # Block private/internal IPs
-        try:
-            ip = ipaddress.ip_address(hostname)
-            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
-                return False
-        except ValueError:
-            pass  # It's a hostname, not an IP — that's fine
-        # Block common internal hostnames
-        if hostname in ('localhost', '127.0.0.1', '0.0.0.0', '169.254.169.254', 'metadata.google.internal'):  # nosec B104
-            return False
-        # Check allowed domains if specified
-        if allowed_domains:
-            if not any(hostname == d or hostname.endswith('.' + d) for d in allowed_domains):
-                return False
-        return True
-    except Exception:
-        return False
+logger = logging.getLogger(__name__)
 
 # Load .env from project root (parent of backend)
 env_path = Path(__file__).resolve().parent.parent.parent.parent / '.env'
 load_dotenv(dotenv_path=env_path)
+
+UPLOAD_DIR = (Path(__file__).resolve().parents[2] / "uploads").resolve()
+ALLOWED_VIDEO_EXTENSIONS = {'.mp4', '.mov', '.avi', '.webm'}
 
 class FacebookService:
     def __init__(self):
@@ -81,6 +63,69 @@ class FacebookService:
             # Re-raise the exception so the caller knows what went wrong
             raise Exception(f"Facebook API Init Error: {str(e)}")
 
+    @staticmethod
+    def _download_media_to_tempfile(media_url: str, suffix: str, timeout: int, stream: bool = False) -> str:
+        """Download a remote asset to a temporary file for SDK uploads."""
+        response = requests.get(media_url, timeout=timeout, stream=stream)
+        response.raise_for_status()
+
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+            if stream:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        tmp.write(chunk)
+            else:
+                tmp.write(response.content)
+            return tmp.name
+
+    @staticmethod
+    def _guess_remote_extension(media_url: str, default_suffix: str, allowed_extensions: set[str] | None = None) -> str:
+        """Infer a safe temp-file suffix from a remote URL."""
+        path = urlparse(media_url).path
+        if "." not in path.rsplit("/", 1)[-1]:
+            return default_suffix
+
+        candidate = f".{path.rsplit('.', 1)[-1].lower()}"
+        if allowed_extensions and candidate not in allowed_extensions:
+            return default_suffix
+        return candidate
+
+    def _resolve_media_source(
+        self,
+        source: str,
+        *,
+        media_kind: str,
+        default_suffix: str,
+        timeout: int,
+        stream: bool = False,
+        allowed_extensions: set[str] | None = None,
+    ) -> tuple[str, bool]:
+        """Resolve a remote URL or managed `/uploads/...` reference into a local file path."""
+        if not isinstance(source, str) or not source.strip():
+            raise ValueError(f"A {media_kind} source is required")
+
+        normalized_source = source.strip()
+        if normalized_source.startswith(('http://', 'https://')):
+            if not validate_url(normalized_source):
+                raise ValueError(f"Invalid or disallowed URL provided for {media_kind} upload")
+
+            suffix = self._guess_remote_extension(normalized_source, default_suffix, allowed_extensions)
+            local_path = self._download_media_to_tempfile(
+                normalized_source,
+                suffix=suffix,
+                timeout=timeout,
+                stream=stream,
+            )
+            return local_path, True
+
+        managed_path = resolve_managed_upload_path(normalized_source, UPLOAD_DIR)
+        if managed_path is None:
+            raise ValueError(
+                f"Only http(s) URLs or managed /uploads/ references are allowed for {media_kind} uploads"
+            )
+
+        return str(managed_path), False
+
 
     def get_ad_accounts(self):
         """Fetch all ad accounts for the current user."""
@@ -89,7 +134,7 @@ class FacebookService:
             self.initialize()
         
         # Use the SDK's User object to fetch ad accounts
-        print("Fetching ad accounts for user 'me'...")
+        logger.info("Fetching ad accounts for user 'me'...")
         try:
             me = User(fbid='me', api=self.api)
             my_accounts = me.get_ad_accounts(fields=['id', 'name', 'account_id', 'account_status', 'currency', 'balance', 'amount_spent'])
@@ -101,10 +146,10 @@ class FacebookService:
                 allowed_ids = [aid if aid.startswith('act_') else f"act_{aid}" for aid in allowed_ids]
                 my_accounts = [acc for acc in my_accounts if acc.get('id') in allowed_ids]
                 
-            print(f"Found {len(my_accounts)} accounts.")
+            logger.info(f"Found {len(my_accounts)} accounts.")
             return [dict(acc) for acc in my_accounts]
         except Exception as e:
-            print(f"Error fetching ad accounts: {e}")
+            logger.error(f"Error fetching ad accounts: {e}")
             raise e
 
     def _get_account(self, ad_account_id=None):
@@ -189,7 +234,6 @@ class FacebookService:
     def get_pages(self, ad_account_id=None):
         """Fetch all Facebook Pages accessible to the user."""
         from facebook_business.adobjects.page import Page
-        from facebook_business.adobjects.user import User
         
         # Fetch pages for the current user (not ad account specific)
         me = User(fbid='me', api=self.api)
@@ -342,47 +386,28 @@ class FacebookService:
 
     def upload_image(self, image_path_or_url, ad_account_id=None):
         """Upload an image to the ad library."""
-        import tempfile
-        import requests
-
         account = self._get_account(ad_account_id)
+        local_path = None
+        cleanup_local_path = False
 
-        # Check if it's a URL or local file path
-        if image_path_or_url.startswith('http://') or image_path_or_url.startswith('https://'):
-            # Validate URL to prevent SSRF
-            if not _validate_url(image_path_or_url):
-                raise ValueError("Invalid or disallowed URL provided for image upload")
-
-            # Download the image to a temp file
-            response = requests.get(image_path_or_url, timeout=30)
-            response.raise_for_status()
-
-            # Get file extension from URL or default to .jpg
-            ext = '.jpg'
-            if '.' in image_path_or_url.split('/')[-1]:
-                ext = '.' + image_path_or_url.split('.')[-1].split('?')[0]
-
-            with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
-                tmp.write(response.content)
-                local_path = tmp.name
+        try:
+            local_path, cleanup_local_path = self._resolve_media_source(
+                image_path_or_url,
+                media_kind="image",
+                default_suffix=".jpg",
+                timeout=30,
+            )
 
             image = AdImage(parent_id=account.get_id_assured())
             image[AdImage.Field.filename] = local_path
             image.remote_create()
-
-            # Clean up temp file
-            try:
-                os.remove(local_path)
-            except:
-                pass
-
             return image[AdImage.Field.hash]
-        else:
-            # Local file path
-            image = AdImage(parent_id=account.get_id_assured())
-            image[AdImage.Field.filename] = image_path_or_url
-            image.remote_create()
-            return image[AdImage.Field.hash]
+        finally:
+            if cleanup_local_path and local_path:
+                try:
+                    os.remove(local_path)
+                except Exception:
+                    pass
 
     def upload_video(self, video_path_or_url, ad_account_id=None, wait_for_ready=True, timeout=600):
         """Upload a video to the ad library.
@@ -396,46 +421,27 @@ class FacebookService:
         Returns:
             dict with video_id, status, and thumbnails (if ready)
         """
-        import tempfile
-        import requests
-
         account = self._get_account(ad_account_id)
-
-        # Check if it's a URL or local file path
-        if video_path_or_url.startswith('http://') or video_path_or_url.startswith('https://'):
-            # Validate URL to prevent SSRF
-            if not _validate_url(video_path_or_url):
-                raise ValueError("Invalid or disallowed URL provided for video upload")
-
-            # Download the video to a temp file
-            print(f"Downloading video from URL: {video_path_or_url[:100]}...")
-            response = requests.get(video_path_or_url, timeout=120, stream=True)
-            response.raise_for_status()
-
-            # Get file extension from URL or default to .mp4
-            ext = '.mp4'
-            if '.' in video_path_or_url.split('/')[-1]:
-                url_ext = video_path_or_url.split('.')[-1].split('?')[0].lower()
-                if url_ext in ['mp4', 'mov', 'avi', 'webm']:
-                    ext = '.' + url_ext
-
-            with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
-                for chunk in response.iter_content(chunk_size=8192):
-                    tmp.write(chunk)
-                local_path = tmp.name
-
-            print(f"Video downloaded to temp file: {local_path}")
-        else:
-            local_path = video_path_or_url
+        local_path = None
+        cleanup_local_path = False
 
         try:
+            local_path, cleanup_local_path = self._resolve_media_source(
+                video_path_or_url,
+                media_kind="video",
+                default_suffix=".mp4",
+                timeout=120,
+                stream=True,
+                allowed_extensions=ALLOWED_VIDEO_EXTENSIONS,
+            )
+
             # Create and upload video
             video = AdVideo(parent_id=account.get_id_assured())
             video[AdVideo.Field.filepath] = local_path
             video.remote_create()
 
             video_id = video['id']
-            print(f"Video uploaded with ID: {video_id}")
+            logger.info(f"Video uploaded with ID: {video_id}")
 
             if wait_for_ready:
                 # Wait for video processing to complete
@@ -449,7 +455,7 @@ class FacebookService:
                 try:
                     thumbnails = self.get_video_thumbnails(video_id)
                 except Exception as e:
-                    print(f"Warning: Could not fetch thumbnails: {e}")
+                    logger.warning(f"Could not fetch thumbnails: {e}")
 
             return {
                 'video_id': video_id,
@@ -458,11 +464,10 @@ class FacebookService:
             }
 
         finally:
-            # Clean up temp file if we downloaded it
-            if video_path_or_url.startswith('http'):
+            if cleanup_local_path and local_path:
                 try:
                     os.remove(local_path)
-                except:
+                except Exception:
                     pass
 
     def get_video_status(self, video_id):
@@ -471,9 +476,8 @@ class FacebookService:
         Returns:
             dict with status ('processing', 'ready', 'error')
         """
-        import requests
 
-        url = f"https://graph.facebook.com/v21.0/{video_id}"
+        url = f"https://graph.facebook.com/{GRAPH_API_VERSION}/{video_id}"
         params = {
             'fields': 'id,status,length,source',
             'access_token': self.access_token
@@ -514,7 +518,7 @@ class FacebookService:
 
         while (time.time() - start_time) < timeout:
             status = self.get_video_status(video_id)
-            print(f"Video {video_id} status: {status.get('status')}")
+            logger.info(f"Video {video_id} status: {status.get('status')}")
 
             if status.get('status') == 'ready':
                 return status
@@ -531,9 +535,8 @@ class FacebookService:
         Returns:
             list of thumbnail URLs
         """
-        import requests
 
-        url = f"https://graph.facebook.com/v21.0/{video_id}/thumbnails"
+        url = f"https://graph.facebook.com/{GRAPH_API_VERSION}/{video_id}/thumbnails"
         params = {
             'access_token': self.access_token
         }
@@ -542,7 +545,7 @@ class FacebookService:
         data = response.json()
 
         if 'error' in data:
-            print(f"Thumbnail fetch error: {data['error']}")
+            logger.warning(f"Thumbnail fetch error: {data['error']}")
             return []
 
         thumbnails = []
@@ -635,4 +638,3 @@ class FacebookService:
         }
         
         return account.get_targeting_search(params=params)
-

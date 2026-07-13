@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import case
 from sqlalchemy.orm import Session
 from typing import List
+import uuid
 from app.database import get_db
 from app.models import Brand as BrandModel, Product as ProductModel, CustomerProfile as ProfileModel, User
 from app.schemas.brand import Brand, BrandCreate, BrandUpdate
@@ -15,7 +17,10 @@ def read_brands(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    brands = db.query(BrandModel).offset(skip).limit(limit).all()
+    brands = db.query(BrandModel).order_by(
+        case((BrandModel.name == "Townsquare Interactive", 0), else_=1),
+        BrandModel.name.asc(),
+    ).offset(skip).limit(limit).all()
     return brands
 
 @router.post("/", response_model=Brand)
@@ -115,7 +120,6 @@ def update_brand(
                     existing_product.product_shots = p.product_shots
                 else:
                     # Product doesn't exist at all - create new
-                    import uuid
                     new_product = ProductModel(
                         id=p.id,
                         brand_id=brand_id,
@@ -126,7 +130,6 @@ def update_brand(
                     db.add(new_product)
             else: # p.id is None, so it's a new product without a pre-assigned ID
                 # Create new product with a generated ID
-                import uuid
                 new_id = str(uuid.uuid4())
                 new_product = ProductModel(
                     id=new_id,

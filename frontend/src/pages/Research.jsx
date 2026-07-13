@@ -1,6 +1,5 @@
 import { useToast } from '../context/ToastContext';
-import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useResearchApi } from '../api/research';
 
 const COUNTRIES = [
@@ -24,8 +23,7 @@ const LIMIT_OPTIONS = [
 
 const Research = () => {
     const { showSuccess, showError, showInfo } = useToast();
-    const location = useLocation();
-    const { searchAndSave, getSavedSearches, deleteSavedSearch, getApiUsage, getBlacklist, addToBlacklist, removeFromBlacklist, getKeywordBlacklist, addToKeywordBlacklist, removeFromKeywordBlacklist, getRateLimit, getVerticals, createVertical, getVerticalAggregatedAds, getVerticalPageAds } = useResearchApi();
+    const { searchAndSave, getSavedSearches, deleteSavedSearch, getBlacklist, addToBlacklist, getKeywordBlacklist, getRateLimit, getVerticals, createVertical, getVerticalAggregatedAds, getVerticalPageAds } = useResearchApi();
     const [query, setQuery] = useState('');
     const [country, setCountry] = useState('US');
     const [negativeKeywords, setNegativeKeywords] = useState('');
@@ -35,13 +33,8 @@ const Research = () => {
     const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('verticals');
     const [selectedVertical, setSelectedVertical] = useState(null);
-    const [apiUsage, setApiUsage] = useState([]);
     const [blacklist, setBlacklist] = useState([]);
-    const [showBlacklistModal, setShowBlacklistModal] = useState(false);
-    const [blacklistPageName, setBlacklistPageName] = useState('');
     const [keywordBlacklist, setKeywordBlacklist] = useState([]);
-    const [showKeywordModal, setShowKeywordModal] = useState(false);
-    const [blacklistKeyword, setBlacklistKeyword] = useState('');
     const [rateLimit, setRateLimit] = useState(null);
     const [progressMessage, setProgressMessage] = useState('');
     const [verticals, setVerticals] = useState([]);
@@ -55,40 +48,16 @@ const Research = () => {
     const [verticalTab, setVerticalTab] = useState('aggregated');
     const [aggregatedFilter, setAggregatedFilter] = useState('');
 
-    useEffect(() => {
-        // Set activeTab based on route
-        if (!selectedVertical) {
-            setActiveTab('verticals');
-        }
-    }, [location.pathname]);
-
-    useEffect(() => {
-        fetchVerticals();
-        fetchRateLimit();
-        if (activeTab === 'saved-searches') {
-            fetchSavedSearches();
-            fetchApiUsage();
-            fetchBlacklist();
-            fetchKeywordBlacklist();
-        }
-        if (activeTab === 'vertical-detail' && selectedVertical) {
-            fetchBlacklist();
-            fetchKeywordBlacklist();
-            fetchSavedSearches();
-            fetchAggregatedAds();
-        }
-    }, [activeTab, selectedVertical]);
-
-    const fetchRateLimit = async () => {
+    const fetchRateLimit = useCallback(async () => {
         try {
             const data = await getRateLimit();
             setRateLimit(data);
         } catch (error) {
             console.error('Failed to load rate limit', error);
         }
-    };
+    }, [getRateLimit]);
 
-    const fetchVerticals = async () => {
+    const fetchVerticals = useCallback(async () => {
         try {
             const data = await getVerticals();
             setVerticals(Array.isArray(data) ? data : []);
@@ -96,9 +65,9 @@ const Research = () => {
             console.error('Failed to load verticals', error);
             setVerticals([]);
         }
-    };
+    }, [getVerticals]);
 
-    const fetchAggregatedAds = async () => {
+    const fetchAggregatedAds = useCallback(async () => {
         if (!selectedVertical) {
             return;
         }
@@ -111,7 +80,68 @@ const Research = () => {
             showError('Failed to load aggregated ads');
             setAggregatedAds([]);
         }
-    };
+    }, [getVerticalAggregatedAds, selectedVertical, showError]);
+
+    const fetchBlacklist = useCallback(async () => {
+        try {
+            const data = await getBlacklist();
+            setBlacklist(Array.isArray(data) ? data : []);
+        } catch (error) {
+            console.error('Failed to load blacklist', error);
+            setBlacklist([]);
+        }
+    }, [getBlacklist]);
+
+    const fetchKeywordBlacklist = useCallback(async () => {
+        try {
+            const data = await getKeywordBlacklist();
+            setKeywordBlacklist(Array.isArray(data) ? data : []);
+        } catch (error) {
+            console.error('Failed to load keyword blacklist', error);
+            setKeywordBlacklist([]);
+        }
+    }, [getKeywordBlacklist]);
+
+    const fetchSavedSearches = useCallback(async () => {
+        try {
+            const data = await getSavedSearches();
+            setSavedSearches(Array.isArray(data) ? data : []);
+        } catch (error) {
+            console.error('Failed to load searches', error);
+            setSavedSearches([]);
+        }
+    }, [getSavedSearches]);
+
+    useEffect(() => {
+        if (!selectedVertical) {
+            setActiveTab('verticals');
+        }
+    }, [selectedVertical]);
+
+    useEffect(() => {
+        fetchVerticals();
+        fetchRateLimit();
+        if (activeTab === 'saved-searches') {
+            fetchSavedSearches();
+            fetchBlacklist();
+            fetchKeywordBlacklist();
+        }
+        if (activeTab === 'vertical-detail' && selectedVertical) {
+            fetchBlacklist();
+            fetchKeywordBlacklist();
+            fetchSavedSearches();
+            fetchAggregatedAds();
+        }
+    }, [
+        activeTab,
+        selectedVertical,
+        fetchAggregatedAds,
+        fetchBlacklist,
+        fetchKeywordBlacklist,
+        fetchRateLimit,
+        fetchSavedSearches,
+        fetchVerticals,
+    ]);
 
     const togglePageExpansion = async (pageId) => {
         const newExpandedPages = new Set(expandedPages);
@@ -156,46 +186,6 @@ const Research = () => {
         }
     };
 
-    const fetchApiUsage = async () => {
-        try {
-            const data = await getApiUsage();
-            setApiUsage(Array.isArray(data) ? data : []);
-        } catch (error) {
-            console.error('Failed to load API usage', error);
-            setApiUsage([]);
-        }
-    };
-
-    const fetchBlacklist = async () => {
-        try {
-            const data = await getBlacklist();
-            setBlacklist(Array.isArray(data) ? data : []);
-        } catch (error) {
-            console.error('Failed to load blacklist', error);
-            setBlacklist([]);
-        }
-    };
-
-    const fetchKeywordBlacklist = async () => {
-        try {
-            const data = await getKeywordBlacklist();
-            setKeywordBlacklist(Array.isArray(data) ? data : []);
-        } catch (error) {
-            console.error('Failed to load keyword blacklist', error);
-            setKeywordBlacklist([]);
-        }
-    };
-
-    const fetchSavedSearches = async () => {
-        try {
-            const data = await getSavedSearches();
-            setSavedSearches(Array.isArray(data) ? data : []);
-        } catch (error) {
-            console.error('Failed to load searches', error);
-            setSavedSearches([]);
-        }
-    };
-
     const handleScrape = async (e) => {
         e.preventDefault();
         if (!query.trim()) {
@@ -235,7 +225,6 @@ const Research = () => {
             setQuery('');
             setNegativeKeywords('');
             fetchSavedSearches();
-            fetchApiUsage();
             fetchRateLimit();
             // Refresh aggregated ads if in a vertical
             if (selectedVertical) {
@@ -303,7 +292,7 @@ const Research = () => {
 
     const handleAddToBlacklist = async (pageName) => {
         if (!pageName) {
-            setShowBlacklistModal(true);
+            showError('Enter a page name to blacklist');
             return;
         }
 
@@ -311,8 +300,6 @@ const Research = () => {
             await addToBlacklist(pageName);
             showSuccess(`Added "${pageName}" to blacklist`);
             fetchBlacklist();
-            setBlacklistPageName('');
-            setShowBlacklistModal(false);
 
             // Remove ads from this page from current view
             if (selectedSearch) {
@@ -327,63 +314,6 @@ const Research = () => {
         } catch (error) {
             const errorMsg = error.message || 'Failed to add to blacklist';
             showError(errorMsg);
-        }
-    };
-
-    const handleRemoveFromBlacklist = async (id, pageName) => {
-        try {
-            await removeFromBlacklist(id);
-            showSuccess(`Removed "${pageName}" from blacklist`);
-            fetchBlacklist();
-        } catch (error) {
-            showError('Failed to remove from blacklist');
-        }
-    };
-
-    const handleAddToKeywordBlacklist = async (keyword) => {
-        if (!keyword) {
-            setShowKeywordModal(true);
-            return;
-        }
-
-        try {
-            await addToKeywordBlacklist(keyword);
-            showSuccess(`Added "${keyword}" to keyword blacklist`);
-            fetchKeywordBlacklist();
-            setBlacklistKeyword('');
-            setShowKeywordModal(false);
-
-            // Remove ads containing this keyword from current view
-            if (selectedSearch) {
-                const keywordLower = keyword.toLowerCase();
-                const filteredAds = selectedSearch.ads.filter(ad => {
-                    const bodyText = ad.ad_copy?.toLowerCase() || '';
-                    const titleText = ad.headline?.toLowerCase() || '';
-                    const captionText = ad.cta_text?.toLowerCase() || '';
-                    const brandName = ad.brand_name?.toLowerCase() || '';
-
-                    return !bodyText.includes(keywordLower) &&
-                           !titleText.includes(keywordLower) &&
-                           !captionText.includes(keywordLower) &&
-                           !brandName.includes(keywordLower);
-                });
-                setSelectedSearch({
-                    ...selectedSearch,
-                    ads: filteredAds
-                });
-            }
-        } catch (error) {
-            showError('Failed to add to keyword blacklist');
-        }
-    };
-
-    const handleRemoveFromKeywordBlacklist = async (id, keyword) => {
-        try {
-            await removeFromKeywordBlacklist(id);
-            showSuccess(`Removed "${keyword}" from keyword blacklist`);
-            fetchKeywordBlacklist();
-        } catch (error) {
-            showError('Failed to remove from keyword blacklist');
         }
     };
 

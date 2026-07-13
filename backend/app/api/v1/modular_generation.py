@@ -1,8 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from typing import Dict, Any, List, Optional
+import logging
 from pydantic import BaseModel
+from app.core.api_errors import log_and_raise_http_error
 from app.database import get_db
+from app.core.utils import extract_markdown_list_items
 from app.models import Product, User, AdModule
 from app.core.deps import get_current_active_user, require_permission
 from app.core.rate_limit import limiter
@@ -11,6 +14,7 @@ from app.schemas.ad_module import AdModule as AdModuleSchema
 
 router = APIRouter()
 orchestrator = AgentOrchestrator()
+logger = logging.getLogger(__name__)
 
 class ModularGenerationRequest(BaseModel):
     product_id: str
@@ -125,10 +129,9 @@ def generate_modular_scripts(
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        print(f"Generation error: {e}")
         db.rollback()
         detail = str(e) if "API key" in str(e) else "Generation failed. Check that GEMINI_API_KEY is configured."
-        raise HTTPException(status_code=500, detail=detail)
+        log_and_raise_http_error(logger, "Modular generation failed", e, detail=detail)
 
 @router.post("/iterate", response_model=List[AdModuleSchema])
 @limiter.limit("20/minute")
@@ -171,13 +174,7 @@ def iterate_winning_module(
         response = agent.model.generate_content(iteration_prompt)
         raw_response = response.text
         
-        # Parse the bullet points
-        lines = [line.strip().lstrip('-').lstrip('*').strip() for line in raw_response.split('\\n') if line.strip() and (line.strip().startswith('-') or line.strip().startswith('*') or line[0].isdigit())]
-        
-        if not lines:
-            lines = [raw_response] # Fallback
-            
-        lines = lines[:body.count]
+        lines = extract_markdown_list_items(raw_response)[:body.count]
         
         db_modules = []
         for line in lines:
@@ -200,7 +197,6 @@ def iterate_winning_module(
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        print(f"Iteration error: {e}")
         db.rollback()
         detail = str(e) if "API key" in str(e) else "Iteration failed. Check that GEMINI_API_KEY is configured."
-        raise HTTPException(status_code=500, detail=detail)
+        log_and_raise_http_error(logger, "Winning module iteration failed", e, detail=detail)

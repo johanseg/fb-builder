@@ -7,30 +7,84 @@ Telegram: @jasonakatiff
 Email: jason@jasonakatiff.com
 """
 
+import logging
 import os
 import re
-from fastapi import FastAPI, Request
+from contextlib import asynccontextmanager
+
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from app.core.config import settings
 from app.core.rate_limit import limiter
+from app.database import get_db
+
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper())
+logger = logging.getLogger(__name__)
 
 _is_dev = os.getenv("ENVIRONMENT", "production") != "production"
+
+
+@asynccontextmanager
+async def lifespan(app_instance: FastAPI):
+    """Validate PostgreSQL connection on startup."""
+    import google.generativeai as genai
+
+    from app.database import SessionLocal, engine
+    from sqlalchemy import text
+    from app.services.auth_service import purge_expired_refresh_tokens
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("SELECT version()"))
+            version = result.scalar()
+            logger.info("Connected to PostgreSQL")
+            logger.info(f"  Version: {version}")
+    except Exception as e:
+        sanitized_url = re.sub(r'://[^:]+:[^@]+@', '://***:***@', settings.DATABASE_URL)
+        logger.error(f"Failed to connect to database: {e}")
+        logger.error(f"  DATABASE_URL: {sanitized_url}")
+        raise RuntimeError(f"Database connection failed: {e}")
+
+    if settings.GEMINI_API_KEY:
+        genai.configure(api_key=settings.GEMINI_API_KEY)
+        logger.info("Gemini API client configured")
+    else:
+        logger.warning("GEMINI_API_KEY is not configured")
+
+    try:
+        with SessionLocal() as db:
+            deleted_count = purge_expired_refresh_tokens(db)
+            if deleted_count:
+                logger.info("Purged %s expired refresh tokens on startup", deleted_count)
+    except Exception:
+        logger.exception("Failed to purge expired refresh tokens during startup")
+    yield
+
 
 app = FastAPI(
     title="TSI Ad Creative Studio API",
     version="1.0.0",
     openapi_url="/api/v1/openapi.json" if _is_dev else None,
     docs_url="/api/v1/docs" if _is_dev else None,
+    lifespan=lifespan,
 )
 
 # Register rate limiter
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled exception during %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 # Security headers middleware
 @app.middleware("http")
@@ -76,28 +130,16 @@ async def root():
     return {"message": "Welcome to the TSI Ad Creative Studio API"}
 
 @app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
-
-# Database Connection Validation
-@app.on_event("startup")
-async def startup_event():
-    """Validate PostgreSQL connection on startup"""
-    from app.database import engine
-    from sqlalchemy import text
-    
+async def health_check(db: Session = Depends(get_db)):
     try:
-        with engine.connect() as conn:
-            result = conn.execute(text("SELECT version()"))
-            version = result.scalar()
-            print(f"✅ Connected to PostgreSQL")
-            print(f"   Version: {version}")
-    except Exception as e:
-        # Sanitize DATABASE_URL - hide password
-        sanitized_url = re.sub(r'://[^:]+:[^@]+@', '://***:***@', settings.DATABASE_URL)
-        print(f"❌ Failed to connect to database: {e}")
-        print(f"   DATABASE_URL: {sanitized_url}")
-        raise RuntimeError(f"Database connection failed: {e}")
+        db.execute(text("SELECT 1"))
+        return {"status": "healthy"}
+    except Exception:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unhealthy", "detail": "Database connection failed"}
+        )
+
 
 
 # Include Routers

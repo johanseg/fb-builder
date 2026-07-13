@@ -1,19 +1,18 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
+import logging
 from app.models import User
+from app.core.api_errors import log_and_raise_http_error
+from app.core.config import settings
 from app.core.deps import get_current_active_user
 from app.core.rate_limit import limiter
+from app.core.utils import extract_json_from_text
 import google.generativeai as genai
-import os
 import json
 
 router = APIRouter()
-
-# Configure Gemini
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
+logger = logging.getLogger(__name__)
 
 class CopyGenerationRequest(BaseModel):
     brand: Dict[str, Any]
@@ -38,7 +37,7 @@ class FieldRegenerationRequest(BaseModel):
 async def generate_copy(request: Request, body: CopyGenerationRequest, current_user: User = Depends(get_current_active_user)):
     """Generate ad copy variations using Gemini AI"""
     
-    if not GEMINI_API_KEY:
+    if not settings.GEMINI_API_KEY:
         raise HTTPException(status_code=500, detail="Gemini API key not configured")
     
     try:
@@ -105,42 +104,32 @@ Return ONLY valid JSON in this exact format:
             prompt = body.customPrompt
         
         # Generate with Gemini
-        model = genai.GenerativeModel('gemini-flash-latest')
+        model = genai.GenerativeModel(settings.GEMINI_MODEL)
         response = model.generate_content(prompt)
-        
-        # Parse the response
-        response_text = response.text.strip()
-        
-        # Remove markdown code blocks if present
-        if response_text.startswith('```json'):
-            response_text = response_text[7:]
-        if response_text.startswith('```'):
-            response_text = response_text[3:]
-        if response_text.endswith('```'):
-            response_text = response_text[:-3]
-        
-        response_text = response_text.strip()
-        
-        # Parse JSON
-        result = json.loads(response_text)
-        
-        return result
+        return extract_json_from_text(response.text)
         
     except json.JSONDecodeError as e:
-        print(f"JSON Parse Error: {e}")
-        print(f"Response text: {response_text}")
-        print(f"Error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        log_and_raise_http_error(
+            logger,
+            "Copy generation returned invalid JSON",
+            e,
+            status_code=502,
+            detail="Gemini returned invalid JSON",
+        )
     except Exception as e:
-        print(f"Error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        log_and_raise_http_error(
+            logger,
+            "Copy generation request failed",
+            e,
+            expose_detail=True,
+        )
 
 @router.post("/regenerate-field")
 @limiter.limit("20/minute")
 async def regenerate_field(request: Request, body: FieldRegenerationRequest, current_user: User = Depends(get_current_active_user)):
     """Regenerate a specific field (headline, body, or cta)"""
     
-    if not GEMINI_API_KEY:
+    if not settings.GEMINI_API_KEY:
         raise HTTPException(status_code=500, detail="Gemini API key not configured")
     
     try:
@@ -166,7 +155,7 @@ Generate a DIFFERENT, fresh variation that:
 
 Return ONLY the new {body.field} text, nothing else."""
 
-        model = genai.GenerativeModel('gemini-flash-latest')
+        model = genai.GenerativeModel(settings.GEMINI_MODEL)
         response = model.generate_content(prompt)
         
         new_value = response.text.strip().strip('"').strip("'")
@@ -174,5 +163,9 @@ Return ONLY the new {body.field} text, nothing else."""
         return {"newValue": new_value}
         
     except Exception as e:
-        print(f"Error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        log_and_raise_http_error(
+            logger,
+            "Field regeneration request failed",
+            e,
+            expose_detail=True,
+        )

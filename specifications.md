@@ -37,6 +37,7 @@ This document serves as the Source of Truth for the Townsquare Interactive Ad Cr
 - **Auth Provider**: Custom JWT.
 - **Middleware**: All protected routes MUST be secured via `Depends(verify_token)`.
 - **RBAC**: Implement Role-Based Access Control where necessary.
+- **User Provisioning**: Public self-signup is disabled. New users are created by admins via the authenticated `/api/v1/auth/register` flow.
 - **CORS**: Strict `allow_origins` policy (Development: `localhost:5173`, Production: Specific Domain). **Wildcard `*` is PROHIBITED in production.**
 
 ### Code Formatting & Style
@@ -157,10 +158,11 @@ The project follows a modular structure. API routes are versioned (`/api/v1`).
 ### Module 6: File Uploads
 - **Endpoint**: `POST /api/v1/uploads/`
 - **Security**:
-    - **Type Check**: Images only (jpg, png, webp).
-    - **Size Limit**: 10MB.
+    - **Type Check**: Images (`jpg`, `jpeg`, `png`, `gif`, `webp`) and video (`mp4`, `mov`, `avi`, `webm`).
+    - **Size Limit**: 10MB for images, 500MB for video.
     - **Storage**: Local `uploads/` directory (Dev) or S3 (Prod).
     - **Sanitization**: UUID-based filenames.
+    - **Upload References**: Local media can only be reused through managed `/uploads/...` references; arbitrary filesystem paths are rejected.
 
 ## 6. Environment Variables
 

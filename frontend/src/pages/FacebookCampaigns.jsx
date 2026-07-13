@@ -37,17 +37,6 @@ const FacebookCampaignWizard = () => {
         }
     };
 
-    // Placeholder for validation logic
-    const isStepValid = () => {
-        switch (currentStep) {
-            case 1: return !!formData.adAccountId;
-            case 2: return !!formData.campaignId;
-            case 3: return !!formData.adSetId;
-            case 4: return !!formData.creativeId;
-            default: return true;
-        }
-    };
-
     return (
         <CampaignProvider>
             <div className="max-w-6xl mx-auto space-y-8">

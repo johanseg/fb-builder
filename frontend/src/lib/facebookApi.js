@@ -120,7 +120,8 @@ export async function getPixels(adAccountId) {
  */
 export async function getPages(adAccountId) {
     try {
-        const response = await authFetch(`${API_BASE_URL}/pages`);
+        const query = adAccountId ? `?ad_account_id=${adAccountId}` : '';
+        const response = await authFetch(`${API_BASE_URL}/pages${query}`);
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.detail || 'Failed to fetch pages');
@@ -209,7 +210,7 @@ export async function uploadVideoToFacebook(videoUrl, adAccountId, waitForReady 
             }
 
             const uploadResult = await uploadResponse.json();
-            finalVideoUrl = uploadResult.url.startsWith('/') ? uploadResult.url.substring(1) : uploadResult.url;
+            finalVideoUrl = uploadResult.url;
         }
 
         const response = await authFetch(`${API_BASE_URL}/upload-video?ad_account_id=${adAccountId}`, {
@@ -304,12 +305,7 @@ export async function uploadImageToFacebook(imageUrl, adAccountId) {
             }
 
             const uploadResult = await uploadResponse.json();
-            // The backend returns { url: "/uploads/filename.ext" }
-            // We need to remove the leading slash to make it a relative path for the python script
-            // or keep it if the python script handles absolute paths.
-            // The python script runs in 'backend/', and uploads are in 'backend/uploads/'
-            // So 'uploads/filename.ext' should work.
-            finalImageUrl = uploadResult.url.startsWith('/') ? uploadResult.url.substring(1) : uploadResult.url;
+            finalImageUrl = uploadResult.url;
         }
 
         const response = await authFetch(`${API_BASE_URL}/upload-image?ad_account_id=${adAccountId}`, {
@@ -507,7 +503,7 @@ export async function searchLocations(query, type = 'city', adAccountId) {
  * @param {string} adAccountId - Facebook ad account ID
  * @param {string} budgetType - Budget type (CBO or ABO)
  */
-export async function createCompleteAd(campaignId, adsetData, creativeData, adData, pageId, adAccountId, budgetType) {
+export async function createCompleteAd(campaignId, adsetData, creativeData, adData, pageId, adAccountId) {
     try {
         let imageHash = null;
         let videoData = null;

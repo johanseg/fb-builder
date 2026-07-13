@@ -32,9 +32,9 @@ export default function ProfileSelectionStep({ profiles, selectedProfile, onSele
                                     <span className="font-medium">Demographics:</span> {profile.demographics}
                                 </div>
                             )}
-                            {profile.pain_points && (
+                            {(profile.painPoints || profile.pain_points) && (
                                 <div className="text-sm text-muted-foreground mb-1">
-                                    <span className="font-medium">Pain Points:</span> {profile.pain_points}
+                                    <span className="font-medium">Pain Points:</span> {profile.painPoints || profile.pain_points}
                                 </div>
                             )}
                             {profile.goals && (

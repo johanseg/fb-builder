@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { Loader, Plus, Sparkles, Trash2, CheckCircle2, Eye, LayoutTemplate } from 'lucide-react';
@@ -31,11 +31,12 @@ export default function ModularBlocksBoard({ product }) {
     const [assembling, setAssembling] = useState(false);
     const [assembledResult, setAssembledResult] = useState(null);
 
-    useEffect(() => {
-        if (product) fetchModules();
-    }, [product]);
+    const fetchModules = useCallback(async () => {
+        if (!product) {
+            setModules([]);
+            return;
+        }
 
-    const fetchModules = async () => {
         setLoading(true);
         try {
             const res = await authFetch(`${API_URL}/ad-modules/?product_id=${product.id}`);
@@ -47,7 +48,11 @@ export default function ModularBlocksBoard({ product }) {
         } finally {
             setLoading(false);
         }
-    };
+    }, [authFetch, product, showError]);
+
+    useEffect(() => {
+        if (product) fetchModules();
+    }, [product, fetchModules]);
 
     const handleDelete = (id) => {
         setDeleteTargetId(id);

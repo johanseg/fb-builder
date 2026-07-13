@@ -401,7 +401,7 @@ function ReviewStep({ wizardData }) {
 function ReviewItem({ label, value, icon: Icon }) {
     return (
         <div className="flex items-start gap-3 p-3 bg-secondary rounded-lg">
-            <Icon className="text-purple-600 mt-0.5" size={20} />
+            {React.createElement(Icon, { className: 'text-purple-600 mt-0.5', size: 20 })}
             <div>
                 <div className="text-sm font-medium text-muted-foreground">{label}</div>
                 <div className="text-foreground">{value}</div>

@@ -5,15 +5,20 @@ Scrapes all ads from a specific Facebook page and downloads media to R2.
 """
 
 import httpx
+import logging
 import os
 import re
-import json
+import uuid
 from typing import List, Optional, Tuple
 from urllib.parse import urlparse, parse_qs
+
 from sqlalchemy.orm import Session
+
 from app.models import BrandScrape, BrandScrapedAd
 from app.core.config import settings
-import uuid
+from app.core.utils import GRAPH_API_VERSION
+
+logger = logging.getLogger(__name__)
 
 
 def parse_page_id_from_url(url: str) -> Optional[str]:
@@ -52,7 +57,21 @@ class BrandScraperService:
     def __init__(self, db: Session):
         self.db = db
         self.access_token = os.getenv("FACEBOOK_ADS_LIBRARY_TOKEN") or os.getenv("VITE_FACEBOOK_ACCESS_TOKEN")
-        self.base_url = "https://graph.facebook.com/v21.0/ads_archive"
+        self.base_url = f"https://graph.facebook.com/{GRAPH_API_VERSION}/ads_archive"
+        self._s3_client = None  # Lazy-initialized, reused across all uploads
+
+    def _get_s3_client(self):
+        """Get or create a single S3/R2 client for this service instance."""
+        if self._s3_client is None:
+            import boto3
+            self._s3_client = boto3.client(
+                's3',
+                endpoint_url=settings.r2_endpoint_url,
+                aws_access_key_id=settings.R2_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
+                region_name='auto'
+            )
+        return self._s3_client
 
     async def scrape_brand(self, brand_scrape: BrandScrape) -> BrandScrape:
         """
@@ -94,19 +113,22 @@ class BrandScraperService:
                     if ad_record and ad_record.media_urls:
                         media_count += len(ad_record.media_urls)
                 except Exception as e:
-                    print(f"Error processing ad {ad_data.get('id')}: {e}")
+                    logger.error(f"Error processing ad {ad_data.get('id')}: {e}")
                     continue
 
             brand_scrape.media_downloaded = media_count
             brand_scrape.status = "completed"
-            self.db.commit()
+            self.db.commit()  # Single commit for all ads + status update
 
             return brand_scrape
 
         except Exception as e:
             brand_scrape.status = "failed"
             brand_scrape.error_message = str(e)[:500]
-            self.db.commit()
+            try:
+                self.db.commit()
+            except Exception:
+                self.db.rollback()
             raise
 
     async def _fetch_page_ads(self, page_id: str, limit: int = 500, brand_name: str = None) -> List[dict]:
@@ -118,12 +140,12 @@ class BrandScraperService:
 
         # Use Playwright for search queries (gets more results than API)
         if is_search_query:
-            print(f"Using Playwright for search query: {page_id}")
+            logger.info("Using Playwright for search query: %s", page_id)
             return await self._playwright_scrape_ads(page_id, limit, is_search=True)
 
         # Use API for page-specific scrapes if we have a token
         if not self.access_token:
-            print("No FB token, using Playwright for page scrape")
+            logger.info("No Facebook token configured, using Playwright for page scrape")
             return await self._playwright_scrape_ads(page_id, limit, is_search=False)
 
         async with httpx.AsyncClient(timeout=60.0) as client:
@@ -151,7 +173,7 @@ class BrandScraperService:
                         break
 
                     ads.extend(data["data"])
-                    print(f"Fetched {len(data['data'])} ads, total: {len(ads)}")
+                    logger.info("Fetched %s ads, total so far: %s", len(data["data"]), len(ads))
 
                     paging = data.get("paging", {})
                     if paging.get("next"):
@@ -160,7 +182,7 @@ class BrandScraperService:
                         break
 
                 except Exception as e:
-                    print(f"API error: {e}, falling back to Playwright")
+                    logger.error(f"API error: {e}, falling back to Playwright")
                     return await self._playwright_scrape_ads(page_id, limit, is_search=False)
 
         return ads
@@ -193,14 +215,14 @@ class BrandScraperService:
                             body = await response.body()
                             if len(body) > 5000:  # Only substantial images
                                 captured_images[url] = body
-                        except:
+                        except Exception:
                             pass
 
                 page.on('response', capture_image_response)
 
                 # Login to Facebook if credentials provided
                 if fb_email and fb_password:
-                    print("Logging into Facebook...")
+                    logger.info("Logging into Facebook for brand scraping")
                     await page.goto("https://www.facebook.com/login", timeout=30000)
                     await page.wait_for_timeout(2000)
 
@@ -217,7 +239,7 @@ class BrandScraperService:
                         error_detail = "Login page still showing" if "login" in current_url else "Security checkpoint triggered"
                         raise Exception(f"Facebook login failed: {error_detail}. URL: {page.url}")
                     else:
-                        print("Facebook login successful")
+                        logger.info("Facebook login successful for scraper")
 
                 # Build URL
                 if is_search:
@@ -226,14 +248,14 @@ class BrandScraperService:
                 else:
                     url = f"https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=US&view_all_page_id={query}"
 
-                print(f"Playwright navigating to: {url}")
+                logger.info("Playwright navigating to ads library URL: %s", url)
                 await page.goto(url, timeout=60000, wait_until="networkidle")
 
                 # Wait for ads to load
                 try:
                     await page.wait_for_selector('text=Library ID:', timeout=15000)
-                except:
-                    print("No ads found or page didn't load properly")
+                except Exception:
+                    logger.info("No ads found or page didn't load properly")
                     await browser.close()
                     return []
 
@@ -242,7 +264,7 @@ class BrandScraperService:
                 for i in range(scroll_count):
                     await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                     await page.wait_for_timeout(1500)
-                    print(f"Scroll {i+1}/{scroll_count}")
+                    logger.info("Playwright scroll %s/%s", i + 1, scroll_count)
 
                 # Extract ad data from DOM
                 ads = await page.evaluate("""
@@ -329,11 +351,15 @@ class BrandScraperService:
                     }
                 """)
 
-                print(f"Playwright extracted {len(ads)} ads, captured {len(captured_images)} images from network")
+                logger.info(
+                    "Playwright extracted %s ads and captured %s images from network",
+                    len(ads),
+                    len(captured_images),
+                )
 
                 # Log image URL stats
                 total_img_urls = sum(len(ad.get('_image_urls', [])) for ad in ads)
-                print(f"Total image URLs extracted from DOM: {total_img_urls}")
+                logger.info("Total image URLs extracted from DOM: %s", total_img_urls)
 
                 # Attach captured image data to ads
                 matched_count = 0
@@ -349,11 +375,11 @@ class BrandScraperService:
                             })
                             matched_count += 1
 
-                print(f"Matched {matched_count} images to ads")
+                logger.info("Matched %s images to ads", matched_count)
 
                 # If few matches, distribute captured images to ads without media
                 if matched_count < len(ads) // 2 and captured_images:
-                    print("Low match rate, distributing captured images to ads")
+                    logger.info("Low image match rate detected, distributing captured images to ads")
                     remaining_images = list(captured_images.items())
                     img_idx = 0
                     for ad in ads:
@@ -370,211 +396,12 @@ class BrandScraperService:
                 await browser.close()
 
         except Exception as e:
-            error_msg = f"Playwright scrape failed: {str(e)}"
-            print(error_msg)
-            import traceback
-            traceback.print_exc()
-            raise Exception(error_msg)
+            logger.exception("Playwright scrape failed")
+            raise Exception(f"Playwright scrape failed: {str(e)}") from e
 
         return ads[:limit]
 
-    async def _fallback_fetch_page_ads(self, page_id: str, limit: int = 500, brand_name: str = None, is_search: bool = False) -> List[dict]:
-        """Fallback to Playwright for scraping when API unavailable. Captures both images and videos."""
-        from playwright.async_api import async_playwright
 
-        ads = []
-        captured_media = []  # Store captured video/image data
-
-        try:
-            async with async_playwright() as p:
-                browser = await p.chromium.launch(headless=True)
-                context = await browser.new_context(
-                    viewport={'width': 1920, 'height': 1080},
-                    user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                )
-                page = await context.new_page()
-
-                # Capture video responses as they stream
-                async def capture_media_response(response):
-                    url = response.url
-                    content_type = response.headers.get('content-type', '')
-
-                    # Capture videos
-                    if 'video' in content_type:
-                        try:
-                            body = await response.body()
-                            if len(body) > 10000:  # Only capture substantial videos
-                                captured_media.append({
-                                    'url': url,
-                                    'type': 'video',
-                                    'content_type': content_type,
-                                    'data': body
-                                })
-                                print(f"Captured video: {len(body)} bytes")
-                        except:
-                            pass
-
-                    # Capture images from scontent
-                    elif 'image' in content_type and ('scontent' in url or 'fbcdn' in url):
-                        try:
-                            body = await response.body()
-                            if len(body) > 5000:  # Only substantial images
-                                captured_media.append({
-                                    'url': url,
-                                    'type': 'image',
-                                    'content_type': content_type,
-                                    'data': body
-                                })
-                        except:
-                            pass
-
-                page.on('response', capture_media_response)
-
-                # Determine URL based on search type
-                import urllib.parse
-
-                if is_search:
-                    # Use the search query directly
-                    search_query = urllib.parse.quote(page_id)  # page_id contains the search term
-                    url = f"https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=US&media_type=all&q={search_query}"
-                    print(f"Searching for '{page_id}'...")
-                elif brand_name:
-                    # Search by brand name - videos autoplay in search results
-                    search_query = urllib.parse.quote(brand_name)
-                    url = f"https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=US&media_type=video&q={search_query}"
-                    print(f"Searching for '{brand_name}' videos...")
-                else:
-                    url = f"https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=US&view_all_page_id={page_id}&media_type=all"
-                    print(f"Scraping page ID: {page_id}")
-
-                await page.goto(url, timeout=60000, wait_until="networkidle")
-
-                try:
-                    await page.wait_for_selector('text=Library ID:', timeout=15000)
-                except:
-                    print("No ads found")
-                    await browser.close()
-                    return []
-
-                await page.wait_for_timeout(5000)  # Wait for video autoplay
-
-                # Scroll to load more ads and trigger video loading
-                for i in range(min(15, limit // 10)):
-                    await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                    await page.wait_for_timeout(2000)  # More time for videos to load
-
-                print(f"Captured {len(captured_media)} media items during scroll")
-
-                # Extract ad metadata from DOM
-                ads_data = await page.evaluate("""
-                    () => {
-                        const results = [];
-                        const seenIds = new Set();
-
-                        document.querySelectorAll('div').forEach(div => {
-                            const text = div.innerText || '';
-                            const idMatch = text.match(/Library ID:\\s*(\\d+)/);
-                            if (!idMatch) return;
-
-                            const libraryId = idMatch[1];
-                            if (seenIds.has(libraryId)) return;
-                            seenIds.add(libraryId);
-
-                            // Extract brand name
-                            let brandName = 'Unknown';
-                            const sponsoredIdx = text.indexOf('Sponsored');
-                            if (sponsoredIdx > 0) {
-                                const before = text.substring(0, sponsoredIdx).split('\\n').filter(l => l.trim());
-                                if (before.length) brandName = before[before.length - 1].trim();
-                            }
-
-                            // Extract headline, copy, and CTA
-                            let headline = null, adCopy = null, ctaText = null;
-                            const lines = text.split('\\n').map(l => l.trim()).filter(l => l);
-                            const sponsoredLine = lines.findIndex(l => l === 'Sponsored');
-                            if (sponsoredLine >= 0) {
-                                for (let i = sponsoredLine + 1; i < lines.length; i++) {
-                                    if (lines[i].includes('Library ID') || lines[i].includes('http')) break;
-                                    if (!headline && lines[i].length > 10) headline = lines[i];
-                                    else if (headline && lines[i].length > 10) adCopy = (adCopy || '') + lines[i] + ' ';
-                                }
-                            }
-
-                            // Look for common CTA button texts
-                            const ctaPatterns = ['Learn More', 'Shop Now', 'Sign Up', 'Get Offer', 'Book Now', 'Contact Us', 'Download', 'Apply Now', 'Get Quote', 'Subscribe'];
-                            for (const cta of ctaPatterns) {
-                                if (text.includes(cta)) {
-                                    ctaText = cta;
-                                    break;
-                                }
-                            }
-
-                            // Try to find page link (view_all_page_id link)
-                            let pageId = null;
-                            div.querySelectorAll('a[href*="view_all_page_id"]').forEach(link => {
-                                const match = link.href.match(/view_all_page_id=(\\d+)/);
-                                if (match) pageId = match[1];
-                            });
-
-                            // Get image URLs visible in this ad container
-                            const imageUrls = [];
-                            div.querySelectorAll('img[src*="scontent"]').forEach(img => {
-                                if (img.src && !img.src.includes('emoji') && img.width > 50) {
-                                    imageUrls.push(img.src);
-                                }
-                            });
-
-                            // Check if this ad has a video
-                            const hasVideo = div.querySelector('video') !== null ||
-                                           text.match(/\\d+:\\d+/) !== null;  // Duration like "0:30"
-
-                            results.push({
-                                id: libraryId,
-                                page_name: brandName,
-                                page_id: pageId,
-                                ad_creative_link_titles: headline ? [headline] : null,
-                                ad_creative_bodies: adCopy ? [adCopy.trim()] : null,
-                                ad_creative_link_captions: ctaText ? [ctaText] : null,
-                                _image_urls: imageUrls,
-                                _has_video: hasVideo
-                            });
-                        });
-
-                        return results;
-                    }
-                """)
-
-                # Associate captured media with ads
-                video_index = 0
-                for ad in ads_data[:limit]:
-                    ad['_media_data'] = []
-
-                    # Add images for this ad
-                    for img_url in ad.get('_image_urls', [])[:3]:
-                        # Find matching captured image
-                        for media in captured_media:
-                            if media['type'] == 'image' and media['url'] == img_url:
-                                ad['_media_data'].append(media)
-                                break
-
-                    # If ad has video, assign next captured video
-                    if ad.get('_has_video') and video_index < len([m for m in captured_media if m['type'] == 'video']):
-                        videos = [m for m in captured_media if m['type'] == 'video']
-                        if video_index < len(videos):
-                            ad['_media_data'].append(videos[video_index])
-                            video_index += 1
-
-                ads = ads_data[:limit]
-                await browser.close()
-
-                print(f"Extracted {len(ads)} ads with media data")
-
-        except Exception as e:
-            print(f"Playwright scrape error: {e}")
-            import traceback
-            traceback.print_exc()
-
-        return ads
 
     async def _process_ad(self, ad_data: dict, brand_scrape_id: str, folder_name: str) -> Optional[BrandScrapedAd]:
         """Process a single ad: extract media URLs and download to R2."""
@@ -640,10 +467,15 @@ class BrandScraperService:
                         r2_urls.append(r2_url)
                         if detected_type == "video":
                             media_type = "video"
-                        print(f"Uploaded {detected_type} for ad {ad_id}: {len(media_item['data'])} bytes")
+                        logger.info(
+                            "Uploaded %s asset for ad %s (%s bytes)",
+                            detected_type,
+                            ad_id,
+                            len(media_item["data"]),
+                        )
 
                 except Exception as e:
-                    print(f"Failed to upload media for ad {ad_id}: {e}")
+                    logger.error(f"Failed to upload media for ad {ad_id}: {e}")
 
         else:
             # Fallback: try to download from URLs (for API-sourced ads)
@@ -664,7 +496,7 @@ class BrandScraperService:
                         if detected_type == "video":
                             media_type = "video"
                 except Exception as e:
-                    print(f"Failed to download media {media_url}: {e}")
+                    logger.error(f"Failed to download media {media_url}: {e}")
 
         # Detect carousel
         if len(r2_urls) > 1 and media_type == "image":
@@ -695,7 +527,7 @@ class BrandScraperService:
         )
 
         self.db.add(ad_record)
-        self.db.commit()
+        # NOTE: commit is done by the caller (scrape_brand) in a single batch
 
         return ad_record
 
@@ -719,7 +551,7 @@ class BrandScraperService:
                 media_urls.extend(videos[:3])
 
         except Exception as e:
-            print(f"Error extracting media from snapshot: {e}")
+            logger.error(f"Error extracting media from snapshot: {e}")
 
         return media_urls
 
@@ -759,25 +591,17 @@ class BrandScraperService:
             return r2_url, media_type
 
         except Exception as e:
-            print(f"Download/upload error: {e}")
+            logger.error(f"Download/upload error: {e}")
             return None, "image"
 
     async def _upload_to_r2(self, content: bytes, filename: str, media_type: str) -> Optional[str]:
         """Upload content to R2 and return public URL."""
         if not settings.r2_enabled:
-            print("R2 not configured, skipping upload")
+            logger.debug("R2 not configured, skipping upload")
             return None
 
         try:
-            import boto3
-
-            s3_client = boto3.client(
-                's3',
-                endpoint_url=settings.r2_endpoint_url,
-                aws_access_key_id=settings.R2_ACCESS_KEY_ID,
-                aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
-                region_name='auto'
-            )
+            s3_client = self._get_s3_client()
 
             content_type = 'video/mp4' if media_type == 'video' else 'image/jpeg'
 
@@ -791,7 +615,7 @@ class BrandScraperService:
             return f"{settings.R2_PUBLIC_URL}/{filename}"
 
         except Exception as e:
-            print(f"R2 upload error: {e}")
+            logger.error(f"R2 upload error: {e}")
             return None
 
     async def delete_brand_scrape(self, brand_scrape: BrandScrape) -> bool:
@@ -799,15 +623,7 @@ class BrandScraperService:
         try:
             # Delete media from R2
             if settings.r2_enabled and brand_scrape.ads:
-                import boto3
-
-                s3_client = boto3.client(
-                    's3',
-                    endpoint_url=settings.r2_endpoint_url,
-                    aws_access_key_id=settings.R2_ACCESS_KEY_ID,
-                    aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
-                    region_name='auto'
-                )
+                s3_client = self._get_s3_client()
 
                 for ad in brand_scrape.ads:
                     if ad.media_urls:
@@ -817,7 +633,7 @@ class BrandScraperService:
                                 key = url.replace(f"{settings.R2_PUBLIC_URL}/", "")
                                 s3_client.delete_object(Bucket=settings.R2_BUCKET_NAME, Key=key)
                             except Exception as e:
-                                print(f"Error deleting {url}: {e}")
+                                logger.error(f"Error deleting {url}: {e}")
 
             # Delete from DB (cascade will delete ads)
             self.db.delete(brand_scrape)
@@ -826,5 +642,5 @@ class BrandScraperService:
             return True
 
         except Exception as e:
-            print(f"Error deleting brand scrape: {e}")
+            logger.error(f"Error deleting brand scrape: {e}")
             return False

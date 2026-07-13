@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { BarChart, Upload, ArrowUpRight, ArrowDownRight, AlertTriangle, Sparkles, Loader } from 'lucide-react';
@@ -14,11 +14,7 @@ export default function Reporting() {
     const [loadingFlags, setLoadingFlags] = useState(true);
     const [iteratingId, setIteratingId] = useState(null);
 
-    useEffect(() => {
-        fetchKillRuleFlags();
-    }, []);
-
-    const fetchKillRuleFlags = async () => {
+    const fetchKillRuleFlags = useCallback(async () => {
         try {
             const res = await authFetch(`${API_URL}/performance/kill-rule`);
             if (!res.ok) throw new Error("Failed to fetch kill rule flags");
@@ -29,7 +25,11 @@ export default function Reporting() {
         } finally {
             setLoadingFlags(false);
         }
-    };
+    }, [authFetch, showError]);
+
+    useEffect(() => {
+        fetchKillRuleFlags();
+    }, [fetchKillRuleFlags]);
 
     const handleFileUpload = async (e) => {
         const file = e.target.files?.[0];

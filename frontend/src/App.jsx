@@ -34,6 +34,7 @@ import BrandScrapes from './pages/BrandScrapes';
 import AdRemix from './pages/AdRemix';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
+import Register from './pages/Register';
 import UserManagement from './pages/UserManagement';
 
 function App() {
@@ -42,50 +43,51 @@ function App() {
       <AuthProvider>
         <BrandProvider>
           <CampaignProvider>
-            <ErrorBoundary>
             <BrowserRouter>
-              <Routes>
-                {/* Public routes */}
-                <Route path="/login" element={<Login />} />
+              <ErrorBoundary>
+                <Routes>
+                  {/* Public routes */}
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/register" element={<Register />} />
 
-                {/* Protected routes */}
-                <Route
-                  path="/"
-                  element={
-                    <PrivateRoute>
-                      <Layout />
-                    </PrivateRoute>
-                  }
-                >
-                  <Route index element={<Dashboard />} />
-                  <Route path="research" element={<Research />} />
-                  <Route path="research/brand-scrapes" element={<BrandScrapes />} />
-                  <Route path="research/settings" element={<ResearchSettings />} />
-                  <Route path="build-creatives" element={<CreateAds />} />
-                  <Route path="modular-ads" element={<ModularAds />} />
-                  <Route path="ad-modules-library" element={<AdModulesLibrary />} />
-                  <Route path="image-ads" element={<ImageAds />} />
-                  <Route path="video-ads" element={<VideoAds />} />
-                  <Route path="facebook-campaigns" element={<FacebookCampaigns />} />
-                  <Route path="winning-ads" element={<WinningAds />} />
-                  <Route path="generated-ads" element={<GeneratedAds />} />
-                  <Route path="profiles" element={<CustomerProfiles />} />
-                  <Route path="personas" element={<AIPersonas />} />
-                  <Route path="ad-remix" element={<AdRemix />} />
-                  <Route path="reporting" element={<Reporting />} />
-                  <Route path="settings" element={<Settings />} />
+                  {/* Protected routes */}
                   <Route
-                    path="users"
+                    path="/"
                     element={
-                      <PrivateRoute requiredRole="admin">
-                        <UserManagement />
+                      <PrivateRoute>
+                        <Layout />
                       </PrivateRoute>
                     }
-                  />
-                </Route>
-              </Routes>
+                  >
+                    <Route index element={<Dashboard />} />
+                    <Route path="research" element={<Research />} />
+                    <Route path="research/brand-scrapes" element={<BrandScrapes />} />
+                    <Route path="research/settings" element={<ResearchSettings />} />
+                    <Route path="build-creatives" element={<CreateAds />} />
+                    <Route path="modular-ads" element={<ModularAds />} />
+                    <Route path="ad-modules-library" element={<AdModulesLibrary />} />
+                    <Route path="image-ads" element={<ImageAds />} />
+                    <Route path="video-ads" element={<VideoAds />} />
+                    <Route path="facebook-campaigns" element={<FacebookCampaigns />} />
+                    <Route path="winning-ads" element={<WinningAds />} />
+                    <Route path="generated-ads" element={<GeneratedAds />} />
+                    <Route path="profiles" element={<CustomerProfiles />} />
+                    <Route path="personas" element={<AIPersonas />} />
+                    <Route path="ad-remix" element={<AdRemix />} />
+                    <Route path="reporting" element={<Reporting />} />
+                    <Route path="settings" element={<Settings />} />
+                    <Route
+                      path="users"
+                      element={
+                        <PrivateRoute requiredRole="admin">
+                          <UserManagement />
+                        </PrivateRoute>
+                      }
+                    />
+                  </Route>
+                </Routes>
+              </ErrorBoundary>
             </BrowserRouter>
-            </ErrorBoundary>
           </CampaignProvider>
         </BrandProvider>
       </AuthProvider>

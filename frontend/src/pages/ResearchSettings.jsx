@@ -1,5 +1,5 @@
 import { useToast } from '../context/ToastContext';
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useResearchApi } from '../api/research';
 
 const ResearchSettings = () => {
@@ -12,28 +12,51 @@ const ResearchSettings = () => {
     const [showKeywordModal, setShowKeywordModal] = useState(false);
     const [blacklistKeyword, setBlacklistKeyword] = useState('');
 
-    useEffect(() => {
-        fetchBlacklist();
-        fetchKeywordBlacklist();
-    }, []);
-
-    const fetchBlacklist = async () => {
+    const fetchBlacklist = useCallback(async () => {
         try {
             const data = await getBlacklist();
             setBlacklist(data);
         } catch (error) {
             console.error('Failed to load blacklist', error);
         }
-    };
+    }, [getBlacklist]);
 
-    const fetchKeywordBlacklist = async () => {
+    const fetchKeywordBlacklist = useCallback(async () => {
         try {
             const data = await getKeywordBlacklist();
             setKeywordBlacklist(data);
         } catch (error) {
             console.error('Failed to load keyword blacklist', error);
         }
-    };
+    }, [getKeywordBlacklist]);
+
+    useEffect(() => {
+        let isActive = true;
+
+        const loadSettings = async () => {
+            try {
+                const [pages, keywords] = await Promise.all([
+                    getBlacklist(),
+                    getKeywordBlacklist(),
+                ]);
+
+                if (!isActive) {
+                    return;
+                }
+
+                setBlacklist(pages);
+                setKeywordBlacklist(keywords);
+            } catch (error) {
+                console.error('Failed to load research settings', error);
+            }
+        };
+
+        void loadSettings();
+
+        return () => {
+            isActive = false;
+        };
+    }, [getBlacklist, getKeywordBlacklist]);
 
     const handleAddToBlacklist = async (pageName) => {
         if (!pageName) {
@@ -47,7 +70,7 @@ const ResearchSettings = () => {
             fetchBlacklist();
             setBlacklistPageName('');
             setShowBlacklistModal(false);
-        } catch (error) {
+        } catch {
             showError('Failed to add to blacklist');
         }
     };
@@ -57,7 +80,7 @@ const ResearchSettings = () => {
             await removeFromBlacklist(id);
             showSuccess(`Removed "${pageName}" from blacklist`);
             fetchBlacklist();
-        } catch (error) {
+        } catch {
             showError('Failed to remove from blacklist');
         }
     };
@@ -74,7 +97,7 @@ const ResearchSettings = () => {
             fetchKeywordBlacklist();
             setBlacklistKeyword('');
             setShowKeywordModal(false);
-        } catch (error) {
+        } catch {
             showError('Failed to add to keyword blacklist');
         }
     };
@@ -84,7 +107,7 @@ const ResearchSettings = () => {
             await removeFromKeywordBlacklist(id);
             showSuccess(`Removed "${keyword}" from keyword blacklist`);
             fetchKeywordBlacklist();
-        } catch (error) {
+        } catch {
             showError('Failed to remove from keyword blacklist');
         }
     };

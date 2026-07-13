@@ -1,5 +1,5 @@
 import { useToast } from '../context/ToastContext';
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ChevronRight, Upload, X, Loader, Trash2, Film, Image } from 'lucide-react';
 import { useCampaign } from '../context/CampaignContext';
 import { getPages } from '../lib/facebookApi';
@@ -22,7 +22,7 @@ const CTA_OPTIONS = [
 
 const AdCreativeStep = ({ onNext, onBack }) => {
     const { showWarning, showError } = useToast();
-    const { creativeData, setCreativeData, selectedAdAccount, selectedProduct, adsetData } = useCampaign();
+    const { creativeData, setCreativeData, selectedAdAccount, adsetData } = useCampaign();
     const [pages, setPages] = useState([]);
     const [loadingPages, setLoadingPages] = useState(false);
 
@@ -84,39 +84,46 @@ const AdCreativeStep = ({ onNext, onBack }) => {
         }));
     };
 
-    // Prepopulate Creative Name with Ad Set Name if empty
-    useEffect(() => {
-        if (adsetData?.name && !creativeData.creativeName) {
-            handleInputChange('creativeName', adsetData.name);
-        }
-    }, [adsetData?.name]);
+    const handleInputChange = useCallback((field, value) => {
+        setCreativeData(prev => ({
+            ...prev,
+            [field]: value,
+            // When manually entering a Page ID, clear the instagramId to prevent using Page ID as IG ID
+            ...(field === 'pageId' ? { instagramId: null } : {})
+        }));
 
-    // Load last used page ID on mount
-    useEffect(() => {
-        const lastUsedPageId = localStorage.getItem('lastUsedPageId');
-        if (lastUsedPageId && !creativeData.pageId) {
-            handleInputChange('pageId', lastUsedPageId);
+        // Persist page ID
+        if (field === 'pageId') {
+            localStorage.setItem('lastUsedPageId', value);
         }
-    }, []);
 
-    // Load default URL from local storage for this ad account
-    useEffect(() => {
-        if (selectedAdAccount && !creativeData.websiteUrl) {
-            const savedUrl = localStorage.getItem(`defaultUrl_${selectedAdAccount.id}`);
-            if (savedUrl) {
-                handleInputChange('websiteUrl', savedUrl);
-            }
+        // Persist description
+        if (field === 'description' && selectedAdAccount) {
+            localStorage.setItem(`defaultDescription_${selectedAdAccount.id}`, value);
         }
-    }, [selectedAdAccount]);
 
-    // Fetch pages when ad account is selected
-    useEffect(() => {
-        if (selectedAdAccount) {
-            fetchPages();
+        // Persist CTA
+        if (field === 'cta' && selectedAdAccount) {
+            localStorage.setItem(`defaultCta_${selectedAdAccount.id}`, value);
         }
-    }, [selectedAdAccount]);
+    }, [selectedAdAccount, setCreativeData]);
 
-    const fetchPages = async () => {
+    const handlePageSelection = useCallback((pageId, currentPages = pages) => {
+        const selectedPage = currentPages.find(p => p.id === pageId);
+        setCreativeData(prev => ({
+            ...prev,
+            pageId,
+            instagramId: selectedPage ? selectedPage.instagramId : null
+        }));
+        localStorage.setItem('lastUsedPageId', pageId);
+    }, [pages, setCreativeData]);
+
+    const fetchPages = useCallback(async () => {
+        if (!selectedAdAccount) {
+            setPages([]);
+            return;
+        }
+
         setLoadingPages(true);
         try {
             const fetchedPages = await getPages(selectedAdAccount.id);
@@ -138,17 +145,39 @@ const AdCreativeStep = ({ onNext, onBack }) => {
         } finally {
             setLoadingPages(false);
         }
-    };
+    }, [creativeData.pageId, handlePageSelection, selectedAdAccount, showError]);
 
-    const handlePageSelection = (pageId, currentPages = pages) => {
-        const selectedPage = currentPages.find(p => p.id === pageId);
-        setCreativeData(prev => ({
-            ...prev,
-            pageId,
-            instagramId: selectedPage ? selectedPage.instagramId : null
-        }));
-        localStorage.setItem('lastUsedPageId', pageId);
-    };
+    // Prepopulate Creative Name with Ad Set Name if empty
+    useEffect(() => {
+        if (adsetData?.name && !creativeData.creativeName) {
+            handleInputChange('creativeName', adsetData.name);
+        }
+    }, [adsetData?.name, creativeData.creativeName, handleInputChange]);
+
+    // Load last used page ID on mount
+    useEffect(() => {
+        const lastUsedPageId = localStorage.getItem('lastUsedPageId');
+        if (lastUsedPageId && !creativeData.pageId) {
+            handleInputChange('pageId', lastUsedPageId);
+        }
+    }, [creativeData.pageId, handleInputChange]);
+
+    // Load default URL from local storage for this ad account
+    useEffect(() => {
+        if (selectedAdAccount && !creativeData.websiteUrl) {
+            const savedUrl = localStorage.getItem(`defaultUrl_${selectedAdAccount.id}`);
+            if (savedUrl) {
+                handleInputChange('websiteUrl', savedUrl);
+            }
+        }
+    }, [creativeData.websiteUrl, handleInputChange, selectedAdAccount]);
+
+    // Fetch pages when ad account is selected
+    useEffect(() => {
+        if (selectedAdAccount) {
+            fetchPages();
+        }
+    }, [fetchPages, selectedAdAccount]);
 
     // Load saved creative fields from local storage for this ad account
     useEffect(() => {
@@ -184,31 +213,14 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                 setCreativeData(prev => ({ ...prev, cta: savedCta }));
             }
         }
-    }, [selectedAdAccount]);
-
-    const handleInputChange = (field, value) => {
-        setCreativeData(prev => ({
-            ...prev,
-            [field]: value,
-            // When manually entering a Page ID, clear the instagramId to prevent using Page ID as IG ID
-            ...(field === 'pageId' ? { instagramId: null } : {})
-        }));
-
-        // Persist page ID
-        if (field === 'pageId') {
-            localStorage.setItem('lastUsedPageId', value);
-        }
-
-        // Persist description
-        if (field === 'description' && selectedAdAccount) {
-            localStorage.setItem(`defaultDescription_${selectedAdAccount.id}`, value);
-        }
-
-        // Persist CTA
-        if (field === 'cta' && selectedAdAccount) {
-            localStorage.setItem(`defaultCta_${selectedAdAccount.id}`, value);
-        }
-    };
+    }, [
+        creativeData.bodies,
+        creativeData.cta,
+        creativeData.description,
+        creativeData.headlines,
+        selectedAdAccount,
+        setCreativeData,
+    ]);
 
     const handleBodyChange = (index, value) => {
         const newBodies = [...creativeData.bodies];

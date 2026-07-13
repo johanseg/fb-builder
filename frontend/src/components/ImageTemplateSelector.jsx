@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { X, Filter, Grid, List, Sparkles, Trash2, AlertTriangle } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
@@ -24,17 +24,7 @@ export default function ImageTemplateSelector({ onSelect, onClose, embedded = fa
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-    // Fetch available filters
-    useEffect(() => {
-        fetchFilters();
-    }, []);
-
-    // Fetch templates when filters change
-    useEffect(() => {
-        fetchTemplates();
-    }, [selectedCategory, selectedStyle]);
-
-    const fetchFilters = async () => {
+    const fetchFilters = useCallback(async () => {
         try {
             const response = await authFetch(`${API_URL}/templates/filters`);
             if (response.ok) {
@@ -44,9 +34,9 @@ export default function ImageTemplateSelector({ onSelect, onClose, embedded = fa
         } catch (error) {
             console.error('Error fetching filters:', error);
         }
-    };
+    }, [authFetch]);
 
-    const fetchTemplates = async () => {
+    const fetchTemplates = useCallback(async () => {
         setLoading(true);
         try {
             const params = new URLSearchParams();
@@ -66,7 +56,17 @@ export default function ImageTemplateSelector({ onSelect, onClose, embedded = fa
         } finally {
             setLoading(false);
         }
-    };
+    }, [authFetch, selectedCategory, selectedStyle, sortBy]);
+
+    // Fetch available filters
+    useEffect(() => {
+        fetchFilters();
+    }, [fetchFilters]);
+
+    // Fetch templates when filters change
+    useEffect(() => {
+        fetchTemplates();
+    }, [fetchTemplates]);
 
     const handleTemplateSelect = async (template) => {
         // Fetch full preview data
@@ -103,11 +103,6 @@ export default function ImageTemplateSelector({ onSelect, onClose, embedded = fa
                 return sorted;
         }
     };
-
-    // Re-sort templates when sortBy changes
-    useEffect(() => {
-        setTemplates(prev => sortTemplates(prev, sortBy));
-    }, [sortBy]);
 
     // Selection Logic
     const toggleSelection = (id) => {

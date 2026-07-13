@@ -19,7 +19,10 @@ const ConfirmationModal = ({
             <div className="bg-card rounded-xl max-w-md w-full p-6 shadow-xl transform transition-all" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center gap-4 mb-6">
                     <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${isDestructive ? 'bg-red-100' : 'bg-blue-100'}`}>
-                        <Icon className={isDestructive ? 'text-red-600' : 'text-blue-600'} size={24} />
+                        {React.createElement(Icon, {
+                            className: isDestructive ? 'text-red-600' : 'text-blue-600',
+                            size: 24,
+                        })}
                     </div>
                     <div className="flex-1">
                         <h3 className="text-lg font-bold text-foreground">{title}</h3>

@@ -5,7 +5,13 @@ from sqlalchemy import func
 
 
 class RateLimiter:
-    """Database-backed rolling window rate limiter for Facebook API calls"""
+    """Database-backed rolling window rate limiter for Facebook API calls.
+
+    KNOWN LIMITATION: This has a check-then-act race condition. Two concurrent
+    requests can both pass check_limit() and exceed the limit. For a
+    production-grade fix, use Redis INCR+EXPIRE or PostgreSQL advisory locks
+    (SELECT ... FOR UPDATE) to make check-and-consume atomic.
+    """
 
     def __init__(self, max_calls: int = 200, window_minutes: int = 59):
         self.max_calls = max_calls

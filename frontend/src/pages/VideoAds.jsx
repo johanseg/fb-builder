@@ -1,26 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Video, Users, Check, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import { useBrands } from '../context/BrandContext';
 import ProfileSelectionStep from '../components/steps/ProfileSelectionStep';
 
 export default function VideoAds() {
-    const { brands, customerProfiles } = useBrands();
+    const { activeBrand, customerProfiles } = useBrands();
     const [currentStep, setCurrentStep] = useState(1);
-    const [wizardData, setWizardData] = useState({
-        brand: null,
-        product: null,
-        profile: null,
-        useProductShots: false
-    });
+    const [profile, setProfile] = useState(null);
 
-    // Auto-populate brand and product from first available
-    useEffect(() => {
-        if (brands.length > 0) {
-            const brand = brands[0];
-            const product = brand?.products?.[0] || null;
-            setWizardData(prev => ({ ...prev, brand, product }));
-        }
-    }, [brands]);
+    const wizardData = {
+        brand: activeBrand,
+        product: activeBrand?.products?.[0] || null,
+        profile,
+        useProductShots: false,
+    };
 
     const steps = [
         { id: 1, name: 'Profile', icon: Users },
@@ -29,7 +22,9 @@ export default function VideoAds() {
     ];
 
     const updateData = (field, value) => {
-        setWizardData(prev => ({ ...prev, [field]: value }));
+        if (field === 'profile') {
+            setProfile(value);
+        }
     };
 
     const isStepComplete = (stepId) => {

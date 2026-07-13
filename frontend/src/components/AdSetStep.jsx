@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ChevronRight, Plus, Check, Loader, X } from 'lucide-react';
 import { useCampaign } from '../context/CampaignContext';
 import { useToast } from '../context/ToastContext';
@@ -66,7 +66,6 @@ const AdSetStep = ({ onNext, onBack }) => {
     const [mode, setMode] = useState('new');
     const [existingAdsets, setExistingAdsets] = useState([]);
     const [selectedAdset, setSelectedAdset] = useState(null);
-    const [loading, setLoading] = useState(false);
     const [loadingAdSets, setLoadingAdSets] = useState(false);
     const [pixels, setPixels] = useState([]);
     const [loadingPixels, setLoadingPixels] = useState(false);
@@ -100,33 +99,14 @@ const AdSetStep = ({ onNext, onBack }) => {
 
         const timeoutId = setTimeout(searchLocations, 500);
         return () => clearTimeout(timeoutId);
-    }, [countrySearch]);
+    }, [countrySearch, selectedAdAccount, showError]);
 
-    useEffect(() => {
-        if (mode === 'existing' && campaignData.id) {
-            fetchExistingAdsets();
+    const fetchPixels = useCallback(async () => {
+        if (!selectedAdAccount) {
+            setPixels([]);
+            return;
         }
-    }, [mode, campaignData.id]);
 
-    useEffect(() => {
-        if (selectedAdAccount) {
-            fetchPixels();
-        }
-    }, [selectedAdAccount]);
-
-    // Close country dropdown when clicking outside
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (showCountryDropdown && !event.target.closest('.country-picker-container')) {
-                setShowCountryDropdown(false);
-            }
-        };
-
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [showCountryDropdown]);
-
-    const fetchPixels = async () => {
         setLoadingPixels(true);
         try {
             const fetchedPixels = await getPixels(selectedAdAccount.id);
@@ -137,9 +117,9 @@ const AdSetStep = ({ onNext, onBack }) => {
         } finally {
             setLoadingPixels(false);
         }
-    };
+    }, [selectedAdAccount, showWarning]);
 
-    const fetchExistingAdsets = async () => {
+    const fetchExistingAdsets = useCallback(async () => {
         setLoadingAdSets(true);
         try {
             // Use FB Campaign ID if available (for existing campaigns), otherwise fallback to local ID
@@ -162,7 +142,31 @@ const AdSetStep = ({ onNext, onBack }) => {
         } finally {
             setLoadingAdSets(false);
         }
-    };
+    }, [campaignData.fbCampaignId, campaignData.id, showError]);
+
+    useEffect(() => {
+        if (mode === 'existing' && campaignData.id) {
+            fetchExistingAdsets();
+        }
+    }, [mode, campaignData.id, fetchExistingAdsets]);
+
+    useEffect(() => {
+        if (selectedAdAccount) {
+            fetchPixels();
+        }
+    }, [selectedAdAccount, fetchPixels]);
+
+    // Close country dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (showCountryDropdown && !event.target.closest('.country-picker-container')) {
+                setShowCountryDropdown(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showCountryDropdown]);
 
     const handleSelectExisting = (adset) => {
         setSelectedAdset(adset);
@@ -259,10 +263,6 @@ const AdSetStep = ({ onNext, onBack }) => {
         }
 
         onNext();
-    };
-
-    const parseCountries = (value) => {
-        return value.split(',').map(c => c.trim().toUpperCase()).filter(c => c.length > 0);
     };
 
     return (
@@ -981,10 +981,10 @@ const AdSetStep = ({ onNext, onBack }) => {
                 </button>
                 <button
                     onClick={handleNext}
-                    disabled={loading}
+                    disabled={loadingAdSets || loadingPixels || isSearchingLocations}
                     className="flex items-center gap-2 px-6 py-3 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
                 >
-                    {loading ? 'Saving...' : 'Next Step'} <ChevronRight size={20} />
+                    {(loadingAdSets || loadingPixels || isSearchingLocations) ? 'Loading...' : 'Next Step'} <ChevronRight size={20} />
                 </button>
             </div>
         </div >

@@ -74,7 +74,7 @@ const WinningAds = () => {
                 throw new Error('Upload failed');
             }
 
-            const result = await response.json();
+            await response.json();
             // Refresh the template selector to show new uploads
             setRefreshKey(prev => prev + 1);
 

@@ -6,39 +6,14 @@ load_dotenv()
 class Settings:
     PROJECT_NAME: str = "Townsquare Interactive Ad Creative Studio"
     API_V1_STR: str = "/api/v1"
-    
-    # Database - PostgreSQL Required
-    DATABASE_URL: str = (os.getenv("DATABASE_URL") or "").strip()
-    
-    # Validate DATABASE_URL is set
-    if not DATABASE_URL:
-        raise ValueError(
-            "DATABASE_URL environment variable is required. "
-            "Please set it to your PostgreSQL connection string.\n"
-            "Example: postgresql://user:password@localhost:5432/facebook_ad_builder"
-        )
-    
-    # Validate that it's PostgreSQL
-    if not DATABASE_URL.startswith("postgresql://") and not DATABASE_URL.startswith("postgres://"):
-        raise ValueError(
-            "DATABASE_URL must be a PostgreSQL connection string. "
-            f"Got: {DATABASE_URL.split(':')[0]}://...\n"
-            "SQLite is no longer supported. Please use PostgreSQL."
-        )
-    
+
     # External APIs
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+    GEMINI_VISION_MODEL: str = os.getenv("GEMINI_VISION_MODEL", "gemini-1.5-flash")
     FAL_AI_API_KEY: str = os.getenv("FAL_AI_API_KEY", "")
     KIE_AI_API_KEY: str = os.getenv("KIE_AI_API_KEY", "")
     FACEBOOK_ACCESS_TOKEN: str = os.getenv("FACEBOOK_ACCESS_TOKEN", "")
-
-    # Auth settings - SECRET_KEY is required
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "")
-    if not SECRET_KEY or SECRET_KEY == "your-secret-key-change-in-production":
-        raise ValueError(
-            "SECRET_KEY environment variable is required for security.\n"
-            "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
-        )
 
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))  # 30 minutes
@@ -58,5 +33,32 @@ class Settings:
     @property
     def r2_endpoint_url(self) -> str:
         return f"https://{self.R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+
+    @property
+    def DATABASE_URL(self) -> str:
+        database_url = (os.getenv("DATABASE_URL") or "").strip()
+        if not database_url:
+            raise ValueError(
+                "DATABASE_URL environment variable is required. "
+                "Please set it to your PostgreSQL connection string.\n"
+                "Example: postgresql://user:password@localhost:5432/facebook_ad_builder"
+            )
+        if not database_url.startswith("postgresql://") and not database_url.startswith("postgres://"):
+            raise ValueError(
+                "DATABASE_URL must be a PostgreSQL connection string. "
+                f"Got: {database_url.split(':')[0]}://...\n"
+                "SQLite is no longer supported. Please use PostgreSQL."
+            )
+        return database_url
+
+    @property
+    def SECRET_KEY(self) -> str:
+        secret_key = os.getenv("SECRET_KEY", "")
+        if not secret_key or secret_key == "your-secret-key-change-in-production":
+            raise ValueError(
+                "SECRET_KEY environment variable is required for security.\n"
+                "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
+            )
+        return secret_key
 
 settings = Settings()

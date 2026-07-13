@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { Users, Shield, Trash2, Plus, X, Check, UserCheck, UserX, Pencil } from 'lucide-react';
@@ -23,12 +23,7 @@ const UserManagement = () => {
     const { authFetch, user: currentUser } = useAuth();
     const { showSuccess, showError } = useToast();
 
-    useEffect(() => {
-        fetchUsers();
-        fetchRoles();
-    }, []);
-
-    const fetchUsers = async () => {
+    const fetchUsers = useCallback(async () => {
         try {
             const response = await authFetch(`${API_URL}/users/`);
             if (response.ok) {
@@ -40,9 +35,9 @@ const UserManagement = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [authFetch, showError]);
 
-    const fetchRoles = async () => {
+    const fetchRoles = useCallback(async () => {
         try {
             const response = await authFetch(`${API_URL}/users/roles/`);
             if (response.ok) {
@@ -52,7 +47,12 @@ const UserManagement = () => {
         } catch (err) {
             console.error('Failed to fetch roles:', err);
         }
-    };
+    }, [authFetch]);
+
+    useEffect(() => {
+        fetchUsers();
+        fetchRoles();
+    }, [fetchRoles, fetchUsers]);
 
     const handleEditRoles = (user) => {
         setEditingUser(user);

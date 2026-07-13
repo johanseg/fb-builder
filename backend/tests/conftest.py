@@ -1,51 +1,57 @@
 import os
+from unittest.mock import MagicMock
+
+from dotenv import load_dotenv
+load_dotenv()
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-from unittest.mock import MagicMock, patch
 
-# For tests, use a SEPARATE dev database to avoid polluting production
-# Set TEST_DATABASE_URL env var or fallback to dev database
+# Prefer an explicit test URL, then Railway's externally reachable Postgres URL,
+# then the app DATABASE_URL for in-platform test runs.
+TEST_DATABASE_URL = (
+    os.getenv("TEST_DATABASE_URL")
+    or os.getenv("DATABASE_PUBLIC_URL")
+    or os.getenv("DATABASE_URL")
+    or ""
+).strip()
+if not TEST_DATABASE_URL:
+    raise ValueError("DATABASE_URL or TEST_DATABASE_URL environment variable required for tests")
+
+os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+os.environ.setdefault("SECRET_KEY", "test-secret-key-change-in-production")
+os.environ.setdefault("GEMINI_API_KEY", "test-gemini-api-key")
 
 from app.main import app
 from app.database import Base, get_db
-from app.models import User, Role
+from app.models import Role, User
 from app.core.security import get_password_hash
-from app.core.config import settings
 
-# Use DATABASE_URL from env (CI sets this to localhost postgres)
-# No fallback - DATABASE_URL must be set
-TEST_DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("TEST_DATABASE_URL")
-if not TEST_DATABASE_URL:
-    raise ValueError("DATABASE_URL or TEST_DATABASE_URL environment variable required for tests")
 engine = create_engine(TEST_DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
+@pytest.fixture(scope="session", autouse=True)
+def setup_test_db():
+    """Initialize database tables once for the entire test session."""
+    Base.metadata.create_all(bind=engine)
+
+
 @pytest.fixture(scope="function")
 def db_session():
-    """Create a fresh database session for each test.
-
-    Note: Uses PostgreSQL. Tables are not dropped after tests to preserve
-    production data. Test user is cleaned up individually.
-    """
-    # Ensure tables exist
-    Base.metadata.create_all(bind=engine)
-    session = TestingSessionLocal()
+    """Create an isolated database session for each test."""
+    connection = engine.connect()
+    transaction = connection.begin()
+    session = TestingSessionLocal(bind=connection)
     try:
         yield session
     finally:
-        # Clean up test data (don't drop tables in production DB)
-        # Delete test user if it exists
-        from app.models import User, RefreshToken
-        test_user = session.query(User).filter(User.email == "test@example.com").first()
-        if test_user:
-            session.query(RefreshToken).filter(RefreshToken.user_id == test_user.id).delete()
-            session.delete(test_user)
-            session.commit()
         session.close()
+        if transaction.is_active:
+            transaction.rollback()
+        connection.close()
 
 
 @pytest.fixture(scope="function")

@@ -1,17 +1,25 @@
+import logging
+from typing import List
+
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from sqlalchemy import desc, distinct, case, func
 from sqlalchemy.orm import Session
-from typing import List, Tuple
-from app.database import get_db
-from app.models import User
+
+from app.database import get_db, SessionLocal
+from app.models import (
+    User, ApiUsageLog, PageBlacklist, KeywordBlacklist, Vertical,
+    ScrapedAd, SavedSearch, FacebookPage, BrandScrape,
+)
 from app.schemas.research import (
     AdSearchRequest, ScrapedAdResponse, ScrapedAdCreate, ScrapedAdSearchResult, SavedSearchResponse,
-    BrandScrapeCreate, BrandScrapeResponse, BrandScrapeListResponse
+    BrandScrapeCreate, BrandScrapeResponse, BrandScrapeListResponse,
 )
 from app.services.research_service import ResearchService
 from app.services.rate_limiter import rate_limiter
 from app.core.deps import get_current_active_user, require_permission
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @router.post("/search", response_model=List[ScrapedAdSearchResult])
 async def search_ads(request: AdSearchRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
@@ -73,9 +81,6 @@ def delete_saved_search(search_id: str, db: Session = Depends(get_db), current_u
 @router.get("/api-usage")
 def get_api_usage(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     """Get API usage stats grouped by date"""
-    from app.models import ApiUsageLog
-    from sqlalchemy import func
-
     # Get usage grouped by date
     usage = db.query(
         ApiUsageLog.date,
@@ -99,7 +104,6 @@ def get_api_usage(db: Session = Depends(get_db), current_user: User = Depends(ge
 @router.get("/blacklist")
 def get_blacklist(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     """Get all blacklisted pages"""
-    from app.models import PageBlacklist
     pages = db.query(PageBlacklist).order_by(PageBlacklist.created_at.desc()).all()
     return [
         {
@@ -114,7 +118,6 @@ def get_blacklist(db: Session = Depends(get_db), current_user: User = Depends(ge
 @router.post("/blacklist")
 def add_to_blacklist(page_name: str, reason: str = None, db: Session = Depends(get_db), current_user: User = Depends(require_permission("research:write"))):
     """Add page to blacklist"""
-    from app.models import PageBlacklist
 
     # Check if already blacklisted
     existing = db.query(PageBlacklist).filter(PageBlacklist.page_name == page_name).first()
@@ -136,7 +139,6 @@ def add_to_blacklist(page_name: str, reason: str = None, db: Session = Depends(g
 @router.delete("/blacklist/{blacklist_id}")
 def remove_from_blacklist(blacklist_id: str, db: Session = Depends(get_db), current_user: User = Depends(require_permission("research:write"))):
     """Remove page from blacklist"""
-    from app.models import PageBlacklist
 
     entry = db.query(PageBlacklist).filter(PageBlacklist.id == blacklist_id).first()
     if not entry:
@@ -149,7 +151,6 @@ def remove_from_blacklist(blacklist_id: str, db: Session = Depends(get_db), curr
 @router.get("/keyword-blacklist")
 def get_keyword_blacklist(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     """Get all blacklisted keywords"""
-    from app.models import KeywordBlacklist
     keywords = db.query(KeywordBlacklist).order_by(KeywordBlacklist.created_at.desc()).all()
     return [
         {
@@ -164,7 +165,6 @@ def get_keyword_blacklist(db: Session = Depends(get_db), current_user: User = De
 @router.post("/keyword-blacklist")
 def add_to_keyword_blacklist(keyword: str, reason: str = None, db: Session = Depends(get_db), current_user: User = Depends(require_permission("research:write"))):
     """Add keyword to blacklist"""
-    from app.models import KeywordBlacklist
 
     # Check if already blacklisted
     existing = db.query(KeywordBlacklist).filter(KeywordBlacklist.keyword == keyword.lower()).first()
@@ -186,7 +186,6 @@ def add_to_keyword_blacklist(keyword: str, reason: str = None, db: Session = Dep
 @router.delete("/keyword-blacklist/{blacklist_id}")
 def remove_from_keyword_blacklist(blacklist_id: str, db: Session = Depends(get_db), current_user: User = Depends(require_permission("research:write"))):
     """Remove keyword from blacklist"""
-    from app.models import KeywordBlacklist
 
     entry = db.query(KeywordBlacklist).filter(KeywordBlacklist.id == blacklist_id).first()
     if not entry:
@@ -210,14 +209,14 @@ def get_facebook_pages(
     current_user: User = Depends(get_current_active_user)
 ):
     """Get Facebook pages with ad counts (excludes blacklisted pages)"""
-    from app.models import FacebookPage, PageBlacklist
-    from sqlalchemy import desc
+    # Filter blacklisted pages at SQL level so pagination returns correct count
+    blacklisted_subq = db.query(func.lower(PageBlacklist.page_name)).subquery()
 
-    # Get blacklisted page names
-    blacklisted_pages = db.query(PageBlacklist.page_name).all()
-    blacklisted_names = {p.page_name.lower() for p in blacklisted_pages}
-
-    query = db.query(FacebookPage)
+    query = db.query(FacebookPage).filter(
+        func.lower(FacebookPage.page_name).notin_(
+            db.query(func.lower(PageBlacklist.page_name))
+        )
+    )
 
     # Sort
     if sort_by == "total_ads":
@@ -229,14 +228,7 @@ def get_facebook_pages(
 
     pages = query.offset(offset).limit(limit).all()
 
-    # Filter out blacklisted pages
-    filtered_pages = [
-        p for p in pages
-        if p.page_name.lower() not in blacklisted_names
-    ]
-
     # Get vertical names for display
-    from app.models import Vertical
     vertical_map = {v.id: v.name for v in db.query(Vertical).all()}
 
     return [
@@ -250,13 +242,12 @@ def get_facebook_pages(
             "first_seen": p.first_seen.isoformat() if p.first_seen else None,
             "last_seen": p.last_seen.isoformat() if p.last_seen else None,
         }
-        for p in filtered_pages
+        for p in pages
     ]
 
 @router.get("/verticals")
 def get_verticals(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     """Get all verticals"""
-    from app.models import Vertical
     verticals = db.query(Vertical).order_by(Vertical.name).all()
     return [
         {
@@ -271,7 +262,7 @@ def get_verticals(db: Session = Depends(get_db), current_user: User = Depends(ge
 @router.post("/run-scheduled-searches")
 async def run_scheduled_searches(db: Session = Depends(get_db), current_user: User = Depends(require_permission("research:admin"))):
     """Manually trigger scheduled searches (called by cron job)"""
-    from app.services.scheduler_service import SchedulerService
+    from app.services.scheduler_service import SchedulerService  # deferred: circular import avoidance
 
     scheduler = SchedulerService(db)
     await scheduler.run_scheduled_searches()
@@ -281,7 +272,6 @@ async def run_scheduled_searches(db: Session = Depends(get_db), current_user: Us
 @router.post("/verticals")
 def create_vertical(name: str, description: str = None, db: Session = Depends(get_db), current_user: User = Depends(require_permission("research:write"))):
     """Create a new vertical"""
-    from app.models import Vertical
 
     # Check if exists
     existing = db.query(Vertical).filter(Vertical.name == name).first()
@@ -304,8 +294,6 @@ def create_vertical(name: str, description: str = None, db: Session = Depends(ge
 def get_vertical_aggregated_ads(vertical_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     """Get all unique ads for a vertical, grouped by Facebook page with media type counts (excluding blacklisted pages)"""
     try:
-        from app.models import ScrapedAd, SavedSearch, FacebookPage, PageBlacklist
-        from sqlalchemy import func, distinct, case
 
         # Get all searches for this vertical
         searches = db.query(SavedSearch).filter(SavedSearch.vertical_id == vertical_id).all()
@@ -318,10 +306,8 @@ def get_vertical_aggregated_ads(vertical_id: str, db: Session = Depends(get_db),
         blacklisted_pages = db.query(PageBlacklist.page_name).all()
         blacklisted_names = {p.page_name.lower() for p in blacklisted_pages}
 
-        # Get all unique ads for these searches, grouped by page
-        # Use COALESCE to fall back to ID when content_hash is NULL
-        from sqlalchemy import func as sqlfunc
-        unique_key = func.coalesce(ScrapedAd.content_hash, ScrapedAd.id)
+        # Prefer the external ad identity, then content hash for legacy rows, then row ID.
+        unique_key = func.coalesce(ScrapedAd.external_id, ScrapedAd.content_hash, ScrapedAd.id)
 
         ads_by_page = db.query(
             FacebookPage.page_name,
@@ -354,17 +340,13 @@ def get_vertical_aggregated_ads(vertical_id: str, db: Session = Depends(get_db),
             if row.page_name.lower() not in blacklisted_names
         ]
     except Exception as e:
-        import traceback
-        print(f"Error in get_vertical_aggregated_ads: {str(e)}")
-        print(traceback.format_exc())
+        logger.exception("Error in get_vertical_aggregated_ads")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/verticals/{vertical_id}/pages/{page_id}/ads")
 def get_vertical_page_ads(vertical_id: str, page_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     """Get unique ads for a specific Facebook page within a vertical"""
     try:
-        from app.models import ScrapedAd, SavedSearch, FacebookPage
-        from sqlalchemy import func, distinct
 
         # Get all searches for this vertical
         searches = db.query(SavedSearch).filter(SavedSearch.vertical_id == vertical_id).all()
@@ -373,14 +355,8 @@ def get_vertical_page_ads(vertical_id: str, page_id: str, db: Session = Depends(
         if not search_ids:
             return []
 
-        # Get unique ads for this page (deduplicated by content_hash or ID)
-        # Use a subquery to get one ad per unique key (content_hash if available, else ID)
-        from sqlalchemy.orm import aliased
-        from sqlalchemy import tuple_
-
-        # For old ads without content_hash, each ad is unique
-        # For new ads with content_hash, deduplicate by hash
-        unique_key = func.coalesce(ScrapedAd.content_hash, ScrapedAd.id)
+        # Prefer the external ad identity, then content hash for legacy rows, then row ID.
+        unique_key = func.coalesce(ScrapedAd.external_id, ScrapedAd.content_hash, ScrapedAd.id)
 
         subq = db.query(
             unique_key.label('unique_key'),
@@ -412,9 +388,7 @@ def get_vertical_page_ads(vertical_id: str, page_id: str, db: Session = Depends(
             for ad in ads
         ]
     except Exception as e:
-        import traceback
-        print(f"Error in get_vertical_page_ads: {str(e)}")
-        print(traceback.format_exc())
+        logger.exception("Error in get_vertical_page_ads")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -428,7 +402,6 @@ async def create_brand_scrape(
     current_user: User = Depends(get_current_active_user)
 ):
     """Create a new brand scrape and start scraping in background."""
-    from app.models import BrandScrape
     from app.services.brand_scraper import BrandScraperService, parse_page_id_from_url, parse_search_query_from_url
 
     # Parse page ID or search query from URL
@@ -454,7 +427,6 @@ async def create_brand_scrape(
 
     # Start scraping in background
     async def run_scrape():
-        from app.database import SessionLocal
         scrape_db = SessionLocal()
         try:
             scraper = BrandScraperService(scrape_db)
@@ -462,12 +434,16 @@ async def create_brand_scrape(
             if scrape_record:
                 await scraper.scrape_brand(scrape_record)
         except Exception as e:
-            print(f"Background scrape error: {e}")
-            scrape_record = scrape_db.query(BrandScrape).filter(BrandScrape.id == brand_scrape.id).first()
-            if scrape_record:
-                scrape_record.status = "failed"
-                scrape_record.error_message = str(e)[:500]
-                scrape_db.commit()
+            logger.exception("Background scrape error")
+            scrape_db.rollback()  # Clear any broken transaction state
+            try:
+                scrape_record = scrape_db.query(BrandScrape).filter(BrandScrape.id == brand_scrape.id).first()
+                if scrape_record:
+                    scrape_record.status = "failed"
+                    scrape_record.error_message = str(e)[:500]
+                    scrape_db.commit()
+            except Exception:
+                logger.exception("Failed to update scrape status after error")
         finally:
             scrape_db.close()
 
@@ -479,7 +455,6 @@ async def create_brand_scrape(
 @router.get("/brand-scrapes", response_model=List[BrandScrapeListResponse])
 def get_brand_scrapes(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     """Get all brand scrapes."""
-    from app.models import BrandScrape
 
     scrapes = db.query(BrandScrape).order_by(BrandScrape.created_at.desc()).all()
     return scrapes
@@ -488,7 +463,6 @@ def get_brand_scrapes(db: Session = Depends(get_db), current_user: User = Depend
 @router.get("/brand-scrapes/{scrape_id}", response_model=BrandScrapeResponse)
 def get_brand_scrape(scrape_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     """Get a single brand scrape with all its ads."""
-    from app.models import BrandScrape
 
     scrape = db.query(BrandScrape).filter(BrandScrape.id == scrape_id).first()
     if not scrape:
@@ -500,7 +474,6 @@ def get_brand_scrape(scrape_id: str, db: Session = Depends(get_db), current_user
 @router.delete("/brand-scrapes/{scrape_id}")
 async def delete_brand_scrape(scrape_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     """Delete a brand scrape and its media from R2."""
-    from app.models import BrandScrape
     from app.services.brand_scraper import BrandScraperService
 
     scrape = db.query(BrandScrape).filter(BrandScrape.id == scrape_id).first()

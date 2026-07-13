@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Grid3X3, Video, FileSpreadsheet } from 'lucide-react';
 import { useBrands } from '../context/BrandContext';
 import ModularBlocksBoard from '../components/ModularBlocksBoard';
@@ -8,7 +8,7 @@ import { useToast } from '../context/ToastContext';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 export default function ModularAds() {
-    const { brands } = useBrands();
+    const { activeBrand } = useBrands();
     const { authFetch } = useAuth();
     const { showError, showSuccess } = useToast();
     
@@ -19,8 +19,7 @@ export default function ModularAds() {
     const [avatarType, setAvatarType] = useState('');
     const [personas, setPersonas] = useState([]);
 
-    const activeBrand = brands[0] || null;
-    const availableProducts = activeBrand?.products || [];
+    const availableProducts = useMemo(() => activeBrand?.products || [], [activeBrand]);
     const activeProduct = availableProducts.find(p => p.id === selectedProduct);
 
     // Auto-select first product when brand loads

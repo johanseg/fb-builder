@@ -7,6 +7,56 @@ def init_db():
     Base.metadata.create_all(bind=engine)
     print("Tables created successfully!")
 
+def ensure_schema_columns():
+    """Add columns that create_all cannot add to existing Railway tables."""
+    from sqlalchemy import inspect, text
+
+    db = SessionLocal()
+    try:
+        inspector = inspect(db.bind)
+        tables = set(inspector.get_table_names())
+
+        if "generated_ads" in tables:
+            generated_ad_columns = {c["name"] for c in inspector.get_columns("generated_ads")}
+            if "bundle_code" not in generated_ad_columns:
+                db.execute(text("ALTER TABLE generated_ads ADD COLUMN bundle_code VARCHAR"))
+                print("  Added missing column: generated_ads.bundle_code")
+            if "parent_ad_id" not in generated_ad_columns:
+                db.execute(text("ALTER TABLE generated_ads ADD COLUMN parent_ad_id VARCHAR"))
+                print("  Added missing column: generated_ads.parent_ad_id")
+
+            db.execute(text("CREATE INDEX IF NOT EXISTS ix_generated_ads_bundle_code ON generated_ads (bundle_code)"))
+            db.execute(text("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_constraint
+                        WHERE conname = 'fk_generated_ads_parent_ad_id'
+                    ) THEN
+                        ALTER TABLE generated_ads
+                        ADD CONSTRAINT fk_generated_ads_parent_ad_id
+                        FOREIGN KEY (parent_ad_id)
+                        REFERENCES generated_ads(id)
+                        ON DELETE SET NULL;
+                    END IF;
+                END $$;
+            """))
+
+        if "brands" in tables:
+            brand_columns = {c["name"] for c in inspector.get_columns("brands")}
+            if "break_even_roas" not in brand_columns:
+                db.execute(text("ALTER TABLE brands ADD COLUMN break_even_roas DOUBLE PRECISION"))
+                print("  Added missing column: brands.break_even_roas")
+
+        db.commit()
+        print("Schema columns verified successfully!")
+    except Exception as e:
+        db.rollback()
+        print(f"Error verifying schema columns: {e}")
+        raise
+    finally:
+        db.close()
+
 def seed_roles_and_permissions():
     """Seed default roles and permissions"""
     db = SessionLocal()
@@ -304,6 +354,9 @@ def backfill_product_brief():
 
 if __name__ == "__main__":
     init_db()
+    print("\nVerifying schema columns...")
+    ensure_schema_columns()
+
     print("\nSeeding roles and permissions...")
     seed_roles_and_permissions()
 

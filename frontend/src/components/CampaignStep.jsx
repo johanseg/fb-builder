@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ChevronRight, ChevronLeft, Check, Loader, Plus } from 'lucide-react';
 import { useCampaign } from '../context/CampaignContext';
 import { useToast } from '../context/ToastContext';
-import { getCampaigns, createFacebookCampaign } from '../lib/facebookApi';
+import { getCampaigns } from '../lib/facebookApi';
 
 const CAMPAIGN_OBJECTIVES = [
     { value: 'OUTCOME_SALES', label: 'Sales - Drive purchases and conversions' },
@@ -20,22 +20,14 @@ const BID_STRATEGIES = [
 ];
 
 const CampaignStep = ({ onNext, onBack }) => {
-    const { campaignData, setCampaignData, selectedAdAccount, setSelectedAdAccount } = useCampaign();
+    const { campaignData, setCampaignData, selectedAdAccount } = useCampaign();
     const { showError, showWarning } = useToast();
     const [mode, setMode] = useState('new'); // 'new' or 'existing'
     const [existingCampaigns, setExistingCampaigns] = useState([]);
     const [selectedCampaign, setSelectedCampaign] = useState(null);
-    const [loading, setLoading] = useState(false);
     const [loadingCampaigns, setLoadingCampaigns] = useState(false);
 
-    useEffect(() => {
-        // Fetch campaigns when switching to existing mode
-        if (mode === 'existing' && selectedAdAccount) {
-            fetchExistingCampaigns();
-        }
-    }, [mode, selectedAdAccount]);
-
-    const fetchExistingCampaigns = async () => {
+    const fetchExistingCampaigns = useCallback(async () => {
         if (!selectedAdAccount) return;
 
         setLoadingCampaigns(true);
@@ -48,7 +40,14 @@ const CampaignStep = ({ onNext, onBack }) => {
         } finally {
             setLoadingCampaigns(false);
         }
-    };
+    }, [selectedAdAccount, showError]);
+
+    useEffect(() => {
+        // Fetch campaigns when switching to existing mode
+        if (mode === 'existing' && selectedAdAccount) {
+            fetchExistingCampaigns();
+        }
+    }, [mode, selectedAdAccount, fetchExistingCampaigns]);
 
     const handleSelectExisting = (campaign) => {
         setSelectedCampaign(campaign);
@@ -351,10 +350,10 @@ const CampaignStep = ({ onNext, onBack }) => {
                 )}
                 <button
                     onClick={handleNext}
-                    disabled={loading}
+                    disabled={loadingCampaigns}
                     className="ml-auto flex items-center gap-2 px-6 py-3 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
                 >
-                    {loading ? 'Saving...' : 'Next Step'} <ChevronRight size={20} />
+                    {loadingCampaigns ? 'Loading...' : 'Next Step'} <ChevronRight size={20} />
                 </button>
             </div>
         </div>
