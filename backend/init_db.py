@@ -48,6 +48,17 @@ def ensure_schema_columns():
                 db.execute(text("ALTER TABLE brands ADD COLUMN break_even_roas DOUBLE PRECISION"))
                 print("  Added missing column: brands.break_even_roas")
 
+        # Multi-account launch: attribute FB entities to the ad account they were pushed to
+        for fb_table in ("facebook_campaigns", "facebook_adsets", "facebook_ads"):
+            if fb_table in tables:
+                fb_columns = {c["name"] for c in inspector.get_columns(fb_table)}
+                if "ad_account_id" not in fb_columns:
+                    db.execute(text(f"ALTER TABLE {fb_table} ADD COLUMN ad_account_id VARCHAR"))
+                    print(f"  Added missing column: {fb_table}.ad_account_id")
+                db.execute(text(
+                    f"CREATE INDEX IF NOT EXISTS ix_{fb_table}_ad_account_id ON {fb_table} (ad_account_id)"
+                ))
+
         db.commit()
         print("Schema columns verified successfully!")
     except Exception as e:

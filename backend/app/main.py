@@ -65,6 +65,19 @@ async def lifespan(app_instance: FastAPI):
                 logger.info("Purged %s expired refresh tokens on startup", deleted_count)
     except Exception:
         logger.exception("Failed to purge expired refresh tokens during startup")
+
+    # Launch jobs run in-process; anything still pending/running died with the last deploy.
+    try:
+        with SessionLocal() as db:
+            reaped = db.execute(text(
+                "UPDATE launch_jobs SET status = 'failed', error = 'server restarted' "
+                "WHERE status IN ('pending', 'running')"
+            ))
+            db.commit()
+            if reaped.rowcount:
+                logger.warning("Marked %s orphaned launch jobs as failed", reaped.rowcount)
+    except Exception:
+        logger.exception("Failed to reap orphaned launch jobs during startup")
     yield
 
 

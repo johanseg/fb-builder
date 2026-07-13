@@ -171,6 +171,7 @@ class FacebookCampaign(Base):
     bid_strategy = Column(String, nullable=True)
     status = Column(String, default='PAUSED')
     fb_campaign_id = Column(String, nullable=True)
+    ad_account_id = Column(String, nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -191,6 +192,7 @@ class FacebookAdSet(Base):
     conversion_event = Column(String, nullable=True)
     status = Column(String, default='PAUSED')
     fb_adset_id = Column(String, nullable=True)
+    ad_account_id = Column(String, nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     campaign = relationship("FacebookCampaign", back_populates="adsets")
@@ -217,9 +219,37 @@ class FacebookAd(Base):
     status = Column(String, default='PAUSED')
     fb_ad_id = Column(String, nullable=True)
     fb_creative_id = Column(String, nullable=True)
+    ad_account_id = Column(String, nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     adset = relationship("FacebookAdSet", back_populates="ads")
+
+class LaunchJob(Base):
+    """Background multi-account creative launch job, polled by the frontend."""
+    __tablename__ = "launch_jobs"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    # pending | running | completed | completed_with_errors | failed
+    status = Column(String, default='pending', index=True)
+    payload = Column(JSON, nullable=False)
+    results = Column(JSON, nullable=True)
+    total_steps = Column(Integer, default=0)
+    completed_steps = Column(Integer, default=0)
+    failed_steps = Column(Integer, default=0)
+    error = Column(Text, nullable=True)
+    created_by = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+class CampaignTemplate(Base):
+    """Reusable campaign+adset configuration for fast launches."""
+    __tablename__ = "campaign_templates"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    name = Column(String, nullable=False, unique=True)
+    config = Column(JSON, nullable=False)
+    created_by = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class WinningAd(Base):
     __tablename__ = "winning_ads"

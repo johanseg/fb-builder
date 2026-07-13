@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ChevronRight, ChevronLeft, Check, Loader, Plus } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Check, Loader, Plus, LayoutTemplate, Trash2 } from 'lucide-react';
 import { useCampaign } from '../context/CampaignContext';
 import { useToast } from '../context/ToastContext';
-import { getCampaigns } from '../lib/facebookApi';
+import { getCampaigns, getCampaignTemplates, deleteCampaignTemplate } from '../lib/facebookApi';
 
 const CAMPAIGN_OBJECTIVES = [
     { value: 'OUTCOME_SALES', label: 'Sales - Drive purchases and conversions' },
@@ -20,9 +20,44 @@ const BID_STRATEGIES = [
 ];
 
 const CampaignStep = ({ onNext, onBack }) => {
-    const { campaignData, setCampaignData, selectedAdAccount } = useCampaign();
-    const { showError, showWarning } = useToast();
+    const { campaignData, setCampaignData, setAdsetData, setCreativeData, selectedAdAccount } = useCampaign();
+    const { showError, showWarning, showSuccess } = useToast();
     const [mode, setMode] = useState('new'); // 'new' or 'existing'
+    const [templates, setTemplates] = useState([]);
+
+    useEffect(() => {
+        getCampaignTemplates()
+            .then(setTemplates)
+            .catch(err => console.error('Error loading templates:', err));
+    }, []);
+
+    const applyTemplate = (template) => {
+        const config = template.config || {};
+        if (config.campaign) {
+            setCampaignData(prev => ({ ...prev, ...config.campaign, id: null, fbCampaignId: null, isExisting: false }));
+        }
+        if (config.adset) {
+            setAdsetData(prev => ({ ...prev, ...config.adset, id: null, fbAdsetId: null, isExisting: false }));
+        }
+        setCreativeData(prev => ({
+            ...prev,
+            ...(config.description != null ? { description: config.description } : {}),
+            ...(config.cta ? { cta: config.cta } : {}),
+            ...(config.website_url ? { websiteUrl: config.website_url } : {}),
+        }));
+        setMode('new');
+        showSuccess(`Template "${template.name}" applied`);
+    };
+
+    const handleDeleteTemplate = async (template, e) => {
+        e.stopPropagation();
+        try {
+            await deleteCampaignTemplate(template.id);
+            setTemplates(prev => prev.filter(t => t.id !== template.id));
+        } catch (err) {
+            showError(`Failed to delete template: ${err.message}`);
+        }
+    };
     const [existingCampaigns, setExistingCampaigns] = useState([]);
     const [selectedCampaign, setSelectedCampaign] = useState(null);
     const [loadingCampaigns, setLoadingCampaigns] = useState(false);
@@ -120,6 +155,31 @@ const CampaignStep = ({ onNext, onBack }) => {
     return (
         <div>
             <h2 className="text-2xl font-bold mb-6">Campaign Setup</h2>
+
+            {/* Templates */}
+            {templates.length > 0 && (
+                <div className="mb-6">
+                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
+                        <LayoutTemplate size={16} /> Start from a template
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {templates.map(template => (
+                            <button
+                                key={template.id}
+                                onClick={() => applyTemplate(template)}
+                                className="group flex items-center gap-2 px-3 py-1.5 bg-secondary border border-border rounded-full text-sm text-foreground hover:border-amber-500 hover:bg-amber-50 transition-colors"
+                            >
+                                {template.name}
+                                <Trash2
+                                    size={13}
+                                    className="text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-red-500"
+                                    onClick={(e) => handleDeleteTemplate(template, e)}
+                                />
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* Mode Toggle */}
             <div className="flex gap-4 mb-6">

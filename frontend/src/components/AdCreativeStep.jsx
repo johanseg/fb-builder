@@ -1,8 +1,9 @@
 import { useToast } from '../context/ToastContext';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ChevronRight, Upload, X, Loader, Trash2, Film, Image } from 'lucide-react';
+import { ChevronRight, Upload, X, Loader, Trash2, Film, Image, FolderOpen } from 'lucide-react';
 import { useCampaign } from '../context/CampaignContext';
 import { getPages } from '../lib/facebookApi';
+import CreativeLibraryModal from './CreativeLibraryModal';
 
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
 const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm'];
@@ -28,6 +29,45 @@ const AdCreativeStep = ({ onNext, onBack }) => {
 
     const [manualPageEntry, setManualPageEntry] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
+    const [libraryOpen, setLibraryOpen] = useState(false);
+
+    // Add GeneratedAd library picks as creative slots (no file — remote URLs pass straight through)
+    const handleLibrarySelect = (selectedAds, { importCopy }) => {
+        const newCreatives = selectedAds.map(ad => {
+            const isVideo = ad.media_type === 'video';
+            return {
+                id: `lib_${ad.id}`,
+                file: null,
+                previewUrl: isVideo ? (ad.thumbnail_url || ad.video_url) : ad.image_url,
+                imageUrl: isVideo ? undefined : ad.image_url,
+                videoUrl: isVideo ? ad.video_url : undefined,
+                thumbnailUrl: ad.thumbnail_url || undefined,
+                name: ad.headline || `Library creative ${ad.id.slice(0, 8)}`,
+                mediaType: isVideo ? 'video' : 'image'
+            };
+        });
+
+        setCreativeData(prev => {
+            const existingIds = new Set((prev.creatives || []).map(c => c.id));
+            const additions = newCreatives.filter(c => !existingIds.has(c.id));
+            let headlines = prev.headlines;
+            let bodies = prev.bodies;
+            if (importCopy) {
+                const newHeadlines = selectedAds.map(ad => ad.headline).filter(h => h && !prev.headlines.includes(h));
+                const newBodies = selectedAds.map(ad => ad.body).filter(b => b && !prev.bodies.includes(b));
+                headlines = [...prev.headlines.filter(h => h.trim()), ...newHeadlines].slice(0, 3);
+                bodies = [...prev.bodies.filter(b => b.trim()), ...newBodies].slice(0, 3);
+                if (headlines.length === 0) headlines = [''];
+                if (bodies.length === 0) bodies = [''];
+            }
+            return {
+                ...prev,
+                creatives: [...(prev.creatives || []), ...additions],
+                headlines,
+                bodies
+            };
+        });
+    };
 
     const handleDragEnter = (e) => {
         e.preventDefault();
@@ -448,9 +488,18 @@ const AdCreativeStep = ({ onNext, onBack }) => {
 
                 {/* Media Upload (Images + Videos) */}
                 <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                        Ad Media (Images or Videos) *
-                    </label>
+                    <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium text-foreground">
+                            Ad Media (Images or Videos) *
+                        </label>
+                        <button
+                            type="button"
+                            onClick={() => setLibraryOpen(true)}
+                            className="flex items-center gap-1.5 text-sm text-amber-600 hover:text-amber-700 font-medium"
+                        >
+                            <FolderOpen size={16} /> From Library
+                        </button>
+                    </div>
 
                     {/* Upload Area */}
                     <div
@@ -729,6 +778,13 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                     />
                 </div>
             </div>
+
+            {libraryOpen && (
+                <CreativeLibraryModal
+                    onClose={() => setLibraryOpen(false)}
+                    onSelect={handleLibrarySelect}
+                />
+            )}
 
             {/* Navigation */}
             <div className="mt-8 flex justify-between">

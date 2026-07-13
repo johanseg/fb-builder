@@ -626,6 +626,39 @@ class FacebookService:
 
         return account.create_ad(params=params)
 
+    def get_account_insights(self, ad_account_id=None, date_preset='last_7d'):
+        """Fetch account-level performance insights (spend, clicks, purchases, ROAS)."""
+        account = self._get_account(ad_account_id)
+
+        insights = account.get_insights(
+            fields=['spend', 'impressions', 'clicks', 'cpm', 'ctr', 'actions', 'purchase_roas'],
+            params={'date_preset': date_preset, 'level': 'account'},
+        )
+        if not insights:
+            return {'spend': 0, 'impressions': 0, 'clicks': 0, 'cpm': 0, 'ctr': 0, 'purchases': 0, 'roas': 0}
+
+        row = dict(insights[0])
+        purchases = 0
+        for action in row.get('actions') or []:
+            if action.get('action_type') == 'purchase':
+                purchases = int(float(action.get('value', 0)))
+                break
+        roas = 0
+        for entry in row.get('purchase_roas') or []:
+            if entry.get('action_type') == 'omni_purchase':
+                roas = float(entry.get('value', 0))
+                break
+
+        return {
+            'spend': float(row.get('spend', 0)),
+            'impressions': int(row.get('impressions', 0)),
+            'clicks': int(row.get('clicks', 0)),
+            'cpm': float(row.get('cpm', 0)),
+            'ctr': float(row.get('ctr', 0)),
+            'purchases': purchases,
+            'roas': roas,
+        }
+
     def search_locations(self, query, location_type='city', limit=10, ad_account_id=None):
         """Search for targeting locations."""
         account = self._get_account(ad_account_id)

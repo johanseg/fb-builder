@@ -1,12 +1,12 @@
 import { useToast } from '../context/ToastContext';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ChevronRight, Loader, Building2, CreditCard, TrendingUp, Calendar, DollarSign, AlertCircle } from 'lucide-react';
+import { ChevronRight, Loader, Building2, CreditCard, TrendingUp, Calendar, DollarSign, AlertCircle, CheckSquare, Square } from 'lucide-react';
 import { useCampaign } from '../context/CampaignContext';
 import { getAdAccounts } from '../lib/facebookApi';
 
 const AdAccountStep = ({ onNext }) => {
     const { showWarning } = useToast();
-    const { selectedAdAccount, setSelectedAdAccount } = useCampaign();
+    const { selectedAdAccount, setSelectedAdAccount, extraAdAccounts, setExtraAdAccounts } = useCampaign();
     const [adAccounts, setAdAccounts] = useState([]);
     const [loadingAccounts, setLoadingAccounts] = useState(true);
     const [accountsError, setAccountsError] = useState(null);
@@ -57,10 +57,20 @@ const AdAccountStep = ({ onNext }) => {
         setSelectedAdAccount(account);
         setSearchQuery(account.name);
         setShowDropdown(false);
+        // The primary account can't also be an extra
+        setExtraAdAccounts(prev => prev.filter(a => a.id !== account.id));
         // Save to localStorage for next time
         if (account) {
             localStorage.setItem('lastSelectedAdAccountId', account.id);
         }
+    };
+
+    const toggleExtraAccount = (account) => {
+        setExtraAdAccounts(prev =>
+            prev.some(a => a.id === account.id)
+                ? prev.filter(a => a.id !== account.id)
+                : [...prev, account]
+        );
     };
 
     const handleNext = () => {
@@ -193,6 +203,44 @@ const AdAccountStep = ({ onNext }) => {
                             </div>
                         )}
                     </div>
+                </div>
+            )}
+
+            {/* Multi-account launch: replicate into additional accounts */}
+            {selectedAdAccount && !showDropdown && adAccounts.length > 1 && (
+                <div className="mt-6 bg-card border border-border rounded-lg shadow-sm p-4">
+                    <h3 className="text-sm font-semibold text-foreground mb-1">
+                        Also launch to other accounts (optional)
+                    </h3>
+                    <p className="text-xs text-muted-foreground mb-3">
+                        The campaign, ad set and ads will be replicated into each selected account.
+                        Pages and pixels are loaded from the primary account — make sure the other
+                        accounts can use them.
+                    </p>
+                    <div className="max-h-48 overflow-y-auto space-y-1">
+                        {adAccounts.filter(a => a.id !== selectedAdAccount.id).map(account => {
+                            const isChecked = extraAdAccounts.some(a => a.id === account.id);
+                            return (
+                                <button
+                                    key={account.id}
+                                    type="button"
+                                    onClick={() => toggleExtraAccount(account)}
+                                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left hover:bg-amber-50 ${isChecked ? 'bg-amber-50' : ''}`}
+                                >
+                                    {isChecked
+                                        ? <CheckSquare className="text-amber-600 shrink-0" size={18} />
+                                        : <Square className="text-muted-foreground shrink-0" size={18} />}
+                                    <span className="text-sm text-foreground truncate">{account.name}</span>
+                                    <span className="text-xs text-muted-foreground ml-auto shrink-0">{account.accountId}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                    {extraAdAccounts.length > 0 && (
+                        <p className="text-xs text-amber-700 mt-3 font-medium">
+                            Launching to {extraAdAccounts.length + 1} accounts total
+                        </p>
+                    )}
                 </div>
             )}
 
