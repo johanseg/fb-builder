@@ -276,6 +276,35 @@ export async function getVideoThumbnails(videoId) {
 }
 
 /**
+ * Upload a local File/Blob (or blob: URL) to our server, returning its public URL.
+ * @param {File|Blob|string} fileOrBlobUrl
+ * @param {string} [filename]
+ * @returns {Promise<string>} public URL of the uploaded file
+ */
+export async function uploadBlobToServer(fileOrBlobUrl, filename = 'upload.jpg') {
+    let blob = fileOrBlobUrl;
+    if (typeof fileOrBlobUrl === 'string') {
+        const blobResponse = await fetch(fileOrBlobUrl);
+        blob = await blobResponse.blob();
+    }
+
+    const formData = new FormData();
+    formData.append('file', blob, blob.name || filename);
+
+    const uploadResponse = await authFetch((import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1') + '/uploads/', {
+        method: 'POST',
+        body: formData
+    });
+
+    if (!uploadResponse.ok) {
+        throw new Error('Failed to upload file to server');
+    }
+
+    const uploadResult = await uploadResponse.json();
+    return uploadResult.url;
+}
+
+/**
  * Upload image to Facebook
  */
 export async function uploadImageToFacebook(imageUrl, adAccountId) {
@@ -284,28 +313,7 @@ export async function uploadImageToFacebook(imageUrl, adAccountId) {
 
         // If it's a blob URL, we need to upload it to our server first
         if (imageUrl.startsWith('blob:')) {
-            // 1. Fetch the blob
-            const blobResponse = await fetch(imageUrl);
-            const blob = await blobResponse.blob();
-
-            // 2. Create FormData
-            const formData = new FormData();
-            // Use a default filename or try to guess extension
-            const filename = 'upload.jpg';
-            formData.append('file', blob, filename);
-
-            // 3. Upload to our backend
-            const uploadResponse = await authFetch((import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1') + '/uploads/', {
-                method: 'POST',
-                body: formData
-            });
-
-            if (!uploadResponse.ok) {
-                throw new Error('Failed to upload image to server');
-            }
-
-            const uploadResult = await uploadResponse.json();
-            finalImageUrl = uploadResult.url;
+            finalImageUrl = await uploadBlobToServer(imageUrl);
         }
 
         const response = await authFetch(`${API_BASE_URL}/upload-image?ad_account_id=${adAccountId}`, {
@@ -494,62 +502,99 @@ export async function searchLocations(query, type = 'city', adAccountId) {
 
 
 /**
- * Complete workflow: Upload media (image or video), create creative, and create ad
- * @param {string} campaignId - Campaign ID
- * @param {Object} adsetData - Ad set data with fbAdsetId
- * @param {Object} creativeData - Creative data with imageUrl or videoUrl
- * @param {Object} adData - Ad data
- * @param {string} pageId - Facebook page ID
- * @param {string} adAccountId - Facebook ad account ID
- * @param {string} budgetType - Budget type (CBO or ABO)
+ * Campaign templates: reusable campaign+adset configs
  */
-export async function createCompleteAd(campaignId, adsetData, creativeData, adData, pageId, adAccountId) {
-    try {
-        let imageHash = null;
-        let videoData = null;
-
-        // Determine if this is a video or image ad
-        const isVideo = creativeData.mediaType === 'video' ||
-                        (creativeData.videoUrl && !creativeData.imageUrl);
-
-        if (isVideo) {
-            // 1. Upload video
-            const videoResult = await uploadVideoToFacebook(
-                creativeData.videoUrl,
-                adAccountId,
-                true, // wait for ready
-                600   // 10 minute timeout
-            );
-
-            videoData = {
-                video_id: videoResult.video_id,
-                thumbnail_url: creativeData.thumbnailUrl || (videoResult.thumbnails && videoResult.thumbnails[0])
-            };
-        } else {
-            // 1. Upload image
-            imageHash = await uploadImageToFacebook(creativeData.imageUrl, adAccountId);
-        }
-
-        // 2. Create ad creative (supports both image and video)
-        const creativeId = await createFacebookCreative(
-            creativeData,
-            imageHash,
-            pageId,
-            adAccountId,
-            videoData
-        );
-
-        // 3. Create ad
-        const adId = await createFacebookAd(adData, adsetData.fbAdsetId, creativeId, adAccountId);
-
-        return {
-            imageHash,
-            videoId: videoData?.video_id || null,
-            creativeId,
-            adId
-        };
-    } catch (error) {
-        console.error('Error in complete ad creation:', error);
-        throw error;
+export async function getCampaignTemplates() {
+    const response = await authFetch(`${API_BASE_URL}/campaign-templates`);
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to fetch templates');
     }
+    return await response.json();
+}
+
+export async function saveCampaignTemplate(name, config) {
+    const response = await authFetch(`${API_BASE_URL}/campaign-templates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, config })
+    });
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to save template');
+    }
+    return await response.json();
+}
+
+export async function deleteCampaignTemplate(templateId) {
+    const response = await authFetch(`${API_BASE_URL}/campaign-templates/${templateId}`, { method: 'DELETE' });
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to delete template');
+    }
+    return await response.json();
+}
+
+/**
+ * Build the launch job payload from wizard state. Pure — unit tested.
+ * @returns {Object} payload for POST /facebook/launches
+ */
+export function buildLaunchPayload({ campaignData, adsetData, creativeData, accounts, sourceAccountId, launchStatus, creatives }) {
+    return {
+        ad_account_ids: accounts,
+        launch_status: launchStatus,
+        source_account_id: sourceAccountId,
+        campaign: {
+            ...campaignData,
+            dailyBudget: campaignData.dailyBudget ? Number(campaignData.dailyBudget) : null,
+        },
+        adset: {
+            ...adsetData,
+            dailyBudget: adsetData.dailyBudget ? Number(adsetData.dailyBudget) : null,
+            bidAmount: adsetData.bidAmount ? Number(adsetData.bidAmount) : null,
+            startTime: adsetData.startTime ? new Date(adsetData.startTime).toISOString() : null,
+        },
+        page_id: creativeData.pageId,
+        instagram_id: creativeData.instagramId || null,
+        creative_name: creativeData.creativeName,
+        creatives,
+        headlines: creativeData.headlines.filter(h => h && h.trim() !== ''),
+        bodies: creativeData.bodies.filter(b => b && b.trim() !== ''),
+        description: creativeData.description || null,
+        cta: creativeData.cta || 'LEARN_MORE',
+        website_url: creativeData.websiteUrl,
+    };
+}
+
+/**
+ * Queue a background multi-account launch job.
+ * @param {Object} payload - Launch spec (ad_account_ids, campaign, adset, creatives, ...)
+ * @returns {Promise<string>} job id
+ */
+export async function createLaunch(payload) {
+    const response = await authFetch(`${API_BASE_URL}/launches`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to queue launch');
+    }
+    const data = await response.json();
+    return data.job_id;
+}
+
+/**
+ * Get the status of a launch job.
+ * @param {string} jobId
+ * @returns {Promise<Object>} job status with progress counters and per-entity results
+ */
+export async function getLaunch(jobId) {
+    const response = await authFetch(`${API_BASE_URL}/launches/${jobId}`);
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to fetch launch status');
+    }
+    return await response.json();
 }

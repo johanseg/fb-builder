@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from typing import Dict, Any, Optional, List
 import logging
 from pydantic import BaseModel, ConfigDict, Field
 from app.core.api_errors import log_and_raise_http_error
 from app.services.facebook_service import FacebookService
-from app.models import FacebookAd, FacebookAdSet, FacebookCampaign, User
+from app.models import CampaignTemplate, FacebookAd, FacebookAdSet, FacebookCampaign, LaunchJob, User
 from app.database import get_db
 from app.core.deps import get_current_active_user, require_permission
 from sqlalchemy.orm import Session
@@ -110,6 +110,36 @@ class AdSaveRequest(BaseModel):
     status: Optional[str] = None
     fbAdId: Optional[str] = None
     fbCreativeId: Optional[str] = None
+
+
+class LaunchCreative(BaseModel):
+    image_url: Optional[str] = None
+    video_url: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    media_type: Optional[str] = "image"
+    name: Optional[str] = None
+
+
+class LaunchCreateRequest(BaseModel):
+    ad_account_ids: List[str]
+    launch_status: Optional[str] = "PAUSED"
+    campaign: dict
+    adset: dict
+    source_account_id: Optional[str] = None
+    page_id: str
+    instagram_id: Optional[str] = None
+    creative_name: Optional[str] = None
+    creatives: List[LaunchCreative]
+    headlines: List[str]
+    bodies: List[str]
+    description: Optional[str] = None
+    cta: Optional[str] = "LEARN_MORE"
+    website_url: Optional[str] = None
+
+
+class CampaignTemplateCreateRequest(BaseModel):
+    name: str
+    config: dict
 
 
 class ImageUploadRequest(BaseModel):
@@ -462,6 +492,182 @@ def get_video_thumbnails(
         return {"thumbnails": thumbnails}
     except Exception as e:
         log_and_raise_http_error(logger, "Failed to fetch video thumbnails", e, expose_detail=True)
+
+# --- Cross-account insights overview ---
+
+# ponytail: in-process TTL cache; move to DB/Redis if this ever runs multi-instance
+_insights_cache: Dict[str, Any] = {}
+INSIGHTS_CACHE_TTL_SECONDS = 300
+VALID_DATE_PRESETS = {"today", "yesterday", "last_7d", "last_14d", "last_30d", "this_month", "last_month"}
+
+
+@router.get("/insights/overview")
+def get_insights_overview(
+    date_preset: str = "last_7d",
+    service: FacebookService = Depends(get_facebook_service),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Spend/KPIs for every accessible ad account — one row per account."""
+    import time as _time
+
+    if date_preset not in VALID_DATE_PRESETS:
+        raise HTTPException(status_code=422, detail=f"date_preset must be one of {sorted(VALID_DATE_PRESETS)}")
+
+    cached = _insights_cache.get(date_preset)
+    if cached and _time.time() - cached[0] < INSIGHTS_CACHE_TTL_SECONDS:
+        return cached[1]
+
+    try:
+        accounts = service.get_ad_accounts()
+    except Exception as e:
+        log_and_raise_http_error(logger, "Failed to fetch ad accounts for insights", e, expose_detail=True)
+
+    rows = []
+    for account in accounts:
+        row = {
+            "account_id": account.get("id"),
+            "account_name": account.get("name"),
+            "currency": account.get("currency"),
+        }
+        try:
+            row.update(service.get_account_insights(account.get("id"), date_preset))
+        except Exception as e:
+            logger.warning("Insights failed for %s: %s", account.get("id"), e)
+            row["error"] = str(e)
+        rows.append(row)
+
+    _insights_cache[date_preset] = (_time.time(), rows)
+    return rows
+
+
+# --- Multi-account launch jobs ---
+
+def _job_to_dict(job: LaunchJob) -> dict:
+    return {
+        "id": job.id,
+        "status": job.status,
+        "total_steps": job.total_steps,
+        "completed_steps": job.completed_steps,
+        "failed_steps": job.failed_steps,
+        "results": job.results or [],
+        "error": job.error,
+        "ad_account_ids": (job.payload or {}).get("ad_account_ids", []),
+        "launch_status": (job.payload or {}).get("launch_status"),
+        "campaign_name": ((job.payload or {}).get("campaign") or {}).get("name"),
+        "created_at": job.created_at.isoformat() if job.created_at else None,
+        "updated_at": job.updated_at.isoformat() if job.updated_at else None,
+    }
+
+
+@router.post("/launches")
+def create_launch(
+    launch: LaunchCreateRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("campaigns:write")),
+):
+    """Queue a background launch of creatives into one or more ad accounts."""
+    from app.services.launch_service import count_total_steps, run_launch_job
+
+    if not launch.ad_account_ids:
+        raise HTTPException(status_code=422, detail="Select at least one ad account")
+    if not launch.creatives:
+        raise HTTPException(status_code=422, detail="Add at least one creative")
+    if launch.launch_status not in ("ACTIVE", "PAUSED"):
+        raise HTTPException(status_code=422, detail="launch_status must be ACTIVE or PAUSED")
+    payload = launch.model_dump()
+    if count_total_steps(payload) == 0:
+        raise HTTPException(status_code=422, detail="Nothing to launch: need creatives, headlines and bodies")
+
+    try:
+        job = LaunchJob(payload=payload, created_by=current_user.id)
+        db.add(job)
+        db.commit()
+        db.refresh(job)
+        background_tasks.add_task(run_launch_job, job.id)
+        return {"job_id": job.id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        log_and_raise_http_error(logger, "Failed to queue launch", e, expose_detail=True)
+
+
+@router.get("/launches")
+def list_launches(
+    limit: int = 20,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    jobs = db.query(LaunchJob).order_by(LaunchJob.created_at.desc()).limit(min(limit, 100)).all()
+    return [_job_to_dict(j) for j in jobs]
+
+
+@router.get("/launches/{job_id}")
+def get_launch(
+    job_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    job = db.query(LaunchJob).filter(LaunchJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Launch job not found")
+    return _job_to_dict(job)
+
+
+# --- Campaign templates ---
+
+@router.get("/campaign-templates")
+def list_campaign_templates(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    templates = db.query(CampaignTemplate).order_by(CampaignTemplate.created_at.desc()).all()
+    return [{
+        "id": t.id,
+        "name": t.name,
+        "config": t.config,
+        "created_at": t.created_at.isoformat() if t.created_at else None,
+    } for t in templates]
+
+
+@router.post("/campaign-templates")
+def create_campaign_template(
+    template: CampaignTemplateCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("campaigns:write")),
+):
+    try:
+        existing = db.query(CampaignTemplate).filter(CampaignTemplate.name == template.name).first()
+        if existing:
+            existing.config = template.config
+            db.commit()
+            return {"id": existing.id, "message": "Template updated"}
+        new_template = CampaignTemplate(
+            name=template.name, config=template.config, created_by=current_user.id
+        )
+        db.add(new_template)
+        db.commit()
+        db.refresh(new_template)
+        return {"id": new_template.id, "message": "Template saved"}
+    except Exception as e:
+        db.rollback()
+        log_and_raise_http_error(logger, "Failed to save campaign template", e, expose_detail=True)
+
+
+@router.delete("/campaign-templates/{template_id}")
+def delete_campaign_template(
+    template_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("campaigns:write")),
+):
+    template = db.query(CampaignTemplate).filter(CampaignTemplate.id == template_id).first()
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+    db.delete(template)
+    db.commit()
+    return {"message": "Template deleted"}
+
 
 @router.get("/locations/search")
 def search_locations(

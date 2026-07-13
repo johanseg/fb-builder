@@ -1,9 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { LayoutDashboard, Image, Video, Star, TrendingUp, Zap, Wand2, Package, ShoppingBag } from 'lucide-react';
+import { LayoutDashboard, Image, Video, Star, TrendingUp, Zap, Wand2, Package, ShoppingBag, Loader, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+
+const DATE_PRESETS = [
+    { value: 'today', label: 'Today' },
+    { value: 'yesterday', label: 'Yesterday' },
+    { value: 'last_7d', label: 'Last 7 days' },
+    { value: 'last_30d', label: 'Last 30 days' },
+];
+
+const formatMoney = (value) => `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const formatNumber = (value) => Number(value || 0).toLocaleString();
 
 export default function Dashboard() {
     const { authFetch } = useAuth();
@@ -30,6 +40,34 @@ export default function Dashboard() {
 
         fetchStats();
     }, [authFetch]);
+
+    // Cross-account performance overview. Result is keyed by preset so
+    // loading state is derived instead of set synchronously in the effect.
+    const [datePreset, setDatePreset] = useState('last_7d');
+    const [insightsResult, setInsightsResult] = useState(null); // { preset, rows, error }
+
+    useEffect(() => {
+        let cancelled = false;
+        authFetch(`${API_URL}/facebook/insights/overview?date_preset=${datePreset}`)
+            .then(res => {
+                if (!res.ok) return res.json().then(err => { throw new Error(err.detail || `Request failed (${res.status})`); });
+                return res.json();
+            })
+            .then(data => { if (!cancelled) setInsightsResult({ preset: datePreset, rows: Array.isArray(data) ? data : [] }); })
+            .catch(err => { if (!cancelled) setInsightsResult({ preset: datePreset, error: err.message }); });
+        return () => { cancelled = true; };
+    }, [authFetch, datePreset]);
+
+    const insightsLoading = !insightsResult || insightsResult.preset !== datePreset;
+    const insightsError = insightsResult?.error;
+    const insights = insightsResult?.rows || [];
+    const okRows = insights.filter(r => !r.error);
+    const totals = okRows.reduce((acc, r) => ({
+        spend: acc.spend + (r.spend || 0),
+        impressions: acc.impressions + (r.impressions || 0),
+        clicks: acc.clicks + (r.clicks || 0),
+        purchases: acc.purchases + (r.purchases || 0),
+    }), { spend: 0, impressions: 0, clicks: 0, purchases: 0 });
 
     const stats = [
         { label: 'Total Campaigns', value: statsData.campaigns_count, icon: TrendingUp, color: 'from-amber-500 to-orange-600' },
@@ -74,6 +112,90 @@ export default function Dashboard() {
                         </div>
                     );
                 })}
+            </div>
+
+            {/* Ad Accounts Performance */}
+            <div className="glass-card rounded-2xl p-8 mb-10 relative overflow-hidden">
+                <div className="flex items-center justify-between mb-6 relative z-10">
+                    <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-white/70 tracking-tight">Ad Accounts</h2>
+                    <select
+                        value={datePreset}
+                        onChange={(e) => setDatePreset(e.target.value)}
+                        className="px-3 py-2 bg-secondary border border-border rounded-lg text-sm text-foreground focus:ring-2 focus:ring-amber-500"
+                    >
+                        {DATE_PRESETS.map(p => (
+                            <option key={p.value} value={p.value}>{p.label}</option>
+                        ))}
+                    </select>
+                </div>
+
+                {insightsLoading ? (
+                    <div className="flex items-center justify-center gap-2 py-10 text-muted-foreground relative z-10">
+                        <Loader className="animate-spin" size={20} />
+                        <span>Loading account performance...</span>
+                    </div>
+                ) : insightsError ? (
+                    <div className="flex items-center gap-2 py-6 text-red-400 text-sm relative z-10">
+                        <AlertCircle size={18} /> {insightsError}
+                    </div>
+                ) : (insights || []).length === 0 ? (
+                    <p className="text-muted-foreground py-6 relative z-10">No ad accounts found.</p>
+                ) : (
+                    <div className="overflow-x-auto relative z-10">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="text-left text-muted-foreground border-b border-border">
+                                    <th className="py-2 pr-4 font-medium">Account</th>
+                                    <th className="py-2 pr-4 font-medium text-right">Spend</th>
+                                    <th className="py-2 pr-4 font-medium text-right">Impressions</th>
+                                    <th className="py-2 pr-4 font-medium text-right">Clicks</th>
+                                    <th className="py-2 pr-4 font-medium text-right">CPM</th>
+                                    <th className="py-2 pr-4 font-medium text-right">CTR</th>
+                                    <th className="py-2 pr-4 font-medium text-right">Purchases</th>
+                                    <th className="py-2 font-medium text-right">ROAS</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {(insights || []).map(row => (
+                                    <tr key={row.account_id} className="border-b border-border/50 hover:bg-white/5">
+                                        <td className="py-2.5 pr-4 text-foreground">{row.account_name}</td>
+                                        {row.error ? (
+                                            <td colSpan={7} className="py-2.5 text-red-400 text-xs truncate max-w-xs" title={row.error}>
+                                                {row.error}
+                                            </td>
+                                        ) : (
+                                            <>
+                                                <td className="py-2.5 pr-4 text-right text-foreground">{formatMoney(row.spend)}</td>
+                                                <td className="py-2.5 pr-4 text-right text-muted-foreground">{formatNumber(row.impressions)}</td>
+                                                <td className="py-2.5 pr-4 text-right text-muted-foreground">{formatNumber(row.clicks)}</td>
+                                                <td className="py-2.5 pr-4 text-right text-muted-foreground">{formatMoney(row.cpm)}</td>
+                                                <td className="py-2.5 pr-4 text-right text-muted-foreground">{Number(row.ctr || 0).toFixed(2)}%</td>
+                                                <td className="py-2.5 pr-4 text-right text-foreground">{formatNumber(row.purchases)}</td>
+                                                <td className="py-2.5 text-right text-foreground">{Number(row.roas || 0).toFixed(2)}</td>
+                                            </>
+                                        )}
+                                    </tr>
+                                ))}
+                                {okRows.length > 1 && (
+                                    <tr className="font-semibold text-foreground">
+                                        <td className="py-2.5 pr-4">Total ({okRows.length} accounts)</td>
+                                        <td className="py-2.5 pr-4 text-right">{formatMoney(totals.spend)}</td>
+                                        <td className="py-2.5 pr-4 text-right">{formatNumber(totals.impressions)}</td>
+                                        <td className="py-2.5 pr-4 text-right">{formatNumber(totals.clicks)}</td>
+                                        <td className="py-2.5 pr-4 text-right">
+                                            {formatMoney(totals.impressions > 0 ? (totals.spend / totals.impressions) * 1000 : 0)}
+                                        </td>
+                                        <td className="py-2.5 pr-4 text-right">
+                                            {(totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0).toFixed(2)}%
+                                        </td>
+                                        <td className="py-2.5 pr-4 text-right">{formatNumber(totals.purchases)}</td>
+                                        <td className="py-2.5 text-right">—</td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </div>
 
             {/* Quick Actions */}

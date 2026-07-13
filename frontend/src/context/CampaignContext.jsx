@@ -86,6 +86,9 @@ export const CampaignProvider = ({ children }) => {
     const [creativeData, setCreativeData] = useState({ ...DEFAULT_CREATIVE });
     const [adsData, setAdsData] = useState([]);
     const [selectedAdAccount, setSelectedAdAccount] = useState(null);
+    // Additional accounts to replicate the launch into (multi-account launch)
+    const [extraAdAccounts, setExtraAdAccounts] = useState([]);
+    const [launchStatus, setLaunchStatus] = useState('PAUSED');
 
     const resetWizard = () => {
         setCampaignData({ ...DEFAULT_CAMPAIGN });
@@ -93,6 +96,8 @@ export const CampaignProvider = ({ children }) => {
         setCreativeData({ ...DEFAULT_CREATIVE });
         setAdsData([]);
         setSelectedAdAccount(null);
+        setExtraAdAccounts([]);
+        setLaunchStatus('PAUSED');
     };
 
     const value = {
@@ -106,6 +111,10 @@ export const CampaignProvider = ({ children }) => {
         setAdsData,
         selectedAdAccount,
         setSelectedAdAccount,
+        extraAdAccounts,
+        setExtraAdAccounts,
+        launchStatus,
+        setLaunchStatus,
         resetWizard
     };
 

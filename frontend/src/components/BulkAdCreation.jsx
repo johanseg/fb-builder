@@ -1,28 +1,28 @@
 import { useToast } from '../context/ToastContext';
-import { useAuth } from '../context/AuthContext';
-import React, { useState } from 'react';
-import { ChevronRight, Plus, Trash2, Loader, Film, Image } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Loader, Film, Image, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import { useCampaign } from '../context/CampaignContext';
-import { createCompleteAd, createFacebookCampaign, createFacebookAdSet } from '../lib/facebookApi';
+import { buildLaunchPayload, createLaunch, getLaunch, saveCampaignTemplate, uploadBlobToServer } from '../lib/facebookApi';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+const POLL_INTERVAL_MS = 3000;
+const RUNNING_STATUSES = ['pending', 'running'];
 
 const BulkAdCreation = ({ onNext, onBack }) => {
-    const { showWarning, showError } = useToast();
-    const { authFetch } = useAuth();
-    const { campaignData, adsetData, creativeData, adsData, setAdsData, selectedAdAccount } = useCampaign();
-    const [loading, setLoading] = useState(false);
-    const [progress, setProgress] = useState({ current: 0, total: 0, status: '' });
-    const [errors, setErrors] = useState([]);
+    const { showWarning, showError, showSuccess } = useToast();
+    const { campaignData, adsetData, creativeData, adsData, setAdsData, selectedAdAccount, extraAdAccounts, launchStatus, setLaunchStatus } = useCampaign();
+    // If a launch was running when the user navigated away, resume in the loading state
+    const [resumeJobId] = useState(() => localStorage.getItem('lastLaunchJobId'));
+    const [loading, setLoading] = useState(!!resumeJobId);
+    const [job, setJob] = useState(null);
+    const [statusText, setStatusText] = useState(resumeJobId ? 'Resuming launch in progress...' : '');
+    const pollRef = useRef(null);
 
-    // Initialize ads based on creatives - generate all permutations
+    // Preview of the permutation matrix the server will create
     React.useEffect(() => {
         if (creativeData.creatives && creativeData.creatives.length > 0) {
-            // Filter out empty headlines and bodies
             const validHeadlines = creativeData.headlines.filter(h => h && h.trim() !== '');
             const validBodies = creativeData.bodies.filter(b => b && b.trim() !== '');
 
-            // Generate all permutations: media × headlines × bodies
             const permutations = [];
             creativeData.creatives.forEach((creative, creativeIndex) => {
                 validHeadlines.forEach((headline, hIndex) => {
@@ -30,13 +30,10 @@ const BulkAdCreation = ({ onNext, onBack }) => {
                         const isVideo = creative.mediaType === 'video';
                         const mediaLabel = isVideo ? 'Video' : 'Image';
                         permutations.push({
-                            id: `ad_${Date.now()}_${creativeIndex}_${hIndex}_${bIndex}`,
+                            id: `ad_${creativeIndex}_${hIndex}_${bIndex}`,
                             name: `${creative.name || `${mediaLabel} ${creativeIndex + 1}`} - H${hIndex + 1}B${bIndex + 1}`,
                             creativeId: creative.id,
-                            headlineIndex: hIndex,
-                            bodyIndex: bIndex,
                             mediaType: creative.mediaType || 'image',
-                            useDefaultCreative: true
                         });
                     });
                 });
@@ -44,221 +41,152 @@ const BulkAdCreation = ({ onNext, onBack }) => {
 
             setAdsData(permutations);
         } else {
-            // Fallback if no creatives (shouldn't happen due to validation)
             setAdsData([]);
         }
     }, [creativeData.creatives, creativeData.headlines, creativeData.bodies, setAdsData]);
 
-    const addAd = () => {
-        setAdsData(prev => [
-            ...prev,
-            {
-                id: `ad_${Date.now()}_${prev.length}`,
-                name: `Ad ${prev.length + 1}`,
-                useDefaultCreative: true
+    const stopPolling = useCallback(() => {
+        if (pollRef.current) {
+            clearInterval(pollRef.current);
+            pollRef.current = null;
+        }
+    }, []);
+
+    const startPolling = useCallback((jobId) => {
+        stopPolling();
+        const poll = async () => {
+            try {
+                const jobStatus = await getLaunch(jobId);
+                setJob(jobStatus);
+                if (!RUNNING_STATUSES.includes(jobStatus.status)) {
+                    stopPolling();
+                    localStorage.removeItem('lastLaunchJobId');
+                    setLoading(false);
+                    if (jobStatus.status === 'completed') {
+                        showSuccess(`Launch complete: ${jobStatus.completed_steps} ads created across ${jobStatus.ad_account_ids.length} account(s)`);
+                    } else if (jobStatus.status === 'completed_with_errors') {
+                        showWarning(`Launch finished with errors: ${jobStatus.completed_steps} created, ${jobStatus.failed_steps} failed`);
+                    } else {
+                        showError(`Launch failed: ${jobStatus.error || 'see results below'}`);
+                    }
+                }
+            } catch (error) {
+                console.error('Error polling launch job:', error);
             }
-        ]);
-    };
+        };
+        poll();
+        pollRef.current = setInterval(poll, POLL_INTERVAL_MS);
+    }, [stopPolling, showSuccess, showWarning, showError]);
 
-    const removeAd = (index) => {
-        setAdsData(prev => prev.filter((_, i) => i !== index));
-    };
-
-    const updateAdName = (index, name) => {
-        setAdsData(prev => prev.map((ad, i) => i === index ? { ...ad, name } : ad));
-    };
+    // Resume polling if a launch was running when the user navigated away
+    useEffect(() => {
+        if (resumeJobId) {
+            startPolling(resumeJobId);
+        }
+        return stopPolling;
+    }, [resumeJobId, startPolling, stopPolling]);
 
     const handleSubmit = async () => {
         if (adsData.length === 0) {
             showWarning('Please add at least one ad');
             return;
         }
+        if (!creativeData.pageId) {
+            showWarning('Page ID is missing. Please go back to the Creative step and select a Facebook Page.');
+            return;
+        }
 
         setLoading(true);
-        setErrors([]);
-        setProgress({ current: 0, total: adsData.length, status: 'Starting...' });
+        setJob(null);
 
         try {
-            // Step 1: Create Facebook Campaign (if new)
-            let fbCampaignId = campaignData.fbCampaignId;
-            if (!campaignData.isExisting) {
-                setProgress(prev => ({ ...prev, status: 'Creating campaign on Facebook...' }));
-                fbCampaignId = await createFacebookCampaign(campaignData, selectedAdAccount.accountId);
-            }
-
-            // Save Campaign Locally (Ensure it exists in DB for FK constraints)
-            try {
-                const saveCampRes = await authFetch(`${API_URL}/facebook/campaigns/save`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        ...campaignData,
-                        fbCampaignId: fbCampaignId,
-                        // Ensure budget fields are numbers
-                        dailyBudget: Number(campaignData.dailyBudget)
-                    })
-                });
-                if (!saveCampRes.ok) {
-                    const err = await saveCampRes.json();
-                    throw new Error(`Failed to save campaign locally: ${err.detail || err.message}`);
+            // 1. Any freshly-dropped files need a public URL before the server can push them to FB
+            const creatives = [];
+            for (const creative of creativeData.creatives || []) {
+                const isVideo = creative.mediaType === 'video';
+                let imageUrl = creative.imageUrl;
+                let videoUrl = creative.videoUrl;
+                if (creative.file) {
+                    setStatusText(`Uploading ${creative.name}...`);
+                    const url = await uploadBlobToServer(creative.file, creative.name);
+                    if (isVideo) videoUrl = url;
+                    else imageUrl = url;
+                } else if (!imageUrl && !videoUrl && creative.previewUrl && !creative.previewUrl.startsWith('blob:')) {
+                    if (isVideo) videoUrl = creative.previewUrl;
+                    else imageUrl = creative.previewUrl;
                 }
-            } catch (err) {
-                console.error('Error saving campaign locally:', err);
-                throw err; // Stop execution
-            }
-
-            // Step 2: Create Facebook Ad Set (if new)
-            let fbAdsetId = adsetData.fbAdsetId;
-            if (!adsetData.isExisting) {
-                setProgress(prev => ({ ...prev, status: 'Creating ad set on Facebook...' }));
-
-                // For CBO campaigns, pass the bid strategy and bid amount from campaign level
-                const adsetPayload = {
-                    ...adsetData,
-                    // Override bid strategy and amount with campaign-level values for CBO
-                    ...(campaignData.budgetType === 'CBO' && {
-                        bidStrategy: campaignData.bidStrategy,
-                        bidAmount: campaignData.bidAmount
-                    })
-                };
-
-                fbAdsetId = await createFacebookAdSet(adsetPayload, fbCampaignId, selectedAdAccount.accountId, campaignData.budgetType);
-            }
-
-            // Save Ad Set Locally (Ensure it exists in DB for FK constraints)
-            try {
-                const saveAdSetRes = await authFetch(`${API_URL}/facebook/adsets/save`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        ...adsetData,
-                        campaignId: campaignData.id, // Use the ID we have in context (local or FB)
-                        fbAdsetId: fbAdsetId,
-                        // Ensure numeric fields
-                        dailyBudget: adsetData.dailyBudget ? Number(adsetData.dailyBudget) : null,
-                        bidAmount: adsetData.bidAmount ? Number(adsetData.bidAmount) : null
-                    })
+                creatives.push({
+                    image_url: imageUrl || null,
+                    video_url: videoUrl || null,
+                    thumbnail_url: creative.thumbnailUrl || null,
+                    media_type: creative.mediaType || 'image',
+                    name: creative.name || null,
                 });
-                if (!saveAdSetRes.ok) {
-                    const err = await saveAdSetRes.json();
-                    throw new Error(`Failed to save ad set locally: ${err.detail || err.message}`);
-                }
-            } catch (err) {
-                console.error('Error saving ad set locally:', err);
-                throw err; // Stop execution
             }
 
-            // Step 3: Create ads
-            const createdAds = [];
-            for (let i = 0; i < adsData.length; i++) {
-                const ad = adsData[i];
-                setProgress({
-                    current: i + 1,
-                    total: adsData.length,
-                    status: `Creating ad ${i + 1} of ${adsData.length}...`
-                });
-
-                try {
-                    // Find the specific creative for this ad
-                    const specificCreative = creativeData.creatives?.find(c => c.id === ad.creativeId);
-                    const isVideo = specificCreative?.mediaType === 'video';
-
-                    // Construct creative data for this specific ad with specific headline and body
-                    const adSpecificCreativeData = {
-                        ...creativeData,
-                        mediaType: isVideo ? 'video' : 'image',
-                        imageUrl: !isVideo ? (specificCreative?.imageUrl || specificCreative?.previewUrl) : undefined,
-                        videoUrl: isVideo ? (specificCreative?.videoUrl || specificCreative?.previewUrl) : undefined,
-                        imageFile: !isVideo && specificCreative ? specificCreative.file : null,
-                        videoFile: isVideo && specificCreative ? specificCreative.file : null,
-                        // Use specific headline and body for this ad permutation
-                        headlines: [creativeData.headlines[ad.headlineIndex]],
-                        bodies: [creativeData.bodies[ad.bodyIndex]]
-                    };
-
-                    if (!creativeData.pageId) {
-                        throw new Error('Page ID is missing. Please go back to the Creative step and select a Facebook Page.');
-                    }
-
-                    // Update progress with video-specific message
-                    if (isVideo) {
-                        setProgress(prev => ({
-                            ...prev,
-                            status: `Uploading video ${i + 1} of ${adsData.length}... (this may take a while)`
-                        }));
-                    }
-
-                    // Create ad on Facebook
-                    const result = await createCompleteAd(
-                        fbCampaignId,
-                        { ...adsetData, fbAdsetId },
-                        adSpecificCreativeData,
-                        ad,
-                        creativeData.pageId,
-                        selectedAdAccount.accountId,
-                        campaignData.budgetType
-                    );
-
-                    // Save to local database
-                    await authFetch(`${API_URL}/facebook/ads/save`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            id: ad.id,
-                            adsetId: adsetData.id,
-                            name: ad.name,
-                            creativeName: creativeData.creativeName,
-                            mediaType: isVideo ? 'video' : 'image',
-                            imageUrl: adSpecificCreativeData.imageUrl,
-                            videoUrl: adSpecificCreativeData.videoUrl,
-                            videoId: result.videoId,
-                            thumbnailUrl: result.thumbnailUrl,
-                            bodies: creativeData.bodies.filter(b => b.trim() !== ''),
-                            headlines: creativeData.headlines.filter(h => h.trim() !== ''),
-                            description: creativeData.description,
-                            cta: creativeData.cta,
-                            websiteUrl: creativeData.websiteUrl,
-                            status: 'PAUSED',
-                            fbAdId: result.adId,
-                            fbCreativeId: result.creativeId
-                        })
-                    });
-
-                    createdAds.push({
-                        ...ad,
-                        fbAdId: result.adId,
-                        fbCreativeId: result.creativeId,
-                        videoId: result.videoId
-                    });
-                } catch (error) {
-                    console.error(`Error creating ad ${ad.name}:`, error);
-                    setErrors(prev => [...prev, `Failed to create ${ad.name}: ${error.message}`]);
-                }
-            }
-
-            setProgress({
-                current: adsData.length,
-                total: adsData.length,
-                status: 'Complete!'
+            // 2. Queue the server-side launch job
+            setStatusText('Queueing launch...');
+            const payload = buildLaunchPayload({
+                campaignData,
+                adsetData,
+                creativeData,
+                accounts: [selectedAdAccount.accountId, ...extraAdAccounts.map(a => a.accountId)],
+                sourceAccountId: selectedAdAccount.accountId,
+                launchStatus,
+                creatives,
             });
+            const jobId = await createLaunch(payload);
+            localStorage.setItem('lastLaunchJobId', jobId);
 
-            // Wait a moment to show completion
-            setTimeout(() => {
-                onNext();
-            }, 1500);
-
+            // 3. Poll until done — the job keeps running even if this tab closes
+            setStatusText('Launching...');
+            startPolling(jobId);
         } catch (error) {
-            console.error('Error in bulk ad creation:', error);
+            console.error('Error queueing launch:', error);
             showError(`Error: ${error.message}`);
             setLoading(false);
         }
     };
 
+    const [savingTemplate, setSavingTemplate] = useState(false);
+    const [templateName, setTemplateName] = useState('');
+    const [showTemplateInput, setShowTemplateInput] = useState(false);
+
+    const handleSaveTemplate = async () => {
+        if (!templateName.trim()) {
+            showWarning('Enter a template name');
+            return;
+        }
+        setSavingTemplate(true);
+        try {
+            await saveCampaignTemplate(templateName.trim(), {
+                campaign: { ...campaignData, id: null, fbCampaignId: null, isExisting: false },
+                adset: { ...adsetData, id: null, fbAdsetId: null, isExisting: false },
+                description: creativeData.description,
+                cta: creativeData.cta,
+                website_url: creativeData.websiteUrl,
+            });
+            showSuccess(`Template "${templateName.trim()}" saved`);
+            setShowTemplateInput(false);
+            setTemplateName('');
+        } catch (error) {
+            showError(`Failed to save template: ${error.message}`);
+        } finally {
+            setSavingTemplate(false);
+        }
+    };
+
+    const totalAccounts = 1 + extraAdAccounts.length;
+    const progressPct = job && job.total_steps > 0
+        ? Math.round(((job.completed_steps + job.failed_steps) / job.total_steps) * 100)
+        : 0;
+    const adResults = (job?.results || []).filter(r => r.entity === 'ad' || r.error);
+
     return (
         <div>
-            <h2 className="text-2xl font-bold mb-6">Bulk Ad Creation</h2>
+            <h2 className="text-2xl font-bold mb-6">Review &amp; Launch</h2>
             <p className="text-muted-foreground mb-6">
-                Add multiple ads to be created with the same creative structure. Each ad will use the dynamic creative you configured.
+                These ads will be created in the background — you can close this tab once the launch starts.
             </p>
 
             {/* Summary */}
@@ -285,40 +213,35 @@ const BulkAdCreation = ({ onNext, onBack }) => {
                             return parts.join(', ') || '0 files';
                         })()}
                     </div>
-                    <div><strong>Ad Copy:</strong> Standard (Single Body & Headline)</div>
+                    <div>
+                        <strong>Accounts:</strong> {selectedAdAccount?.name}
+                        {extraAdAccounts.length > 0 && ` + ${extraAdAccounts.length} more (${extraAdAccounts.map(a => a.name).join(', ')})`}
+                    </div>
+                    <div><strong>Total ads:</strong> {adsData.length * totalAccounts} ({adsData.length} per account × {totalAccounts} account{totalAccounts !== 1 ? 's' : ''})</div>
                 </div>
             </div>
 
             {!loading ? (
                 <>
-                    {/* Ads List */}
+                    {/* Ads preview list */}
                     <div className="space-y-2 mb-4">
-                        {adsData.map((ad, index) => {
+                        {adsData.map((ad) => {
                             const creative = creativeData.creatives?.find(c => c.id === ad.creativeId);
                             const isVideo = creative?.mediaType === 'video';
                             return (
-                                <div key={ad.id} className="flex items-center gap-3 p-4 bg-secondary rounded-lg border border-border">
-                                    {/* Thumbnail */}
+                                <div key={ad.id} className="flex items-center gap-3 p-3 bg-secondary rounded-lg border border-border">
                                     {creative && (
                                         <div className="w-12 h-12 rounded overflow-hidden bg-muted flex-shrink-0 relative">
                                             {isVideo ? (
                                                 <>
-                                                    <video
-                                                        src={creative.previewUrl}
-                                                        className="w-full h-full object-cover"
-                                                        muted
-                                                    />
+                                                    <video src={creative.previewUrl} className="w-full h-full object-cover" muted />
                                                     <div className="absolute bottom-0 right-0 bg-purple-600 text-white p-0.5 rounded-tl">
                                                         <Film size={10} />
                                                     </div>
                                                 </>
                                             ) : (
                                                 <>
-                                                    <img
-                                                        src={creative.previewUrl}
-                                                        alt="Thumbnail"
-                                                        className="w-full h-full object-cover"
-                                                    />
+                                                    <img src={creative.previewUrl} alt="Thumbnail" className="w-full h-full object-cover" />
                                                     <div className="absolute bottom-0 right-0 bg-blue-600 text-white p-0.5 rounded-tl">
                                                         <Image size={10} />
                                                     </div>
@@ -326,46 +249,79 @@ const BulkAdCreation = ({ onNext, onBack }) => {
                                             )}
                                         </div>
                                     )}
-                                    <div className="flex-1">
-                                        <input
-                                            type="text"
-                                            value={ad.name}
-                                            onChange={(e) => updateAdName(index, e.target.value)}
-                                            placeholder={`Ad ${index + 1} name`}
-                                            className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        />
-                                    </div>
-                                    <button
-                                        onClick={() => removeAd(index)}
-                                        className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                                    >
-                                        <Trash2 size={20} />
-                                    </button>
+                                    <span className="text-sm text-foreground">{ad.name}</span>
                                 </div>
                             );
                         })}
                     </div>
 
-                    {/* Add Ad Button */}
-                    <button
-                        onClick={addAd}
-                        className="w-full p-4 border-2 border-dashed border-border rounded-lg text-muted-foreground hover:border-blue-500 hover:text-blue-600 transition-colors flex items-center justify-center gap-2"
-                    >
-                        <Plus size={20} />
-                        Add Another Ad
-                    </button>
-
-                    {/* Errors */}
-                    {errors.length > 0 && (
-                        <div className="mt-6 bg-red-50 border border-red-200 rounded-lg p-4">
-                            <h3 className="font-semibold text-red-900 mb-2">Errors</h3>
-                            <ul className="text-sm text-red-800 space-y-1">
-                                {errors.map((error, index) => (
-                                    <li key={index}>• {error}</li>
-                                ))}
-                            </ul>
+                    {/* Launch state toggle */}
+                    <div className={`rounded-lg border p-4 mb-6 ${launchStatus === 'ACTIVE' ? 'bg-red-50 border-red-300' : 'bg-secondary border-border'}`}>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h3 className="font-semibold text-foreground text-sm">Launch state</h3>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                    {launchStatus === 'ACTIVE'
+                                        ? 'Ads will start spending as soon as they are approved by Meta.'
+                                        : 'Ads will be created paused — activate them in Ads Manager when ready.'}
+                                </p>
+                            </div>
+                            <div className="flex rounded-lg overflow-hidden border border-border">
+                                <button
+                                    onClick={() => setLaunchStatus('PAUSED')}
+                                    className={`px-4 py-2 text-sm font-medium ${launchStatus === 'PAUSED' ? 'bg-amber-600 text-white' : 'bg-card text-muted-foreground hover:text-foreground'}`}
+                                >
+                                    Paused
+                                </button>
+                                <button
+                                    onClick={() => setLaunchStatus('ACTIVE')}
+                                    className={`px-4 py-2 text-sm font-medium ${launchStatus === 'ACTIVE' ? 'bg-red-600 text-white' : 'bg-card text-muted-foreground hover:text-foreground'}`}
+                                >
+                                    Active
+                                </button>
+                            </div>
                         </div>
-                    )}
+                        {launchStatus === 'ACTIVE' && (
+                            <div className="flex items-center gap-2 mt-3 text-red-700 text-xs font-medium">
+                                <AlertTriangle size={14} /> Live launch: ads will spend real budget across {totalAccounts} account{totalAccounts !== 1 ? 's' : ''}.
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Save as template */}
+                    <div className="mb-2">
+                        {showTemplateInput ? (
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="text"
+                                    value={templateName}
+                                    onChange={(e) => setTemplateName(e.target.value)}
+                                    placeholder="Template name..."
+                                    className="px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                />
+                                <button
+                                    onClick={handleSaveTemplate}
+                                    disabled={savingTemplate}
+                                    className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 disabled:opacity-50"
+                                >
+                                    {savingTemplate ? 'Saving...' : 'Save'}
+                                </button>
+                                <button
+                                    onClick={() => setShowTemplateInput(false)}
+                                    className="px-3 py-2 text-muted-foreground text-sm hover:text-foreground"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => setShowTemplateInput(true)}
+                                className="text-sm text-amber-600 hover:text-amber-700 font-medium"
+                            >
+                                Save this setup as a template
+                            </button>
+                        )}
+                    </div>
 
                     {/* Navigation */}
                     <div className="mt-8 flex justify-between">
@@ -378,29 +334,70 @@ const BulkAdCreation = ({ onNext, onBack }) => {
                         <button
                             onClick={handleSubmit}
                             disabled={adsData.length === 0}
-                            className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                            className={`flex items-center gap-2 px-6 py-3 text-white rounded-lg font-medium disabled:bg-gray-300 disabled:cursor-not-allowed ${launchStatus === 'ACTIVE' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}`}
                         >
-                            Create {adsData.length} Ad{adsData.length !== 1 ? 's' : ''} on Facebook
+                            Launch {adsData.length * totalAccounts} Ad{adsData.length * totalAccounts !== 1 ? 's' : ''} {launchStatus === 'ACTIVE' ? '(Active)' : '(Paused)'}
                         </button>
                     </div>
                 </>
             ) : (
-                <>
-                    {/* Progress Indicator */}
-                    <div className="text-center py-12">
-                        <Loader className="animate-spin mx-auto mb-4 text-blue-600" size={48} />
-                        <h3 className="text-xl font-semibold mb-2">{progress.status}</h3>
+                <div className="py-8">
+                    {/* Progress */}
+                    <div className="text-center mb-6">
+                        <Loader className="animate-spin mx-auto mb-4 text-blue-600" size={40} />
+                        <h3 className="text-xl font-semibold mb-2">
+                            {job ? `Launching... ${job.completed_steps + job.failed_steps} of ${job.total_steps}` : statusText}
+                        </h3>
                         <div className="w-full max-w-md mx-auto bg-muted rounded-full h-3 mb-2">
                             <div
                                 className="bg-blue-600 h-3 rounded-full transition-all duration-300"
-                                style={{ width: `${(progress.current / progress.total) * 100}%` }}
+                                style={{ width: `${progressPct}%` }}
                             />
                         </div>
-                        <p className="text-muted-foreground">
-                            {progress.current} of {progress.total} ads created
+                        <p className="text-muted-foreground text-sm">
+                            Runs in the background — you can safely leave this page.
                         </p>
                     </div>
-                </>
+
+                    {/* Per-account results */}
+                    {adResults.length > 0 && (
+                        <div className="max-w-2xl mx-auto space-y-1 max-h-64 overflow-y-auto">
+                            {adResults.map((result, index) => (
+                                <div key={index} className="flex items-center gap-2 text-sm px-3 py-1.5 bg-secondary rounded">
+                                    {result.error
+                                        ? <XCircle className="text-red-500 shrink-0" size={16} />
+                                        : <CheckCircle2 className="text-green-600 shrink-0" size={16} />}
+                                    <span className="text-muted-foreground shrink-0">{result.ad_account_id}</span>
+                                    <span className="truncate">{result.name || result.entity}</span>
+                                    {result.error && <span className="text-red-600 truncate ml-auto">{result.error}</span>}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Finished job results (shown after completion) */}
+            {!loading && job && !RUNNING_STATUSES.includes(job.status) && (
+                <div className="mt-6 max-w-2xl space-y-1">
+                    <h3 className="font-semibold text-sm mb-2">
+                        Last launch: {job.status.replace(/_/g, ' ')} — {job.completed_steps} created, {job.failed_steps} failed
+                    </h3>
+                    {adResults.filter(r => r.error).map((result, index) => (
+                        <div key={index} className="flex items-center gap-2 text-sm px-3 py-1.5 bg-red-50 border border-red-200 rounded">
+                            <XCircle className="text-red-500 shrink-0" size={16} />
+                            <span className="text-muted-foreground shrink-0">{result.ad_account_id}</span>
+                            <span className="truncate">{result.name || result.entity}</span>
+                            <span className="text-red-600 truncate ml-auto">{result.error}</span>
+                        </div>
+                    ))}
+                    <button
+                        onClick={onNext}
+                        className="mt-4 px-6 py-3 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-700"
+                    >
+                        Done
+                    </button>
+                </div>
             )}
         </div>
     );
