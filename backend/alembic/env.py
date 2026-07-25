@@ -59,7 +59,9 @@ def run_migrations_online() -> None:
         # pristine database is bootstrapped only inside `alembic upgrade`, then
         # stamped at the same immutable revision; existing databases still run
         # normal forward migrations.
-        if not inspect(connection).get_table_names():
+        table_names = inspect(connection).get_table_names()
+        connection.commit()
+        if not table_names:
             Base.metadata.create_all(bind=connection)
             connection.commit()
             context.configure(connection=connection, target_metadata=target_metadata)
