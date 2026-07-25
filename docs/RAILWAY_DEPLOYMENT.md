@@ -12,7 +12,7 @@ Production reporting is read-only against Meta: it stores daily ad Insights and 
 
 1. Apply the reporting Alembic migration in the controlled Railway pre-deploy phase. Web and worker startup must not mutate schema or run `init_db.py` schema checks.
 2. Set the staging allowlist and map only its account as an admin in Settings. Mapping verifies the configured server token can read the account.
-3. Create a Railway Cron service with command `python run_meta_reporting_sync.py` from `backend/`; do not add it to the web service `railway.toml`. The initial successful sync collects 90 completed account-local days; later runs use the brand policy, defaulting to 35 completed days. Admins and managers may also use the authenticated manual sync control.
+3. Create a Railway Cron service from `backend/railway.reporting.toml`. The initial successful sync collects 90 completed account-local days; later runs use the brand policy, defaulting to 35 completed days. Admins and managers may also use the authenticated manual sync control.
 4. Reconcile the sync-run account totals to stored ad-day totals before using recommendations. Any failed or mismatched mapped account makes the report partial and suppresses recommendations.
 5. Repeat on production with a separately confirmed production allowlist. Verify the deployed SHA, service logs, migration revision, and health endpoint before declaring it ready.
 
