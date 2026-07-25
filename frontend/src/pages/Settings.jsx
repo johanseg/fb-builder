@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Settings as SettingsIcon, Plus, Sparkles, Edit, Trash2, Save, X, FileText, Code, AlertTriangle } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
+import { useBrands } from '../context/BrandContext';
 import { adStyles as initialStyles, AD_CATEGORIES } from '../data/adStyles';
 import { PROMPT_CATEGORIES } from '../data/prompts';
 
@@ -9,7 +10,8 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 export default function Settings() {
     const { showSuccess, showError } = useToast();
-    const { authFetch } = useAuth();
+    const { authFetch, user, hasPermission, hasRole } = useAuth();
+    const { activeBrand } = useBrands();
     const [activeTab, setActiveTab] = useState('styles');
     const [styles, setStyles] = useState([]);
     const [prompts, setPrompts] = useState([]);
@@ -167,7 +169,7 @@ export default function Settings() {
                         />
                     )}
                     {activeTab === 'general' && (
-                        <GeneralSettings />
+                        <GeneralSettings authFetch={authFetch} showSuccess={showSuccess} showError={showError} user={user} activeBrand={activeBrand} hasPermission={hasPermission} hasRole={hasRole} />
                     )}
                 </div>
             </div>
@@ -732,13 +734,53 @@ function EditPromptForm({ prompt, onChange, onSave, onCancel }) {
     );
 }
 
-function GeneralSettings() {
+function GeneralSettings({ authFetch, showSuccess, showError, user, activeBrand, hasPermission, hasRole }) {
+    const [policy, setPolicy] = useState({ lookback_days: 35, min_spend: 0, break_even_roas: 0, scale_roas: 0, min_purchases: 0 });
+    const [accounts, setAccounts] = useState([]);
+    const [account, setAccount] = useState({ meta_account_id: '', currency: 'USD', timezone: 'UTC' });
+    const isAdmin = user?.is_superuser || hasRole('admin');
+    const canWritePolicy = hasPermission('reporting:write');
+
+    const loadReportingSettings = async () => {
+        if ((!isAdmin && !canWritePolicy) || !activeBrand?.id) return;
+        const [policyResponse, accountResponse] = await Promise.all([
+            authFetch(`${API_BASE}/performance/meta/brands/${activeBrand.id}/policy`),
+            authFetch(`${API_BASE}/performance/meta/accounts?brand_id=${activeBrand.id}`),
+        ]);
+        if (policyResponse.ok) setPolicy(await policyResponse.json());
+        if (accountResponse.ok) setAccounts(await accountResponse.json());
+    };
+
+    const savePolicy = async () => {
+        const response = await authFetch(`${API_BASE}/performance/meta/brands/${activeBrand.id}/policy`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(policy),
+        });
+        if (!response.ok) return showError((await response.json()).detail || 'Could not save reporting policy');
+        showSuccess('Reporting policy saved');
+    };
+
+    const addAccount = async (event) => {
+        event.preventDefault();
+        const response = await authFetch(`${API_BASE}/performance/meta/accounts?brand_id=${encodeURIComponent(activeBrand.id)}&meta_account_id=${encodeURIComponent(account.meta_account_id)}&currency=${encodeURIComponent(account.currency)}&timezone=${encodeURIComponent(account.timezone)}`, { method: 'POST' });
+        if (!response.ok) return showError((await response.json()).detail || 'Could not map account');
+        setAccount({ meta_account_id: '', currency: 'USD', timezone: 'UTC' });
+        await loadReportingSettings();
+    };
+
     return (
         <div className="space-y-6">
             <div className="bg-secondary border border-border rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-foreground mb-4">Application Settings</h3>
-                <p className="text-muted-foreground">General settings coming soon...</p>
+                <p className="text-muted-foreground">General settings are managed by deployment configuration.</p>
             </div>
+            {(isAdmin || canWritePolicy) && activeBrand && <div className="bg-secondary border border-border rounded-lg p-6 space-y-5">
+                <div><h3 className="text-lg font-semibold text-foreground">Meta reporting — {activeBrand.name}</h3><p className="text-sm text-muted-foreground">Read-only thresholds and allowlisted account mapping. No delivery settings are changed here.</p></div>
+                <div className="grid md:grid-cols-5 gap-3">{[['lookback_days', 'Lookback days'], ['min_spend', 'Min spend'], ['break_even_roas', 'Break-even ROAS'], ['scale_roas', 'Scale ROAS'], ['min_purchases', 'Min purchases']].map(([key, label]) => <label key={key} className="text-sm">{label}<input type="number" min="0" disabled={!canWritePolicy} value={policy[key] ?? ''} onChange={(event) => setPolicy({ ...policy, [key]: event.target.value === '' ? null : Number(event.target.value) })} className="mt-1 w-full px-2 py-1 border border-border rounded disabled:opacity-50" /></label>)}</div>
+                <button onClick={savePolicy} disabled={!canWritePolicy} className="px-4 py-2 bg-purple-600 text-white rounded-lg disabled:opacity-50">Save reporting policy</button>
+                {isAdmin && <form onSubmit={addAccount} className="grid md:grid-cols-4 gap-3 items-end border-t border-border pt-4"><label className="text-sm">Meta account ID<input required value={account.meta_account_id} onChange={(event) => setAccount({ ...account, meta_account_id: event.target.value })} className="mt-1 w-full px-2 py-1 border border-border rounded" /></label><label className="text-sm">Currency<input required value={account.currency} onChange={(event) => setAccount({ ...account, currency: event.target.value })} className="mt-1 w-full px-2 py-1 border border-border rounded" /></label><label className="text-sm">Timezone<input required value={account.timezone} onChange={(event) => setAccount({ ...account, timezone: event.target.value })} className="mt-1 w-full px-2 py-1 border border-border rounded" /></label><button className="px-4 py-2 bg-amber-600 text-white rounded-lg">Map allowlisted account</button></form>}
+                <button onClick={() => loadReportingSettings().catch(error => showError(error.message))} className="text-sm underline">Load mapped accounts and policy</button>
+                <ul className="text-sm text-muted-foreground">{accounts.map(item => <li key={item.id}>{item.meta_account_id} · {item.currency} · {item.timezone}</li>)}</ul>
+            </div>}
         </div>
     );
 }

@@ -29,16 +29,22 @@ logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper())
 logger = logging.getLogger(__name__)
 
 _is_dev = os.getenv("ENVIRONMENT", "production") != "production"
+_is_production = not _is_dev
+_commit_sha = os.getenv("RAILWAY_GIT_COMMIT_SHA", "local")
 
 
 @asynccontextmanager
 async def lifespan(app_instance: FastAPI):
     """Validate PostgreSQL connection on startup."""
-    import google.generativeai as genai
 
     from app.database import SessionLocal, engine
     from sqlalchemy import text
     from app.services.auth_service import purge_expired_refresh_tokens
+
+    if _is_production and not settings.r2_enabled:
+        raise RuntimeError("R2 must be fully configured in production")
+    if settings.r2_partially_configured and not settings.r2_enabled:
+        raise RuntimeError("R2 configuration is incomplete; set every R2_* value or none")
 
     try:
         with engine.connect() as conn:
@@ -53,7 +59,6 @@ async def lifespan(app_instance: FastAPI):
         raise RuntimeError(f"Database connection failed: {e}")
 
     if settings.GEMINI_API_KEY:
-        genai.configure(api_key=settings.GEMINI_API_KEY)
         logger.info("Gemini API client configured")
     else:
         logger.warning("GEMINI_API_KEY is not configured")
@@ -66,18 +71,6 @@ async def lifespan(app_instance: FastAPI):
     except Exception:
         logger.exception("Failed to purge expired refresh tokens during startup")
 
-    # Launch jobs run in-process; anything still pending/running died with the last deploy.
-    try:
-        with SessionLocal() as db:
-            reaped = db.execute(text(
-                "UPDATE launch_jobs SET status = 'failed', error = 'server restarted' "
-                "WHERE status IN ('pending', 'running')"
-            ))
-            db.commit()
-            if reaped.rowcount:
-                logger.warning("Marked %s orphaned launch jobs as failed", reaped.rowcount)
-    except Exception:
-        logger.exception("Failed to reap orphaned launch jobs during startup")
     yield
 
 
@@ -133,7 +126,13 @@ app.add_middleware(
     allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+    allow_headers=[
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "Idempotency-Key",
+        "X-Preflight-Token",
+    ],
     expose_headers=["X-Total-Count"],
     max_age=600,
 )
@@ -146,7 +145,7 @@ async def root():
 async def health_check(db: Session = Depends(get_db)):
     try:
         db.execute(text("SELECT 1"))
-        return {"status": "healthy"}
+        return {"status": "healthy", "commit_sha": _commit_sha}
     except Exception:
         return JSONResponse(
             status_code=503,

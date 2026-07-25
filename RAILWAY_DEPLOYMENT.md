@@ -43,8 +43,8 @@ Railway should automatically detect your backend service from `railway.toml`.
 ```
 DATABASE_URL=${{Postgres.DATABASE_URL}}
 GEMINI_API_KEY=your_gemini_api_key_here
-VITE_FACEBOOK_ACCESS_TOKEN=your_facebook_token_here
-VITE_FACEBOOK_AD_ACCOUNT_ID=your_facebook_ad_account_id_here
+FACEBOOK_ACCESS_TOKEN=your_facebook_token_here
+FACEBOOK_AD_ACCOUNT_ID=act_your_facebook_ad_account_id
 ```
 
 > [!IMPORTANT]
@@ -80,8 +80,6 @@ After the first deployment:
 
 ```
 VITE_API_URL=https://${{backend.RAILWAY_PUBLIC_DOMAIN}}/api/v1
-VITE_FACEBOOK_ACCESS_TOKEN=your_facebook_token_here
-VITE_FACEBOOK_AD_ACCOUNT_ID=your_facebook_ad_account_id_here
 ```
 
 > [!IMPORTANT]
@@ -137,16 +135,14 @@ If you need to manually trigger a deployment:
 |----------|-------------|---------|
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@host:5432/db` |
 | `GEMINI_API_KEY` | Google Gemini API key | `AIza...` |
-| `VITE_FACEBOOK_ACCESS_TOKEN` | Facebook Marketing API token | `EAAx...` |
-| `VITE_FACEBOOK_AD_ACCOUNT_ID` | Facebook Ad Account ID | `act_123456789` |
+| `FACEBOOK_ACCESS_TOKEN` | Server-side Facebook Marketing API token | `EAAx...` |
+| `FACEBOOK_AD_ACCOUNT_ID` | Server-side Facebook Ad Account ID | `act_123456789` |
 
 ### Frontend Service
 
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `VITE_API_URL` | Backend API URL | `https://backend.railway.app/api/v1` |
-| `VITE_FACEBOOK_ACCESS_TOKEN` | Facebook Marketing API token | `EAAx...` |
-| `VITE_FACEBOOK_AD_ACCOUNT_ID` | Facebook Ad Account ID | `act_123456789` |
 
 ## Troubleshooting
 

@@ -1,13 +1,21 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from typing import List, Optional
-from app.database import get_db
-from app.models import WinningAd as WinningAdModel, User
-from app.schemas.template import WinningAd
-from app.core.deps import get_current_active_user, require_permission
+import os
 import uuid
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from sqlalchemy.orm import Session
+
+from app.api.v1.uploads import valid_media_signature
+from app.core.deps import require_permission
+from app.database import get_db
+from app.models import User, WinningAd as WinningAdModel
+from app.schemas.template import WinningAd
+from app.services.storage import store_upload
 
 router = APIRouter()
+ALLOWED_TEMPLATE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+MAX_TEMPLATE_FILE_SIZE = 10 * 1024 * 1024
+
 
 @router.get("/", response_model=List[WinningAd])
 def read_winning_ads(
@@ -15,103 +23,90 @@ def read_winning_ads(
     category: Optional[str] = None,
     style: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_permission("templates:read")),
 ):
     query = db.query(WinningAdModel)
-    
     if category:
         query = query.filter(WinningAdModel.template_category == category)
     if style:
         query = query.filter(WinningAdModel.design_style == style)
-    
     if search:
-        search_term = f"%{search}%"
+        term = f"%{search}%"
         query = query.filter(
-            (WinningAdModel.name.ilike(search_term)) |
-            (WinningAdModel.tags.ilike(search_term)) |
-            (WinningAdModel.product_name.ilike(search_term))
+            (WinningAdModel.name.ilike(term))
+            | (WinningAdModel.tags.ilike(term))
+            | (WinningAdModel.product_name.ilike(term))
         )
-    
     return query.all()
+
 
 @router.get("/filters")
 def read_template_filters(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_permission("templates:read")),
 ):
-    categories = db.query(WinningAdModel.template_category).distinct().filter(WinningAdModel.template_category != None).all()
-    styles = db.query(WinningAdModel.design_style).distinct().filter(WinningAdModel.design_style != None).all()
-    
     return {
-        "categories": [c[0] for c in categories],
-        "styles": [s[0] for s in styles]
+        "categories": [
+            value[0]
+            for value in db.query(WinningAdModel.template_category)
+            .distinct()
+            .filter(WinningAdModel.template_category.isnot(None))
+            .all()
+        ],
+        "styles": [
+            value[0]
+            for value in db.query(WinningAdModel.design_style)
+            .distinct()
+            .filter(WinningAdModel.design_style.isnot(None))
+            .all()
+        ],
     }
 
-@router.get("/{id}/preview", response_model=WinningAd)
+
+@router.get("/{template_id}/preview", response_model=WinningAd)
 def read_template_preview(
-    id: str,
+    template_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_permission("templates:read")),
 ):
-    template = db.query(WinningAdModel).filter(WinningAdModel.id == id).first()
+    template = db.query(WinningAdModel).filter(WinningAdModel.id == template_id).first()
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
     return template
 
-from fastapi import File, UploadFile
-import shutil
-from pathlib import Path
-import os
 
-UPLOAD_DIR = Path(__file__).parent.parent.parent.parent / "uploads"
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-
-ALLOWED_TEMPLATE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp', '.gif'}
-MAX_TEMPLATE_FILE_SIZE = 10 * 1024 * 1024  # 10MB
-
-@router.post("/upload")
+@router.post("/upload", response_model=List[WinningAd])
 async def upload_winning_ad(
     images: List[UploadFile] = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("templates:write"))
+    current_user: User = Depends(require_permission("templates:write")),
 ):
     saved_ads = []
     for image in images:
-        # Validate file extension
-        ext = os.path.splitext(image.filename or "")[1].lower()
-        if ext not in ALLOWED_TEMPLATE_EXTENSIONS:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid file type '{ext}'. Allowed types: {', '.join(ALLOWED_TEMPLATE_EXTENSIONS)}"
-            )
+        extension = os.path.splitext(image.filename or "")[1].lower()
+        if extension not in ALLOWED_TEMPLATE_EXTENSIONS:
+            raise HTTPException(status_code=400, detail="Invalid template file type")
 
-        # Read file content to validate size
-        file_content = await image.read()
-        if len(file_content) > MAX_TEMPLATE_FILE_SIZE:
-            raise HTTPException(
-                status_code=400,
-                detail=f"File too large. Maximum size: {MAX_TEMPLATE_FILE_SIZE / (1024 * 1024)}MB"
-            )
+        stream = image.file
+        stream.seek(0, os.SEEK_END)
+        if stream.tell() > MAX_TEMPLATE_FILE_SIZE:
+            raise HTTPException(status_code=400, detail="Template image exceeds 10MB")
+        stream.seek(0)
+        if not valid_media_signature(extension, stream.read(32)):
+            raise HTTPException(status_code=400, detail="Template content does not match its extension")
 
-        # Sanitize filename: use only UUID-based name
-        filename = f"template_{uuid.uuid4()}{ext}"
-        file_path = UPLOAD_DIR / filename
-
-        # Save file
-        with file_path.open("wb") as buffer:
-            buffer.write(file_content)
-
-        # Create DB record
+        filename = f"template_{uuid.uuid4()}{extension}"
+        image_url = store_upload(stream, filename)
         new_ad = WinningAdModel(
-            name=image.filename,
-            image_url=f"/uploads/{filename}",
+            name=image.filename or filename,
+            image_url=image_url,
             filename=filename,
             template_category="Uploaded",
-            design_style="Unknown"
+            design_style="Unknown",
         )
         db.add(new_ad)
-        db.commit()
-        db.refresh(new_ad)
         saved_ads.append(new_ad)
-
-    return {"message": f"Successfully uploaded {len(saved_ads)} templates", "ads": saved_ads}
+    db.commit()
+    for ad in saved_ads:
+        db.refresh(ad)
+    return saved_ads

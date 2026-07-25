@@ -31,14 +31,14 @@ class TestCopyGeneration:
             json=make_brand_payload("Copy Gen Test Brand", voice="Professional and friendly"),
             headers=auth_headers
         )
+        assert response.status_code in (status.HTTP_200_OK, status.HTTP_201_CREATED), response.text
         return response.json()
 
     @pytest.fixture
     def test_product(self, client, auth_headers, test_brand):
         """Create a test product."""
         brand_id = test_brand.get("id")
-        if not brand_id:
-            pytest.skip("Brand creation failed, cannot create product")
+        assert brand_id, "Brand fixture did not return an id"
         response = client.post(
             "/api/v1/products/",
             json={
@@ -48,6 +48,7 @@ class TestCopyGeneration:
             },
             headers=auth_headers
         )
+        assert response.status_code in (status.HTTP_200_OK, status.HTTP_201_CREATED), response.text
         return response.json()
 
     @pytest.fixture
@@ -116,7 +117,7 @@ class TestCopyGeneration:
         })
         mock_model = MagicMock()
         mock_model.generate_content.return_value = mock_response
-        mock_genai.GenerativeModel.return_value = mock_model
+        mock_genai.Client.return_value.models = mock_model
 
         response = client.post(
             "/api/v1/copy-generation/generate",
@@ -162,7 +163,7 @@ class TestCopyGenerationEdgeCases:
 ```"""
         mock_model = MagicMock()
         mock_model.generate_content.return_value = mock_response
-        mock_genai.GenerativeModel.return_value = mock_model
+        mock_genai.Client.return_value.models = mock_model
 
         response = client.post(
             "/api/v1/copy-generation/generate",
@@ -180,7 +181,7 @@ class TestCopyGenerationEdgeCases:
         """Test handling Gemini API errors."""
         mock_model = MagicMock()
         mock_model.generate_content.side_effect = Exception("API Error")
-        mock_genai.GenerativeModel.return_value = mock_model
+        mock_genai.Client.return_value.models = mock_model
 
         response = client.post(
             "/api/v1/copy-generation/generate",
@@ -205,7 +206,7 @@ class TestCopyGenerationEdgeCases:
         mock_response.text = "This is not valid JSON"
         mock_model = MagicMock()
         mock_model.generate_content.return_value = mock_response
-        mock_genai.GenerativeModel.return_value = mock_model
+        mock_genai.Client.return_value.models = mock_model
 
         response = client.post(
             "/api/v1/copy-generation/generate",

@@ -15,7 +15,7 @@ from app.core.security import (
     create_access_token,
     create_refresh_token,
 )
-from app.core.deps import get_current_active_user
+from app.core.deps import get_current_active_user, require_permission
 from app.schemas.auth import (
     Token,
     TokenRefresh,
@@ -82,7 +82,7 @@ async def register(
     request: Request,
     user_data: UserCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_permission("users:write"))
 ):
     """Register a new user (admin only)"""
     # Check if current user has admin role or is superuser

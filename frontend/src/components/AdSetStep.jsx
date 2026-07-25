@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ChevronRight, Plus, Check, Loader, X } from 'lucide-react';
 import { useCampaign } from '../context/CampaignContext';
+import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getAdSets, getPixels, searchGeoLocations } from '../lib/facebookApi';
 
@@ -61,6 +62,7 @@ const COUNTRIES = [
 ];
 
 const AdSetStep = ({ onNext, onBack }) => {
+    const { authFetch } = useAuth();
     const { campaignData, adsetData, setAdsetData, selectedAdAccount } = useCampaign();
     const { showError, showWarning } = useToast();
     const [mode, setMode] = useState('new');
@@ -83,7 +85,7 @@ const AdSetStep = ({ onNext, onBack }) => {
             if (countrySearch.length >= 2 && selectedAdAccount) {
                 setIsSearchingLocations(true);
                 try {
-                    const results = await searchGeoLocations(countrySearch, selectedAdAccount.id);
+            const results = await searchGeoLocations(countrySearch, selectedAdAccount.id, authFetch);
                     setLocationResults(results);
                 } catch (error) {
                     console.error('Error searching locations:', error);
@@ -99,7 +101,7 @@ const AdSetStep = ({ onNext, onBack }) => {
 
         const timeoutId = setTimeout(searchLocations, 500);
         return () => clearTimeout(timeoutId);
-    }, [countrySearch, selectedAdAccount, showError]);
+    }, [authFetch, countrySearch, selectedAdAccount, showError]);
 
     const fetchPixels = useCallback(async () => {
         if (!selectedAdAccount) {
@@ -109,7 +111,7 @@ const AdSetStep = ({ onNext, onBack }) => {
 
         setLoadingPixels(true);
         try {
-            const fetchedPixels = await getPixels(selectedAdAccount.id);
+            const fetchedPixels = await getPixels(selectedAdAccount.id, authFetch);
             setPixels(fetchedPixels);
         } catch (error) {
             console.error('Error fetching pixels:', error);
@@ -117,7 +119,7 @@ const AdSetStep = ({ onNext, onBack }) => {
         } finally {
             setLoadingPixels(false);
         }
-    }, [selectedAdAccount, showWarning]);
+    }, [authFetch, selectedAdAccount, showWarning]);
 
     const fetchExistingAdsets = useCallback(async () => {
         setLoadingAdSets(true);
@@ -134,7 +136,7 @@ const AdSetStep = ({ onNext, onBack }) => {
                 return;
             }
 
-            const adSets = await getAdSets(campaignIdToUse);
+            const adSets = await getAdSets(campaignIdToUse, undefined, authFetch);
             setExistingAdsets(adSets);
         } catch (error) {
             console.error('Error fetching ad sets:', error);
@@ -142,7 +144,7 @@ const AdSetStep = ({ onNext, onBack }) => {
         } finally {
             setLoadingAdSets(false);
         }
-    }, [campaignData.fbCampaignId, campaignData.id, showError]);
+    }, [authFetch, campaignData.fbCampaignId, campaignData.id, showError]);
 
     useEffect(() => {
         if (mode === 'existing' && campaignData.id) {

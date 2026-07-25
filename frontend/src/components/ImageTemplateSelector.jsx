@@ -1,12 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { X, Filter, Grid, List, Sparkles, Trash2, AlertTriangle } from 'lucide-react';
-import { useToast } from '../context/ToastContext';
+import { X, Filter, Grid, List, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 export default function ImageTemplateSelector({ onSelect, onClose, embedded = false }) {
-    const { showError } = useToast();
     const { authFetch } = useAuth();
     const [templates, setTemplates] = useState([]);
     const [filters, setFilters] = useState({ categories: [], styles: [] });
@@ -22,7 +20,6 @@ export default function ImageTemplateSelector({ onSelect, onClose, embedded = fa
     const [sortBy, setSortBy] = useState('newest'); // 'newest', 'oldest', 'name'
     const [loading, setLoading] = useState(true);
     const [selectedIds, setSelectedIds] = useState(new Set());
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     const fetchFilters = useCallback(async () => {
         try {
@@ -125,34 +122,6 @@ export default function ImageTemplateSelector({ onSelect, onClose, embedded = fa
         }
     };
 
-    const confirmDelete = () => {
-        setShowDeleteConfirm(true);
-    };
-
-    const handleDelete = async () => {
-        try {
-            const response = await authFetch(`${API_URL}/templates/bulk-delete`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ ids: Array.from(selectedIds) })
-            });
-
-            if (response.ok) {
-                setSelectedIds(new Set());
-                fetchTemplates(); // Refresh list
-                fetchFilters(); // Refresh filters
-                setShowDeleteConfirm(false);
-            } else {
-                showError('Failed to delete templates');
-            }
-        } catch (error) {
-            console.error('Delete error:', error);
-            showError('Error deleting templates');
-        }
-    };
-
     const content = (
         <>
             {/* Header */}
@@ -186,15 +155,6 @@ export default function ImageTemplateSelector({ onSelect, onClose, embedded = fa
                             <span className="text-sm text-muted-foreground">
                                 {selectedIds.size > 0 ? `${selectedIds.size} Selected` : 'Select All'}
                             </span>
-                            {selectedIds.size > 0 && (
-                                <button
-                                    onClick={confirmDelete}
-                                    className="ml-2 flex items-center gap-1 text-red-600 hover:text-red-700 text-sm font-medium bg-red-50 px-2 py-1 rounded"
-                                >
-                                    <Trash2 size={14} />
-                                    Delete
-                                </button>
-                            )}
                         </div>
                     )}
 
@@ -302,34 +262,6 @@ export default function ImageTemplateSelector({ onSelect, onClose, embedded = fa
                 )}
             </div>
 
-            {/* Delete Confirmation Modal */}
-            {showDeleteConfirm && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
-                    <div className="bg-card rounded-lg shadow-xl max-w-md w-full p-6">
-                        <div className="flex items-center gap-3 text-red-600 mb-4">
-                            <AlertTriangle size={24} />
-                            <h3 className="text-lg font-bold">Delete Templates?</h3>
-                        </div>
-                        <p className="text-muted-foreground mb-6">
-                            Are you sure you want to delete {selectedIds.size} selected template{selectedIds.size !== 1 ? 's' : ''}? This action cannot be undone.
-                        </p>
-                        <div className="flex justify-end gap-3">
-                            <button
-                                onClick={() => setShowDeleteConfirm(false)}
-                                className="px-4 py-2 text-muted-foreground hover:bg-secondary rounded-lg font-medium"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleDelete}
-                                className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700"
-                            >
-                                Delete
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </>
     );
 

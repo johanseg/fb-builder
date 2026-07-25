@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ChevronRight, ChevronLeft, Check, Loader, Plus, LayoutTemplate, Trash2 } from 'lucide-react';
 import { useCampaign } from '../context/CampaignContext';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 import { getCampaigns, getCampaignTemplates, deleteCampaignTemplate } from '../lib/facebookApi';
 
 const CAMPAIGN_OBJECTIVES = [
@@ -22,14 +23,15 @@ const BID_STRATEGIES = [
 const CampaignStep = ({ onNext, onBack }) => {
     const { campaignData, setCampaignData, setAdsetData, setCreativeData, selectedAdAccount } = useCampaign();
     const { showError, showWarning, showSuccess } = useToast();
+    const { authFetch } = useAuth();
     const [mode, setMode] = useState('new'); // 'new' or 'existing'
     const [templates, setTemplates] = useState([]);
 
     useEffect(() => {
-        getCampaignTemplates()
+        getCampaignTemplates(authFetch)
             .then(setTemplates)
             .catch(err => console.error('Error loading templates:', err));
-    }, []);
+    }, [authFetch]);
 
     const applyTemplate = (template) => {
         const config = template.config || {};
@@ -52,7 +54,7 @@ const CampaignStep = ({ onNext, onBack }) => {
     const handleDeleteTemplate = async (template, e) => {
         e.stopPropagation();
         try {
-            await deleteCampaignTemplate(template.id);
+            await deleteCampaignTemplate(template.id, authFetch);
             setTemplates(prev => prev.filter(t => t.id !== template.id));
         } catch (err) {
             showError(`Failed to delete template: ${err.message}`);
@@ -67,7 +69,7 @@ const CampaignStep = ({ onNext, onBack }) => {
 
         setLoadingCampaigns(true);
         try {
-            const campaigns = await getCampaigns(selectedAdAccount.id);
+            const campaigns = await getCampaigns(selectedAdAccount.id, authFetch);
             setExistingCampaigns(campaigns);
         } catch (error) {
             console.error('Error fetching campaigns:', error);
@@ -75,7 +77,7 @@ const CampaignStep = ({ onNext, onBack }) => {
         } finally {
             setLoadingCampaigns(false);
         }
-    }, [selectedAdAccount, showError]);
+    }, [authFetch, selectedAdAccount, showError]);
 
     useEffect(() => {
         // Fetch campaigns when switching to existing mode

@@ -1,151 +1,140 @@
-"""Unit tests for the multi-account background launch executor."""
+"""Focused tests for the durable, PAUSED-only launch worker."""
 from unittest.mock import MagicMock
 
 import pytest
+import requests
 
 from app.database import SessionLocal
-from app.models import FacebookAd, FacebookAdSet, FacebookCampaign, LaunchJob
-from app.services.launch_service import count_total_steps, run_launch_job
-import app.services.launch_service as launch_service_module
+from app.models import LaunchJob, LaunchOperation, User
+from app.services.launch_service import MAX_ADS_PER_LAUNCH, MAX_OPERATION_ATTEMPTS, _result, create_job, reconcile_job, request_activation, run_worker_once, validate_launch_payload
 
 
-def make_payload(**overrides):
-    payload = {
-        "ad_account_ids": ["act_111", "act_222"],
-        "launch_status": "PAUSED",
-        "source_account_id": "act_111",
+def payload(**overrides):
+    value = {
+        "ad_account_ids": ["act_111", "act_222"], "launch_status": "PAUSED", "source_account_id": "act_111",
         "campaign": {"name": "Test Campaign", "objective": "OUTCOME_TRAFFIC", "budgetType": "ABO"},
         "adset": {"name": "Test AdSet", "optimizationGoal": "LINK_CLICKS", "dailyBudget": 10},
-        "page_id": "page_1",
-        "instagram_id": None,
-        "creative_name": "Test Creative",
-        "creatives": [{"image_url": "https://example.com/a.jpg", "media_type": "image", "name": "A"}],
-        "headlines": ["H1", "H2"],
-        "bodies": ["B1"],
-        "description": "desc",
-        "cta": "LEARN_MORE",
-        "website_url": "https://example.com",
+        "page_id": "page_1", "creatives": [{"image_url": "https://example.com/a.jpg", "media_type": "image", "name": "A"}],
+        "headlines": ["H1", "H2"], "bodies": ["B1"], "cta": "LEARN_MORE", "website_url": "https://example.com",
     }
-    payload.update(overrides)
-    return payload
+    value.update(overrides)
+    return value
 
 
-def make_fake_service():
+def fake_service():
     service = MagicMock()
-    service.create_campaign.side_effect = lambda data, acct: {"id": f"fbcamp_{acct}"}
-    service.create_adset.side_effect = lambda data, acct: {"id": f"fbadset_{acct}"}
-    service.upload_image.side_effect = lambda url, acct: f"hash_{acct}"
-    service.create_creative.side_effect = lambda data, acct: {"id": f"fbcreative_{acct}"}
-    service.create_ad.side_effect = lambda data, acct: {"id": f"fbad_{acct}_{data['name']}"}
+    service.create_campaign.side_effect = lambda data, account: {"id": f"campaign_{account}"}
+    service.create_adset.side_effect = lambda data, account: {"id": f"adset_{account}"}
+    service.upload_image.side_effect = lambda url, account: f"hash_{account}"
+    service.create_creative.side_effect = lambda data, account: {"id": f"creative_{account}_{data['name']}"}
+    service.create_ad.side_effect = lambda data, account: {"id": f"ad_{account}_{data['name']}"}
+    service.get_object.return_value = {"id": "known", "status": "PAUSED"}
     return service
 
 
-@pytest.fixture()
-def launch_env(monkeypatch):
-    """Create a LaunchJob, patch out FB + pacing, and clean up commits afterwards."""
-    monkeypatch.setattr(launch_service_module.time, "sleep", lambda s: None)
-    created = {}
-
-    def setup(payload, service):
-        monkeypatch.setattr("app.api.v1.facebook.get_facebook_service", lambda: service)
-        db = SessionLocal()
-        job = LaunchJob(payload=payload)
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        created["job_id"] = job.id
-        db.close()
-        return job.id
-
-    yield setup
-
-    # run_launch_job commits its own transactions — remove them explicitly
-    if created:
-        db = SessionLocal()
-        for campaign in db.query(FacebookCampaign).filter(FacebookCampaign.name == "Test Campaign").all():
-            db.delete(campaign)  # cascades to adsets/ads
-        job = db.query(LaunchJob).filter(LaunchJob.id == created["job_id"]).first()
-        if job:
-            db.delete(job)
-        db.commit()
-        db.close()
-
-
-def get_job(job_id):
+@pytest.fixture
+def owner_id():
     db = SessionLocal()
-    job = db.query(LaunchJob).filter(LaunchJob.id == job_id).first()
-    db.expunge(job)
+    user = User(id="test-worker-user", email="launch-worker@example.test", hashed_password="not-used")
+    db.add(user); db.commit()
+    yield user.id
+    db.query(User).filter_by(id=user.id).delete(); db.commit(); db.close()
+
+
+@pytest.fixture
+def job_id(owner_id):
+    db = SessionLocal()
+    job, _ = create_job(db, payload(), owner_id, "test-worker-key")
+    yield job.id
+    db = SessionLocal()
+    job = db.query(LaunchJob).filter_by(id=job.id).first()
+    if job:
+        db.delete(job); db.commit()
     db.close()
-    return job
 
 
-def test_count_total_steps():
-    payload = make_payload()
-    # 2 accounts x 1 creative x 2 headlines x 1 body
-    assert count_total_steps(payload) == 4
-    assert count_total_steps(make_payload(headlines=["", "  "])) == 0
+def drain(service):
+    while run_worker_once(lambda: service):
+        pass
 
 
-def test_launch_creates_per_account_campaigns_and_ads(launch_env):
-    service = make_fake_service()
-    job_id = launch_env(make_payload(), service)
-
-    run_launch_job(job_id)
-
-    job = get_job(job_id)
-    assert job.status == "completed"
+def test_worker_creates_paused_launch_then_requires_explicit_activation(job_id):
+    service = fake_service()
+    drain(service)
+    db = SessionLocal(); job = db.query(LaunchJob).filter_by(id=job_id).one()
+    assert job.status == "ready"
     assert job.completed_steps == 4
-    assert job.failed_steps == 0
-
-    # One campaign per account, image uploaded once per account (cached across permutations)
-    assert service.create_campaign.call_count == 2
-    assert service.upload_image.call_count == 2
-    assert service.create_ad.call_count == 4
-
-    db = SessionLocal()
-    campaigns = db.query(FacebookCampaign).filter(FacebookCampaign.name == "Test Campaign").all()
-    assert {c.ad_account_id for c in campaigns} == {"act_111", "act_222"}
-    ads = (
-        db.query(FacebookAd)
-        .join(FacebookAdSet, FacebookAd.adset_id == FacebookAdSet.id)
-        .filter(FacebookAdSet.campaign_id.in_([c.id for c in campaigns]))
-        .all()
-    )
-    assert len(ads) == 4
-    assert all(ad.ad_account_id in ("act_111", "act_222") for ad in ads)
-    assert all(ad.status == "PAUSED" for ad in ads)
+    request_activation(db, job, service)
+    db.close()
+    drain(service)
+    db = SessionLocal(); job = db.query(LaunchJob).filter_by(id=job_id).one()
+    assert job.status == "active"
+    assert service.set_status.call_count == 8  # 4 ads + 2 adsets + 2 campaigns
     db.close()
 
 
-def test_account_failure_does_not_abort_other_accounts(launch_env):
-    service = make_fake_service()
-
-    def failing_campaign(data, acct):
-        if acct == "act_111":
-            raise RuntimeError("no access to this account")
-        return {"id": f"fbcamp_{acct}"}
-
-    service.create_campaign.side_effect = failing_campaign
-    job_id = launch_env(make_payload(), service)
-
-    run_launch_job(job_id)
-
-    job = get_job(job_id)
-    assert job.status == "completed_with_errors"
-    assert job.completed_steps == 2  # act_222 only
-    assert job.failed_steps == 2  # act_111's two permutations
-    errors = [r for r in job.results if r.get("error")]
-    assert errors and errors[0]["ad_account_id"] == "act_111"
+def test_idempotency_replays_only_the_matching_payload(owner_id):
+    db = SessionLocal()
+    job, replayed = create_job(db, payload(ad_account_ids=["act_333"]), owner_id, "same-key")
+    same, replayed_same = create_job(db, payload(ad_account_ids=["act_333"]), owner_id, "same-key")
+    with pytest.raises(RuntimeError):
+        create_job(db, payload(ad_account_ids=["act_444"]), owner_id, "same-key")
+    assert not replayed and replayed_same and same.id == job.id
+    db = SessionLocal(); db.delete(db.query(LaunchJob).filter_by(id=job.id).one()); db.commit(); db.close()
 
 
-def test_all_failures_marks_job_failed(launch_env):
-    service = make_fake_service()
-    service.upload_image.side_effect = RuntimeError("upload broken")
-    job_id = launch_env(make_payload(ad_account_ids=["act_111"]), service)
+def test_launch_is_paused_only_and_capped():
+    with pytest.raises(ValueError, match="PAUSED only"):
+        validate_launch_payload(payload(launch_status="ACTIVE"))
+    too_many = payload(ad_account_ids=[f"act_{number}" for number in range(MAX_ADS_PER_LAUNCH + 1)])
+    with pytest.raises(ValueError, match="limited"):
+        validate_launch_payload(too_many)
 
-    run_launch_job(job_id)
 
-    job = get_job(job_id)
-    assert job.status == "failed"
-    assert job.completed_steps == 0
-    assert job.failed_steps == 2
+def test_retries_are_bounded(job_id):
+    db = SessionLocal()
+    op = db.query(LaunchOperation).join(LaunchOperation.target).filter_by(job_id=job_id).first()
+    op.attempt_count = MAX_OPERATION_ATTEMPTS
+    op.status = "leased"
+    db.commit()
+    _result(db, op.id, retryable=True)
+    db.refresh(op)
+    assert op.status == "failed"
+    assert "exceeded" in op.last_error
+    db.close()
+
+
+def test_uncertain_activation_is_reconciled_without_replay(job_id):
+    service = fake_service()
+    drain(service)
+    db = SessionLocal()
+    job = db.query(LaunchJob).filter_by(id=job_id).one()
+    request_activation(db, job, service)
+    db.close()
+    service.set_status.side_effect = requests.Timeout("provider timeout")
+    assert run_worker_once(lambda: service)
+    db = SessionLocal(); job = db.query(LaunchJob).filter_by(id=job_id).one()
+    op = next(op for target in job.targets for op in target.operations if op.kind == "activate_ad" and op.status == "needs_reconciliation")
+    assert op.fb_object_id == op.request_payload["fb_object_id"]
+    service.get_object.return_value = {"id": op.fb_object_id, "status": "ACTIVE"}
+    assert reconcile_job(db, job, service) == []
+    db.refresh(op)
+    assert op.status == "succeeded"
+    assert service.set_status.call_count == 1
+    db.close()
+
+
+def test_reused_parent_is_not_activated(owner_id):
+    db = SessionLocal()
+    reused = payload(ad_account_ids=["act_111"], campaign={"name": "Existing", "isExisting": True, "fbCampaignId": "existing_campaign"}, adset={"name": "Existing set", "fbAdsetId": "existing_adset"})
+    job, _ = create_job(db, reused, owner_id, "reused-parent-key")
+    launch_id = job.id
+    db.close()
+    service = fake_service(); drain(service)
+    db = SessionLocal(); job = db.query(LaunchJob).filter_by(id=launch_id).one()
+    request_activation(db, job, service); db.close()
+    drain(service)
+    activated_ids = [call.args[0] for call in service.set_status.call_args_list]
+    assert "existing_campaign" not in activated_ids
+    assert "existing_adset" not in activated_ids
+    db = SessionLocal(); db.delete(db.query(LaunchJob).filter_by(id=launch_id).one()); db.commit(); db.close()

@@ -113,13 +113,8 @@ class TestFileUploadSecurity:
         # but should not cause server error
         assert response.status_code != status.HTTP_500_INTERNAL_SERVER_ERROR
 
-    @pytest.mark.xfail(reason="Upload endpoint currently doesn't require auth - security gap to address")
     def test_upload_requires_auth(self, client):
-        """Test that uploads require authentication.
-
-        NOTE: Currently fails because /api/v1/uploads/ doesn't require authentication.
-        This is a security issue that should be addressed.
-        """
+        """Test that uploads require authentication."""
         file_content = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
 
         response = client.post(

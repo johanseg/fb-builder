@@ -7,7 +7,7 @@
  * Email: jason@jasonakatiff.com
  */
 
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { BrandProvider } from './context/BrandContext';
@@ -17,25 +17,25 @@ import PrivateRoute from './components/PrivateRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
-import CreateAds from './pages/CreateAds';
-import ImageAds from './pages/ImageAds';
-import VideoAds from './pages/VideoAds';
-import ModularAds from './pages/ModularAds';
-import AdModulesLibrary from './pages/AdModulesLibrary';
-import Reporting from './pages/Reporting';
-import CustomerProfiles from './pages/CustomerProfiles';
-import AIPersonas from './pages/AIPersonas';
-import FacebookCampaigns from './pages/FacebookCampaigns';
-import WinningAds from './pages/WinningAds';
-import GeneratedAds from './pages/GeneratedAds';
-import Research from './pages/Research';
-import ResearchSettings from './pages/ResearchSettings';
-import BrandScrapes from './pages/BrandScrapes';
-import AdRemix from './pages/AdRemix';
-import Settings from './pages/Settings';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import UserManagement from './pages/UserManagement';
+const CreateAds = lazy(() => import('./pages/CreateAds'));
+const ImageAds = lazy(() => import('./pages/ImageAds'));
+const VideoAds = lazy(() => import('./pages/VideoAds'));
+const ModularAds = lazy(() => import('./pages/ModularAds'));
+const AdModulesLibrary = lazy(() => import('./pages/AdModulesLibrary'));
+const Reporting = lazy(() => import('./pages/Reporting'));
+const CustomerProfiles = lazy(() => import('./pages/CustomerProfiles'));
+const AIPersonas = lazy(() => import('./pages/AIPersonas'));
+const FacebookCampaigns = lazy(() => import('./pages/FacebookCampaigns'));
+const WinningAds = lazy(() => import('./pages/WinningAds'));
+const GeneratedAds = lazy(() => import('./pages/GeneratedAds'));
+const Research = lazy(() => import('./pages/Research'));
+const ResearchSettings = lazy(() => import('./pages/ResearchSettings'));
+const BrandScrapes = lazy(() => import('./pages/BrandScrapes'));
+const AdRemix = lazy(() => import('./pages/AdRemix'));
+const Settings = lazy(() => import('./pages/Settings'));
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const UserManagement = lazy(() => import('./pages/UserManagement'));
 
 function App() {
   return (
@@ -45,6 +45,7 @@ function App() {
           <CampaignProvider>
             <BrowserRouter>
               <ErrorBoundary>
+                <Suspense fallback={<div className="min-h-screen grid place-items-center">Loading...</div>}>
                 <Routes>
                   {/* Public routes */}
                   <Route path="/login" element={<Login />} />
@@ -86,6 +87,7 @@ function App() {
                     />
                   </Route>
                 </Routes>
+                </Suspense>
               </ErrorBoundary>
             </BrowserRouter>
           </CampaignProvider>

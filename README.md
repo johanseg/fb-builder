@@ -203,6 +203,7 @@ FACEBOOK_ACCESS_TOKEN=your-token
 FACEBOOK_AD_ACCOUNT_ID=act_123456789
 FACEBOOK_APP_ID=your-app-id
 FACEBOOK_APP_SECRET=your-app-secret
+ALLOWED_FB_ACCOUNTS=act_123456789
 ```
 
 > **Note:** Access tokens expire after ~60 days. For production, implement token refresh.
@@ -245,6 +246,7 @@ Create a `.env.local` file in the project root:
 | `ALLOWED_ORIGINS` | Production | Comma-separated CORS origins |
 | `FACEBOOK_ACCESS_TOKEN` | For FB features | Facebook Marketing API token |
 | `FACEBOOK_AD_ACCOUNT_ID` | For FB features | Facebook Ad Account ID |
+| `ALLOWED_FB_ACCOUNTS` | Required for Meta reporting | Comma-separated server-side account allowlist (`act_` IDs) |
 | `R2_*` | For uploads | Cloudflare R2 credentials |
 | `FAL_AI_API_KEY` | For image gen | Fal.ai API key |
 
@@ -599,6 +601,5 @@ Contributions are welcome! Please:
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
-
 
 

@@ -1,4 +1,4 @@
-import google.generativeai as genai
+from google import genai
 import logging
 import os
 from collections import defaultdict
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class BaseAgent:
     def __init__(self):
         self.api_key = settings.GEMINI_API_KEY
-        self.model = genai.GenerativeModel(settings.GEMINI_MODEL)
+        self.client = genai.Client(api_key=self.api_key) if self.api_key else None
         self.prompts_dir = os.path.join(os.path.dirname(__file__), 'prompts')
 
     def load_prompt(self, template_name: str, **kwargs) -> str:
@@ -23,7 +23,7 @@ class BaseAgent:
     def generate(self, prompt: str) -> str:
         if not self.api_key:
             raise ValueError("Gemini API key not configured")
-        response = self.model.generate_content(prompt)
+        response = self.client.models.generate_content(model=settings.GEMINI_MODEL, contents=prompt)
         return response.text.strip()
 
     def generate_json(self, prompt: str) -> Dict[str, Any]:

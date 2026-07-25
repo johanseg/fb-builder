@@ -1,175 +1,194 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from datetime import date, timedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy.orm.attributes import flag_modified
-from typing import Dict, Any, List
-from pydantic import BaseModel
-import csv
-import io
-import re
+
+from app.core.deps import require_permission, require_role
 from app.database import get_db
-from app.models import AdModule, Brand, Product, User
-from app.core.deps import require_permission, get_current_active_user
+from app.models import Brand, BrandAdAccount, MetaSyncRun, User
+from app.schemas.reporting import ReportingPolicy, ReportingResponse, SyncRunResponse
+from app.services.meta_reporting_service import MetaReportingService, allowed_account_ids, normalized_account_id
+
 
 router = APIRouter()
 
-class KillRuleFlag(BaseModel):
-    module_id: str
-    module_type: str
-    content: str
-    score: int
-    spend: float
-    status: str # "KILL" or "SCALE"
-    reason: str
 
-@router.post("/import")
-async def import_performance_csv(
-    file: UploadFile = File(...),
+@router.get("/meta/report", response_model=ReportingResponse)
+def read_meta_report(
+    brand_id: str,
+    date_from: date | None = None,
+    date_to: date | None = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("ads:write"))
+    current_user: User = Depends(require_permission("reporting:read")),
 ):
-    """
-    Ingest a Facebook Ads CSV export.
-    We extract the UUID fragments from the bundle code in the Ad Name to link back to modules.
-    Scores are mapped 0-5 based on the deepest funnel event using the Retention-Driven Scoring System.
-    """
-    if not file.filename.endswith('.csv'):
-        raise HTTPException(status_code=400, detail="Only CSV files are allowed detected.")
-
-    contents = await file.read()
+    del current_user
+    end = date_to or (date.today() - timedelta(days=1))
+    start = date_from or (end - timedelta(days=34))
+    if start > end:
+        raise HTTPException(status_code=422, detail="date_from must be on or before date_to")
     try:
-        decoded = contents.decode('utf-8')
-    except UnicodeDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid file encoding. Please use UTF-8.")
-
-    reader = csv.DictReader(io.StringIO(decoded))
-    
-    module_metrics = {}
-
-    for row in reader:
-        ad_name = row.get("Ad Name", "")
-        spend_str = row.get("Amount spent (USD)", "0")
-        
-        try:
-            spend = float(spend_str.replace(',', '')) if spend_str else 0.0
-        except ValueError:
-            spend = 0.0
-
-        if spend == 0:
-            continue
-
-        # Extract deepest funnel event for the Fit Score
-        # 5: AddPaymentInfo, 4: InitiateCheckout, 3: AddToCart, 2: Contact, 1: Lead, 0: CompleteRegistration
-        
-        def safe_int(val):
-            try: return int(val.replace(',', '')) if val else 0
-            except ValueError: return 0
-
-        c_pay = safe_int(row.get("AddsPaymentInfo", "0"))
-        c_chk = safe_int(row.get("InitiatesCheckout", "0"))
-        c_atc = safe_int(row.get("AddsToCart", "0"))
-        c_cnt = safe_int(row.get("Contacts", "0"))
-        c_led = safe_int(row.get("Leads", "0"))
-        c_reg = safe_int(row.get("CompleteRegistration", "0"))
-
-        # Determine highest score for this particular ad row
-        row_score = -1
-        if c_pay > 0: row_score = 5
-        elif c_chk > 0: row_score = 4
-        elif c_atc > 0: row_score = 3
-        elif c_cnt > 0: row_score = 2
-        elif c_led > 0: row_score = 1
-        elif c_reg > 0: row_score = 0
-        
-        # Format I-PAIN-Q-1a2b_B-MEC-3c4d...
-        fragments = re.findall(r'-([a-f0-9]{4,8})(?:_|$)', ad_name.lower())
-        
-        for frag in fragments:
-            if frag not in module_metrics:
-                module_metrics[frag] = {"spend": 0.0, "max_score": -1}
-            
-            module_metrics[frag]["spend"] += spend
-            if row_score > module_metrics[frag]["max_score"]:
-                module_metrics[frag]["max_score"] = row_score
-
-    updated_count = 0
-    if not module_metrics:
-        return {"message": "No matching bundle codes found in CSV. Updated 0 modules."}
-
-    # Build OR filters to only load modules whose IDs start with a known fragment
-    from sqlalchemy import or_, func as sa_func
-    fragment_filters = [sa_func.lower(AdModule.id).like(f"{frag}%") for frag in module_metrics.keys()]
-    all_modules = db.query(AdModule).filter(or_(*fragment_filters)).all()
-
-    for mod in all_modules:
-        mod_id_str = str(mod.id).lower()
-        matched_frag = next((f for f in module_metrics.keys() if mod_id_str.startswith(f)), None)
-        
-        if matched_frag:
-            metrics = module_metrics[matched_frag]
-            final_score = max(0, metrics["max_score"]) # If -1 it remains 0
-            
-            mod.performance_score = final_score
-            
-            # Store raw metrics in metadata as copy to trigger SQLAlchemy change
-            new_meta = dict(mod.generation_metadata or {})
-            new_meta["total_spend"] = metrics["spend"]
-            new_meta["verified_score"] = final_score
-            mod.generation_metadata = new_meta
-            
-            flag_modified(mod, "generation_metadata")
-            updated_count += 1
-
-    db.commit()
-    return {"message": f"Successfully processed CSV. Updated {updated_count} granular ad modules via Fit Score."}
+        return MetaReportingService(db).report(brand_id, start, end)
+    except Exception as error:
+        if "No row was found" in str(error):
+            raise HTTPException(status_code=404, detail="Brand not found") from error
+        raise
 
 
-@router.get("/kill-rule", response_model=List[KillRuleFlag])
-def get_kill_rule_flags(
-    brand_id: str = None,
+@router.get("/meta/sync-runs", response_model=list[SyncRunResponse])
+def list_meta_sync_runs(
+    brand_id: str,
+    limit: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_permission("reporting:read")),
 ):
-    """
-    US-012: 7-Day Kill Rule using Fit Score mapping.
-    Kill if Score <= 1 (Low Quality/Learning) and spend is significant.
-    Scale if Score >= 4 (High Retention/Premium LTV).
-    Spend threshold is configurable per brand via break_even_roas (defaults to $50).
-    """
-    # Get brand-specific spend threshold if brand_id provided
-    spend_threshold = 50.0
+    del current_user
+    rows = db.query(MetaSyncRun).join(BrandAdAccount).filter(
+        BrandAdAccount.brand_id == brand_id,
+    ).order_by(MetaSyncRun.started_at.desc()).limit(limit).all()
+    return [
+        {
+            "id": row.id,
+            "account_id": row.brand_ad_account_id,
+            "status": row.status,
+            "started_at": row.started_at,
+            "completed_at": row.completed_at,
+            "lookback_days": row.lookback_days,
+            "totals": row.totals,
+            "error": row.error,
+        }
+        for row in rows
+    ]
+
+
+@router.get("/meta/brands/{brand_id}/policy", response_model=ReportingPolicy)
+def read_reporting_policy(
+    brand_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("reporting:read")),
+):
+    del current_user
+    brand = db.query(Brand).filter(Brand.id == brand_id).first()
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found")
+    return ReportingPolicy(
+        lookback_days=brand.lookback_days,
+        min_spend=brand.min_spend,
+        break_even_roas=brand.break_even_roas,
+        scale_roas=brand.scale_roas,
+        min_purchases=brand.min_purchases,
+    )
+
+
+@router.put("/meta/brands/{brand_id}/policy", response_model=ReportingPolicy)
+def update_reporting_policy(
+    brand_id: str,
+    policy: ReportingPolicy,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("reporting:write")),
+):
+    del current_user
+    if policy.lookback_days is not None and policy.lookback_days < 1:
+        raise HTTPException(status_code=422, detail="lookback_days must be at least 1")
+    if any(value is not None and value < 0 for value in (policy.min_spend, policy.break_even_roas, policy.scale_roas)):
+        raise HTTPException(status_code=422, detail="Metric thresholds cannot be negative")
+    if policy.min_purchases is not None and policy.min_purchases < 0:
+        raise HTTPException(status_code=422, detail="min_purchases cannot be negative")
+    brand = db.query(Brand).filter(Brand.id == brand_id).first()
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found")
+    for key, value in policy.model_dump().items():
+        setattr(brand, key, value)
+    db.commit()
+    return policy
+
+
+@router.get("/meta/accounts")
+def list_brand_ad_accounts(
+    brand_id: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+):
+    del current_user
+    query = db.query(BrandAdAccount)
     if brand_id:
-        brand = db.query(Brand).filter(Brand.id == brand_id).first()
-        if brand and brand.break_even_roas is not None:
-            spend_threshold = brand.break_even_roas
+        query = query.filter(BrandAdAccount.brand_id == brand_id)
+    return [
+        {"id": row.id, "brand_id": row.brand_id, "meta_account_id": row.meta_account_id, "currency": row.currency, "timezone": row.timezone, "enabled": row.enabled}
+        for row in query.order_by(BrandAdAccount.meta_account_id).all()
+    ]
 
-    flags = []
-    modules = db.query(AdModule).filter(AdModule.performance_score.isnot(None)).all()
 
-    for mod in modules:
-        meta = mod.generation_metadata or {}
-        spend = meta.get("total_spend", 0)
-        score = mod.performance_score or 0
+@router.post("/meta/accounts", status_code=201)
+def create_brand_ad_account(
+    brand_id: str,
+    meta_account_id: str,
+    currency: str,
+    timezone: str = "UTC",
+    enabled: bool = True,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+):
+    del current_user
+    if normalized_account_id(meta_account_id) not in allowed_account_ids():
+        raise HTTPException(status_code=422, detail="Account must be in ALLOWED_FB_ACCOUNTS")
+    if len(currency) != 3 or not currency.isalpha():
+        raise HTTPException(status_code=422, detail="currency must be a three-letter ISO code")
+    try:
+        ZoneInfo(timezone)
+    except ZoneInfoNotFoundError as error:
+        raise HTTPException(status_code=422, detail="timezone must be an IANA timezone") from error
+    if not db.query(Brand).filter(Brand.id == brand_id).first():
+        raise HTTPException(status_code=404, detail="Brand not found")
+    account_id = normalized_account_id(meta_account_id)
+    if db.query(BrandAdAccount).filter(BrandAdAccount.meta_account_id == account_id).first():
+        raise HTTPException(status_code=409, detail="Account is already assigned to a brand")
+    try:
+        accessible = MetaReportingService(db).accessible_account(account_id)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    actual_currency = (accessible.get("currency") or "").upper()
+    if actual_currency and actual_currency != currency.upper():
+        raise HTTPException(status_code=422, detail="currency must match the accessible Meta account")
+    account = BrandAdAccount(brand_id=brand_id, meta_account_id=account_id, currency=actual_currency or currency.upper(), timezone=timezone, enabled=enabled)
+    db.add(account)
+    db.commit()
+    db.refresh(account)
+    return {"id": account.id, "brand_id": account.brand_id, "meta_account_id": account.meta_account_id}
 
-        if spend > spend_threshold:
-            if score <= 1:
-                flags.append(KillRuleFlag(
-                    module_id=str(mod.id),
-                    module_type=mod.module_type,
-                    content=mod.content,
-                    score=score,
-                    spend=spend,
-                    status="KILL",
-                    reason="Low Fit Score (Only Lead or lower). Kill & Replace this chunk."
-                ))
-            elif score >= 4:
-                flags.append(KillRuleFlag(
-                    module_id=str(mod.id),
-                    module_type=mod.module_type,
-                    content=mod.content,
-                    score=score,
-                    spend=spend,
-                    status="SCALE",
-                    reason="High Fit Score (Checkout/Purchase intent). Keep as control vector."
-                ))
 
-    return flags
+@router.delete("/meta/accounts/{account_id}", status_code=204)
+def delete_brand_ad_account(
+    account_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+):
+    del current_user
+    account = db.query(BrandAdAccount).filter(BrandAdAccount.id == account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account mapping not found")
+    db.delete(account)
+    db.commit()
+
+
+@router.post("/meta/sync", response_model=list[SyncRunResponse])
+def sync_brand_meta_reporting(
+    brand_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("reporting:sync")),
+):
+    del current_user
+    if not db.query(Brand).filter(Brand.id == brand_id).first():
+        raise HTTPException(status_code=404, detail="Brand not found")
+    try:
+        runs = MetaReportingService(db).sync_brand(brand_id)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    return [
+        {
+            "id": run.id, "account_id": run.brand_ad_account_id, "status": run.status,
+            "started_at": run.started_at, "completed_at": run.completed_at,
+            "lookback_days": run.lookback_days, "totals": run.totals, "error": run.error,
+        }
+        for run in runs
+    ]

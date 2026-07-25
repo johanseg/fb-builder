@@ -5,6 +5,7 @@ Scrapes all ads from a specific Facebook page and downloads media to R2.
 """
 
 import httpx
+from io import BytesIO
 import logging
 import os
 import re
@@ -17,6 +18,7 @@ from sqlalchemy.orm import Session
 from app.models import BrandScrape, BrandScrapedAd
 from app.core.config import settings
 from app.core.utils import GRAPH_API_VERSION
+from app.services.storage import store_upload
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +58,7 @@ class BrandScraperService:
 
     def __init__(self, db: Session):
         self.db = db
-        self.access_token = os.getenv("FACEBOOK_ADS_LIBRARY_TOKEN") or os.getenv("VITE_FACEBOOK_ACCESS_TOKEN")
+        self.access_token = os.getenv("FACEBOOK_ADS_LIBRARY_TOKEN")
         self.base_url = f"https://graph.facebook.com/{GRAPH_API_VERSION}/ads_archive"
         self._s3_client = None  # Lazy-initialized, reused across all uploads
 
@@ -601,18 +603,7 @@ class BrandScraperService:
             return None
 
         try:
-            s3_client = self._get_s3_client()
-
-            content_type = 'video/mp4' if media_type == 'video' else 'image/jpeg'
-
-            s3_client.put_object(
-                Bucket=settings.R2_BUCKET_NAME,
-                Key=filename,
-                Body=content,
-                ContentType=content_type
-            )
-
-            return f"{settings.R2_PUBLIC_URL}/{filename}"
+            return store_upload(BytesIO(content), filename)
 
         except Exception as e:
             logger.error(f"R2 upload error: {e}")

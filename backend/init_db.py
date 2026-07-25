@@ -1,72 +1,6 @@
-from app.database import engine, Base, SessionLocal
+from app.database import SessionLocal
 from app.models import *
 from app.core.security import get_password_hash
-
-def init_db():
-    print("Creating database tables...")
-    Base.metadata.create_all(bind=engine)
-    print("Tables created successfully!")
-
-def ensure_schema_columns():
-    """Add columns that create_all cannot add to existing Railway tables."""
-    from sqlalchemy import inspect, text
-
-    db = SessionLocal()
-    try:
-        inspector = inspect(db.bind)
-        tables = set(inspector.get_table_names())
-
-        if "generated_ads" in tables:
-            generated_ad_columns = {c["name"] for c in inspector.get_columns("generated_ads")}
-            if "bundle_code" not in generated_ad_columns:
-                db.execute(text("ALTER TABLE generated_ads ADD COLUMN bundle_code VARCHAR"))
-                print("  Added missing column: generated_ads.bundle_code")
-            if "parent_ad_id" not in generated_ad_columns:
-                db.execute(text("ALTER TABLE generated_ads ADD COLUMN parent_ad_id VARCHAR"))
-                print("  Added missing column: generated_ads.parent_ad_id")
-
-            db.execute(text("CREATE INDEX IF NOT EXISTS ix_generated_ads_bundle_code ON generated_ads (bundle_code)"))
-            db.execute(text("""
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (
-                        SELECT 1 FROM pg_constraint
-                        WHERE conname = 'fk_generated_ads_parent_ad_id'
-                    ) THEN
-                        ALTER TABLE generated_ads
-                        ADD CONSTRAINT fk_generated_ads_parent_ad_id
-                        FOREIGN KEY (parent_ad_id)
-                        REFERENCES generated_ads(id)
-                        ON DELETE SET NULL;
-                    END IF;
-                END $$;
-            """))
-
-        if "brands" in tables:
-            brand_columns = {c["name"] for c in inspector.get_columns("brands")}
-            if "break_even_roas" not in brand_columns:
-                db.execute(text("ALTER TABLE brands ADD COLUMN break_even_roas DOUBLE PRECISION"))
-                print("  Added missing column: brands.break_even_roas")
-
-        # Multi-account launch: attribute FB entities to the ad account they were pushed to
-        for fb_table in ("facebook_campaigns", "facebook_adsets", "facebook_ads"):
-            if fb_table in tables:
-                fb_columns = {c["name"] for c in inspector.get_columns(fb_table)}
-                if "ad_account_id" not in fb_columns:
-                    db.execute(text(f"ALTER TABLE {fb_table} ADD COLUMN ad_account_id VARCHAR"))
-                    print(f"  Added missing column: {fb_table}.ad_account_id")
-                db.execute(text(
-                    f"CREATE INDEX IF NOT EXISTS ix_{fb_table}_ad_account_id ON {fb_table} (ad_account_id)"
-                ))
-
-        db.commit()
-        print("Schema columns verified successfully!")
-    except Exception as e:
-        db.rollback()
-        print(f"Error verifying schema columns: {e}")
-        raise
-    finally:
-        db.close()
 
 def seed_roles_and_permissions():
     """Seed default roles and permissions"""
@@ -85,15 +19,25 @@ def seed_roles_and_permissions():
             ("ads:delete", "Delete ads"),
             ("campaigns:read", "View campaigns"),
             ("campaigns:write", "Create and edit campaigns"),
+            ("campaigns:activate", "Activate verified Meta launches"),
             ("campaigns:delete", "Delete campaigns"),
             ("templates:read", "View templates"),
             ("templates:write", "Create and edit templates"),
             ("templates:delete", "Delete templates"),
             ("users:read", "View users"),
             ("users:write", "Manage users"),
+            ("prompts:read", "View prompts"),
+            ("prompts:write", "Create and edit prompts"),
+            ("prompts:delete", "Delete prompts"),
+            ("ad_styles:read", "View ad styles"),
+            ("ad_styles:write", "Create and edit ad styles"),
+            ("ad_styles:delete", "Delete ad styles"),
             ("research:read", "View research data"),
             ("research:write", "Create searches and manage blacklists"),
             ("research:admin", "Run scheduled searches"),
+            ("reporting:read", "View Meta reporting"),
+            ("reporting:write", "Manage reporting settings"),
+            ("reporting:sync", "Run Meta reporting syncs"),
         ]
 
         # Create permissions if they don't exist
@@ -124,6 +68,7 @@ def seed_roles_and_permissions():
                     "campaigns:read", "campaigns:write",
                     "templates:read", "templates:write",
                     "research:read", "research:write",
+                    "reporting:read", "reporting:write", "reporting:sync",
                 ]
             },
             "editor": {
@@ -134,6 +79,7 @@ def seed_roles_and_permissions():
                     "ads:read", "ads:write",
                     "templates:read", "templates:write",
                     "research:read", "research:write",
+                    "reporting:read",
                 ]
             },
             "viewer": {
@@ -145,6 +91,7 @@ def seed_roles_and_permissions():
                     "campaigns:read",
                     "templates:read",
                     "research:read",
+                    "reporting:read",
                 ]
             }
         }
@@ -161,7 +108,11 @@ def seed_roles_and_permissions():
                 db.add(role)
                 print(f"  Created role: {role_name}")
             else:
-                print(f"  Role exists: {role_name}")
+                for perm_name in role_data["permissions"]:
+                    permission = permissions[perm_name]
+                    if permission not in existing.permissions:
+                        existing.permissions.append(permission)
+                print(f"  Reconciled role: {role_name}")
 
         db.commit()
         print("Roles and permissions seeded successfully!")
@@ -364,10 +315,6 @@ def backfill_product_brief():
 
 
 if __name__ == "__main__":
-    init_db()
-    print("\nVerifying schema columns...")
-    ensure_schema_columns()
-
     print("\nSeeding roles and permissions...")
     seed_roles_and_permissions()
 

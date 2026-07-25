@@ -1,14 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 import logging
 from app.models import User
 from app.core.api_errors import log_and_raise_http_error
 from app.core.config import settings
-from app.core.deps import get_current_active_user
+from app.core.deps import require_permission
 from app.core.rate_limit import limiter
 from app.core.utils import extract_json_from_text
-import google.generativeai as genai
+from google import genai
 import json
 
 router = APIRouter()
@@ -19,7 +19,7 @@ class CopyGenerationRequest(BaseModel):
     product: Dict[str, Any]
     profile: Dict[str, Any]
     template: Optional[Dict[str, Any]] = None
-    variationCount: int = 3
+    variationCount: int = Field(3, ge=1, le=10)
     campaignDetails: Dict[str, str]
     customPrompt: Optional[str] = None
 
@@ -34,7 +34,7 @@ class FieldRegenerationRequest(BaseModel):
 
 @router.post("/generate")
 @limiter.limit("20/minute")
-async def generate_copy(request: Request, body: CopyGenerationRequest, current_user: User = Depends(get_current_active_user)):
+async def generate_copy(request: Request, body: CopyGenerationRequest, current_user: User = Depends(require_permission("ads:write"))):
     """Generate ad copy variations using Gemini AI"""
     
     if not settings.GEMINI_API_KEY:
@@ -104,8 +104,9 @@ Return ONLY valid JSON in this exact format:
             prompt = body.customPrompt
         
         # Generate with Gemini
-        model = genai.GenerativeModel(settings.GEMINI_MODEL)
-        response = model.generate_content(prompt)
+        response = genai.Client(api_key=settings.GEMINI_API_KEY).models.generate_content(
+            model=settings.GEMINI_MODEL, contents=prompt
+        )
         return extract_json_from_text(response.text)
         
     except json.JSONDecodeError as e:
@@ -126,7 +127,7 @@ Return ONLY valid JSON in this exact format:
 
 @router.post("/regenerate-field")
 @limiter.limit("20/minute")
-async def regenerate_field(request: Request, body: FieldRegenerationRequest, current_user: User = Depends(get_current_active_user)):
+async def regenerate_field(request: Request, body: FieldRegenerationRequest, current_user: User = Depends(require_permission("ads:write"))):
     """Regenerate a specific field (headline, body, or cta)"""
     
     if not settings.GEMINI_API_KEY:
@@ -155,8 +156,9 @@ Generate a DIFFERENT, fresh variation that:
 
 Return ONLY the new {body.field} text, nothing else."""
 
-        model = genai.GenerativeModel(settings.GEMINI_MODEL)
-        response = model.generate_content(prompt)
+        response = genai.Client(api_key=settings.GEMINI_API_KEY).models.generate_content(
+            model=settings.GEMINI_MODEL, contents=prompt
+        )
         
         new_value = response.text.strip().strip('"').strip("'")
         

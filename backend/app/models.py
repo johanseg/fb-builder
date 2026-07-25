@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Float, ForeignKey, DateTime, Text, JSON, Table, Boolean
+from sqlalchemy import Column, String, Integer, Float, ForeignKey, Date, DateTime, Text, JSON, Numeric, Table, Boolean, UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -107,7 +107,12 @@ class Brand(Base):
     secondary_color = Column(String, default='#10B981')
     highlight_color = Column(String, default='#F59E0B')
     voice = Column(Text, nullable=True)
-    break_even_roas = Column(Float, nullable=True, default=None)
+    break_even_roas = Column(Numeric(18, 6), nullable=True, default=None)
+    # Nullable until each brand explicitly opts into an operating policy.
+    lookback_days = Column(Integer, nullable=True)
+    min_spend = Column(Numeric(18, 2), nullable=True)
+    scale_roas = Column(Numeric(18, 6), nullable=True)
+    min_purchases = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -115,6 +120,7 @@ class Brand(Base):
     profiles = relationship("CustomerProfile", secondary=brand_profiles, back_populates="brands")
     generated_ads = relationship("GeneratedAd", back_populates="brand")
     ai_personas = relationship("AIPersona", back_populates="brand", cascade="all, delete-orphan")
+    ad_accounts = relationship("BrandAdAccount", back_populates="brand", cascade="all, delete-orphan")
 
     @property
     def colors(self):
@@ -224,13 +230,28 @@ class FacebookAd(Base):
 
     adset = relationship("FacebookAdSet", back_populates="ads")
 
+class BrandAdAccount(Base):
+    """The one Brand that owns a Meta ad account in this installation."""
+    __tablename__ = "brand_ad_accounts"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    brand_id = Column(String, ForeignKey("brands.id", ondelete="CASCADE"), nullable=False, index=True)
+    meta_account_id = Column(String, nullable=False, unique=True)
+    currency = Column(String, nullable=True)
+    timezone = Column(String, nullable=True)
+    enabled = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    brand = relationship("Brand", back_populates="ad_accounts")
+
+
 class LaunchJob(Base):
-    """Background multi-account creative launch job, polled by the frontend."""
+    """Durable launch request. The Railway worker owns execution, not HTTP."""
     __tablename__ = "launch_jobs"
 
     id = Column(String, primary_key=True, default=generate_uuid)
-    # pending | running | completed | completed_with_errors | failed
-    status = Column(String, default='pending', index=True)
+    status = Column(String, default='queued', index=True)
     payload = Column(JSON, nullable=False)
     results = Column(JSON, nullable=True)
     total_steps = Column(Integer, default=0)
@@ -238,8 +259,122 @@ class LaunchJob(Base):
     failed_steps = Column(Integer, default=0)
     error = Column(Text, nullable=True)
     created_by = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    idempotency_key = Column(String, nullable=True)
+    payload_sha256 = Column(String(64), nullable=True)
+    activation_requested_at = Column(DateTime(timezone=True), nullable=True)
+    activated_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("created_by", "idempotency_key", name="uq_launch_jobs_creator_idempotency"),
+    )
+    targets = relationship("LaunchTarget", back_populates="job", cascade="all, delete-orphan")
+
+
+class LaunchTarget(Base):
+    __tablename__ = "launch_targets"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    job_id = Column(String, ForeignKey("launch_jobs.id", ondelete="CASCADE"), nullable=False, index=True)
+    ad_account_id = Column(String, nullable=False)
+    status = Column(String, nullable=False, default="queued", index=True)
+    campaign_fb_id = Column(String, nullable=True)
+    adset_fb_id = Column(String, nullable=True)
+    campaign_owned_by_launch = Column(Boolean, nullable=False, default=True)
+    adset_owned_by_launch = Column(Boolean, nullable=False, default=True)
+    last_error = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("job_id", "ad_account_id", name="uq_launch_targets_job_account"),
+        CheckConstraint("status IN ('queued','building','reconciliation_required','ready','activating','active','failed')", name="ck_launch_targets_status"),
+    )
+    job = relationship("LaunchJob", back_populates="targets")
+    operations = relationship("LaunchOperation", back_populates="target", cascade="all, delete-orphan")
+
+
+class LaunchOperation(Base):
+    __tablename__ = "launch_operations"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    target_id = Column(String, ForeignKey("launch_targets.id", ondelete="CASCADE"), nullable=False, index=True)
+    operation_key = Column(String, nullable=False)
+    kind = Column(String, nullable=False)
+    ordinal = Column(Integer, nullable=False, default=0)
+    request_payload = Column(JSON, nullable=False)
+    result = Column(JSON, nullable=True)
+    fb_object_id = Column(String, nullable=True)
+    status = Column(String, nullable=False, default="pending", index=True)
+    attempt_count = Column(Integer, nullable=False, default=0)
+    available_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    lease_expires_at = Column(DateTime(timezone=True), nullable=True, index=True)
+    last_error = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("target_id", "operation_key", name="uq_launch_operations_target_key"),
+        CheckConstraint("status IN ('pending','leased','succeeded','retryable','needs_reconciliation','failed','cancelled')", name="ck_launch_operations_status"),
+    )
+    target = relationship("LaunchTarget", back_populates="operations")
+
+
+class MetaSyncRun(Base):
+    __tablename__ = "meta_sync_runs"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    brand_ad_account_id = Column(String, ForeignKey("brand_ad_accounts.id", ondelete="CASCADE"), nullable=False, index=True)
+    status = Column(String, nullable=False, default="queued")
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    scope = Column(String, nullable=True)
+    lookback_days = Column(Integer, nullable=True)
+    cursor = Column(String, nullable=True)
+    totals = Column(JSON, nullable=True)
+    error = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class MetaInsightDaily(Base):
+    __tablename__ = "meta_insight_daily"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    brand_ad_account_id = Column(String, ForeignKey("brand_ad_accounts.id", ondelete="CASCADE"), nullable=False, index=True)
+    meta_sync_run_id = Column(String, ForeignKey("meta_sync_runs.id", ondelete="SET NULL"), nullable=True, index=True)
+    meta_ad_id = Column(String, nullable=False)
+    date_start = Column(Date, nullable=False)
+    currency = Column(String, nullable=True)
+    spend = Column(Numeric(18, 2), nullable=True)
+    impressions = Column(Integer, nullable=True)
+    clicks = Column(Integer, nullable=True)
+    actions = Column(JSON, nullable=True)
+    purchase_value = Column(Numeric(18, 2), nullable=True)
+    meta_campaign_id = Column(String, nullable=True)
+    meta_adset_id = Column(String, nullable=True)
+    campaign_name = Column(String, nullable=True)
+    adset_name = Column(String, nullable=True)
+    ad_name = Column(String, nullable=True)
+    raw = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (UniqueConstraint("brand_ad_account_id", "meta_ad_id", "date_start", name="uq_meta_insight_daily_ad_date"),)
+
+
+class FacebookAdModule(Base):
+    __tablename__ = "facebook_ad_modules"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    facebook_ad_id = Column(String, ForeignKey("facebook_ads.id", ondelete="CASCADE"), nullable=False, index=True)
+    ad_module_id = Column(String, ForeignKey("ad_modules.id", ondelete="CASCADE"), nullable=False, index=True)
+    role = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("facebook_ad_id", "ad_module_id", name="uq_facebook_ad_modules_ad_module"),
+    )
 
 class CampaignTemplate(Base):
     """Reusable campaign+adset configuration for fast launches."""

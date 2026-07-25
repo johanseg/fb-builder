@@ -2,10 +2,11 @@ from logging.config import fileConfig
 import os
 import sys
 
-from sqlalchemy import engine_from_config
+from sqlalchemy import engine_from_config, inspect
 from sqlalchemy import pool
 
 from alembic import context
+from alembic.script import ScriptDirectory
 
 # Add parent directory to path so we can import app modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -54,6 +55,19 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
+        # This repository predates a complete initial Alembic revision.  A
+        # pristine database is bootstrapped only inside `alembic upgrade`, then
+        # stamped at the same immutable revision; existing databases still run
+        # normal forward migrations.
+        if not inspect(connection).get_table_names():
+            Base.metadata.create_all(bind=connection)
+            connection.commit()
+            context.configure(connection=connection, target_metadata=target_metadata)
+            migration_context = context.get_context()
+            migration_context._ensure_version_table()
+            migration_context.stamp(ScriptDirectory.from_config(config), "head")
+            connection.commit()
+            return
         context.configure(
             connection=connection, target_metadata=target_metadata
         )

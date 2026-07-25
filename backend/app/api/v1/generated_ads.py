@@ -3,23 +3,24 @@ import csv
 import io
 import logging
 import os
+from io import BytesIO
 import uuid
 from math import gcd
-from pathlib import Path
 from typing import List, Optional, Dict, Any
 from urllib.parse import quote_plus, urljoin, urlparse, urlunparse
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.deps import get_current_active_user, require_permission
-from app.core.utils import validate_url
+from app.core.rate_limit import limiter
+from app.core.utils import IMAGE_CONTENT_TYPES, allowed_media_domains, download_remote_media
 from app.database import get_db
 from app.models import GeneratedAd, User, WinningAd
+from app.services.storage import store_upload
 
 logger = logging.getLogger(__name__)
 
@@ -39,13 +40,19 @@ class ImageGenerationRequest(BaseModel):
     brand: Optional[Dict[str, Any]] = None
     product: Optional[Dict[str, Any]] = None
     ad_copy: Optional[Dict[str, Any]] = Field(None, alias="copy")
-    count: int = 1
-    imageSizes: List[Dict[str, Any]] = []
+    count: int = Field(1, ge=1, le=8)
+    imageSizes: List[Dict[str, Any]] = Field(default_factory=list, max_length=8)
     resolution: str = "1K"
     productShots: List[str] = []
     model: str = "nano-banana-2"
     customPrompt: Optional[str] = None
     useProductImage: bool = False  # Use uploaded product image as base
+
+    @model_validator(mode="after")
+    def enforce_output_limit(self):
+        if self.count * len(self.imageSizes) > 8:
+            raise ValueError("The total requested images cannot exceed 8")
+        return self
 
 def build_comprehensive_prompt(request: ImageGenerationRequest) -> str:
     """
@@ -283,7 +290,7 @@ class GeneratedAdCreate(BaseModel):
     thumbnailUrl: Optional[str] = None
 
 class BatchSaveRequest(BaseModel):
-    ads: List[GeneratedAdCreate]
+    ads: List[GeneratedAdCreate] = Field(max_length=100)
 
 router = APIRouter()
 
@@ -293,43 +300,32 @@ except ImportError:
     fal_client = None
 
 # Setup uploads directory
-UPLOAD_DIR = Path(__file__).parent.parent.parent.parent / "uploads"
-UPLOAD_DIR = UPLOAD_DIR.resolve()
-os.makedirs(UPLOAD_DIR, mode=0o755, exist_ok=True)
-
 async def download_and_save_image(image_url: str, prefix: str = "generated") -> str:
     """
     Download image from external URL and save it locally.
     Returns the local URL path.
     """
-    # Validate URL to prevent SSRF - only allow known Fal.ai CDN domains
-    allowed_domains = ['fal.media', 'v3.fal.media', 'cdn.fal.ai', 'storage.googleapis.com']
-    if not validate_url(image_url, allowed_domains=allowed_domains):
-        logger.warning("Skipping download from disallowed URL: %s", image_url)
-        return image_url
-
+    # Generated assets may only be persisted from known Fal.ai/CDN hosts.
+    allowed_domains = allowed_media_domains()
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(image_url, timeout=30.0)
-            response.raise_for_status()
+        content, _ = await download_remote_media(
+            image_url,
+            media_kind="image",
+            allowed_mime_types=IMAGE_CONTENT_TYPES,
+            max_bytes=10 * 1024 * 1024,
+            allowed_domains=allowed_domains,
+        )
+        unique_id = str(uuid.uuid4())
+        filename = f"{prefix}_{unique_id}.png"
+        return store_upload(BytesIO(content), filename)
 
-            # Generate unique filename
-            unique_id = str(uuid.uuid4())
-            filename = f"{prefix}_{unique_id}.png"
-            file_path = UPLOAD_DIR / filename
-
-            # Save image
-            with open(file_path, "wb") as f:
-                f.write(response.content)
-
-            # Return local URL
-            return f"/uploads/{filename}"
     except Exception as e:
         logger.exception("Error downloading generated image")
         # Return original URL as fallback
         return image_url
 
 @router.post("/generate-image")
+@limiter.limit("10/minute")
 async def generate_image(
     request: ImageGenerationRequest,
     http_request: Request,
