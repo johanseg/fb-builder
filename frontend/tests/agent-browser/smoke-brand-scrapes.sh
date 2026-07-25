@@ -32,8 +32,9 @@ else
   exit 1
 fi
 
-# Check for form inputs
-if echo "$SNAPSHOT" | grep -q "input"; then
+# Check for the two labeled form fields
+if echo "$SNAPSHOT" | grep -qi "Brand Name" &&
+  echo "$SNAPSHOT" | grep -qi "Facebook Page ID"; then
   echo "✓ Form inputs found"
 else
   echo "✗ Form inputs not found"
