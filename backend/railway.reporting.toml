@@ -1,0 +1,9 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "python run_meta_reporting_sync.py"
+cronSchedule = "0 16 * * *"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 1
