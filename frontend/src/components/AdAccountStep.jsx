@@ -2,10 +2,12 @@ import { useToast } from '../context/ToastContext';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ChevronRight, Loader, Building2, CreditCard, TrendingUp, Calendar, DollarSign, AlertCircle, CheckSquare, Square } from 'lucide-react';
 import { useCampaign } from '../context/CampaignContext';
+import { useAuth } from '../context/AuthContext';
 import { getAdAccounts } from '../lib/facebookApi';
 
 const AdAccountStep = ({ onNext }) => {
     const { showWarning } = useToast();
+    const { authFetch } = useAuth();
     const { selectedAdAccount, setSelectedAdAccount, extraAdAccounts, setExtraAdAccounts } = useCampaign();
     const [adAccounts, setAdAccounts] = useState([]);
     const [loadingAccounts, setLoadingAccounts] = useState(true);
@@ -17,7 +19,7 @@ const AdAccountStep = ({ onNext }) => {
         setLoadingAccounts(true);
         setAccountsError(null);
         try {
-            const accounts = await getAdAccounts();
+            const accounts = await getAdAccounts(authFetch);
             setAdAccounts(accounts);
 
             // Try to restore last selected account from localStorage
@@ -41,7 +43,7 @@ const AdAccountStep = ({ onNext }) => {
         } finally {
             setLoadingAccounts(false);
         }
-    }, [selectedAdAccount, setSelectedAdAccount]);
+    }, [authFetch, selectedAdAccount, setSelectedAdAccount]);
 
     useEffect(() => {
         fetchAdAccounts();

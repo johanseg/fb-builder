@@ -1,12 +1,9 @@
 import logging
 import os
-import tempfile
 import time
 from pathlib import Path
-from urllib.parse import urlparse
 
 import requests
-from dotenv import load_dotenv
 from facebook_business.api import FacebookAdsApi
 from facebook_business.adobjects.adaccount import AdAccount
 from facebook_business.adobjects.campaign import Campaign
@@ -17,16 +14,22 @@ from facebook_business.adobjects.ad import Ad
 from facebook_business.adobjects.advideo import AdVideo
 from facebook_business.adobjects.user import User
 
-from app.core.utils import GRAPH_API_VERSION, resolve_managed_upload_path, validate_url
+from app.core.utils import (
+    GRAPH_API_VERSION,
+    IMAGE_CONTENT_TYPES,
+    VIDEO_CONTENT_TYPES,
+    allowed_media_domains,
+    download_remote_media_to_tempfile,
+    resolve_managed_upload_path,
+)
 
 logger = logging.getLogger(__name__)
 
-# Load .env from project root (parent of backend)
-env_path = Path(__file__).resolve().parent.parent.parent.parent / '.env'
-load_dotenv(dotenv_path=env_path)
-
 UPLOAD_DIR = (Path(__file__).resolve().parents[2] / "uploads").resolve()
 ALLOWED_VIDEO_EXTENSIONS = {'.mp4', '.mov', '.avi', '.webm'}
+ALLOWED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
+IMAGE_MAX_BYTES = 10 * 1024 * 1024
+VIDEO_MAX_BYTES = 500 * 1024 * 1024
 
 class FacebookService:
     def __init__(self):
@@ -63,33 +66,6 @@ class FacebookService:
             # Re-raise the exception so the caller knows what went wrong
             raise Exception(f"Facebook API Init Error: {str(e)}")
 
-    @staticmethod
-    def _download_media_to_tempfile(media_url: str, suffix: str, timeout: int, stream: bool = False) -> str:
-        """Download a remote asset to a temporary file for SDK uploads."""
-        response = requests.get(media_url, timeout=timeout, stream=stream)
-        response.raise_for_status()
-
-        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-            if stream:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        tmp.write(chunk)
-            else:
-                tmp.write(response.content)
-            return tmp.name
-
-    @staticmethod
-    def _guess_remote_extension(media_url: str, default_suffix: str, allowed_extensions: set[str] | None = None) -> str:
-        """Infer a safe temp-file suffix from a remote URL."""
-        path = urlparse(media_url).path
-        if "." not in path.rsplit("/", 1)[-1]:
-            return default_suffix
-
-        candidate = f".{path.rsplit('.', 1)[-1].lower()}"
-        if allowed_extensions and candidate not in allowed_extensions:
-            return default_suffix
-        return candidate
-
     def _resolve_media_source(
         self,
         source: str,
@@ -97,7 +73,6 @@ class FacebookService:
         media_kind: str,
         default_suffix: str,
         timeout: int,
-        stream: bool = False,
         allowed_extensions: set[str] | None = None,
     ) -> tuple[str, bool]:
         """Resolve a remote URL or managed `/uploads/...` reference into a local file path."""
@@ -106,15 +81,15 @@ class FacebookService:
 
         normalized_source = source.strip()
         if normalized_source.startswith(('http://', 'https://')):
-            if not validate_url(normalized_source):
-                raise ValueError(f"Invalid or disallowed URL provided for {media_kind} upload")
-
-            suffix = self._guess_remote_extension(normalized_source, default_suffix, allowed_extensions)
-            local_path = self._download_media_to_tempfile(
+            local_path = download_remote_media_to_tempfile(
                 normalized_source,
-                suffix=suffix,
+                media_kind=media_kind,
+                allowed_mime_types=VIDEO_CONTENT_TYPES if media_kind == "video" else IMAGE_CONTENT_TYPES,
+                max_bytes=VIDEO_MAX_BYTES if media_kind == "video" else IMAGE_MAX_BYTES,
                 timeout=timeout,
-                stream=stream,
+                default_suffix=default_suffix,
+                allowed_extensions=allowed_extensions,
+                allowed_domains=allowed_media_domains(),
             )
             return local_path, True
 
@@ -129,6 +104,10 @@ class FacebookService:
 
     def get_ad_accounts(self):
         """Fetch all ad accounts for the current user."""
+        allowed_ids = self._allowed_account_ids()
+        if not allowed_ids:
+            logger.warning("ALLOWED_FB_ACCOUNTS is empty; refusing Meta account discovery")
+            return []
         if not self.api:
             # Try to initialize if not already done
             self.initialize()
@@ -139,12 +118,7 @@ class FacebookService:
             me = User(fbid='me', api=self.api)
             my_accounts = me.get_ad_accounts(fields=['id', 'name', 'account_id', 'account_status', 'currency', 'balance', 'amount_spent'])
             
-            # Filter accounts if ALLOWED_FB_ACCOUNTS is set (accepts as many as added)
-            allowed_accounts_raw = os.getenv("ALLOWED_FB_ACCOUNTS")
-            if allowed_accounts_raw:
-                allowed_ids = [acc_id.strip() for acc_id in allowed_accounts_raw.split(',') if acc_id.strip()]
-                allowed_ids = [aid if aid.startswith('act_') else f"act_{aid}" for aid in allowed_ids]
-                my_accounts = [acc for acc in my_accounts if acc.get('id') in allowed_ids]
+            my_accounts = [acc for acc in my_accounts if acc.get('id') in allowed_ids]
                 
             logger.info(f"Found {len(my_accounts)} accounts.")
             return [dict(acc) for acc in my_accounts]
@@ -152,16 +126,27 @@ class FacebookService:
             logger.error(f"Error fetching ad accounts: {e}")
             raise e
 
+    @staticmethod
+    def _allowed_account_ids():
+        return {
+            value if value.startswith("act_") else f"act_{value}"
+            for value in (item.strip() for item in os.getenv("ALLOWED_FB_ACCOUNTS", "").split(","))
+            if value
+        }
+
     def _get_account(self, ad_account_id=None):
         """Helper to get AdAccount object."""
-        if ad_account_id:
-            if not ad_account_id.startswith('act_'):
-                ad_account_id = f'act_{ad_account_id}'
-            return AdAccount(ad_account_id, api=self.api)
-        
-        if self.account:
-            return self.account
-            
+        resolved_id = ad_account_id
+        if not resolved_id and self.account:
+            resolved_id = self.account.get_id()
+        if resolved_id:
+            if not resolved_id.startswith('act_'):
+                resolved_id = f'act_{resolved_id}'
+            allowed_ids = self._allowed_account_ids()
+            if not allowed_ids or resolved_id not in allowed_ids:
+                raise PermissionError("Ad account is outside ALLOWED_FB_ACCOUNTS")
+            return AdAccount(resolved_id, api=self.api)
+
         raise Exception("No Ad Account ID provided and no default account set.")
 
     def get_campaigns(self, ad_account_id=None):
@@ -190,7 +175,7 @@ class FacebookService:
         params = {
             Campaign.Field.name: campaign_data.get('name'),
             Campaign.Field.objective: campaign_data.get('objective'),
-            Campaign.Field.status: campaign_data.get('status', 'PAUSED'),
+            Campaign.Field.status: 'PAUSED',
             Campaign.Field.special_ad_categories: [],
         }
 
@@ -334,7 +319,7 @@ class FacebookService:
             AdSet.Field.billing_event: 'IMPRESSIONS',
             AdSet.Field.optimization_goal: adset_data.get('optimization_goal') or adset_data.get('optimizationGoal'),
             AdSet.Field.is_dynamic_creative: False,
-            AdSet.Field.status: adset_data.get('status', 'PAUSED'),
+            AdSet.Field.status: 'PAUSED',
             AdSet.Field.targeting: transformed_targeting,
         }
 
@@ -431,7 +416,6 @@ class FacebookService:
                 media_kind="video",
                 default_suffix=".mp4",
                 timeout=120,
-                stream=True,
                 allowed_extensions=ALLOWED_VIDEO_EXTENSIONS,
             )
 
@@ -621,10 +605,28 @@ class FacebookService:
             Ad.Field.name: ad_data.get('name'),
             Ad.Field.adset_id: ad_data.get('adset_id'),
             Ad.Field.creative: {'creative_id': ad_data.get('creative_id')},
-            Ad.Field.status: ad_data.get('status', 'ACTIVE'),  # Changed from PAUSED to ACTIVE
+            Ad.Field.status: 'PAUSED',
         }
 
         return account.create_ad(params=params)
+
+    def get_object(self, object_id):
+        """Read a persisted Meta object during worker reconciliation."""
+        response = requests.get(
+            f"https://graph.facebook.com/{GRAPH_API_VERSION}/{object_id}",
+            params={"fields": "id,status", "access_token": self.access_token}, timeout=30,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def set_status(self, object_id, status):
+        """Explicit activation path; launch creation never calls this."""
+        response = requests.post(
+            f"https://graph.facebook.com/{GRAPH_API_VERSION}/{object_id}",
+            data={"status": status, "access_token": self.access_token}, timeout=30,
+        )
+        response.raise_for_status()
+        return response.json()
 
     def get_account_insights(self, ad_account_id=None, date_preset='last_7d'):
         """Fetch account-level performance insights (spend, clicks, purchases, ROAS)."""

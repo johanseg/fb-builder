@@ -3,28 +3,10 @@
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1') + '/facebook';
 
-// Helper to get auth headers from localStorage
-const getAuthHeaders = () => {
-    const token = localStorage.getItem('accessToken');
-    return token ? { 'Authorization': `Bearer ${token}` } : {};
-};
-
-// Authenticated fetch wrapper
-const authFetch = async (url, options = {}) => {
-    const response = await fetch(url, {
-        ...options,
-        headers: {
-            ...options.headers,
-            ...getAuthHeaders(),
-        },
-    });
-    return response;
-};
-
 /**
  * Get all ad accounts accessible by the access token
  */
-export async function getAdAccounts() {
+export async function getAdAccounts(authFetch) {
     try {
         const response = await authFetch(`${API_BASE_URL}/accounts`);
         if (!response.ok) {
@@ -60,7 +42,7 @@ export async function getAdAccounts() {
 /**
  * Get all campaigns for a specific ad account
  */
-export async function getCampaigns(adAccountId) {
+export async function getCampaigns(adAccountId, authFetch) {
     try {
         // Backend service currently fetches all campaigns for the connected account
         // It doesn't filter by adAccountId in the service call yet, but assumes the env var account
@@ -93,7 +75,7 @@ export async function getCampaigns(adAccountId) {
 /**
  * Get all pixels for a specific ad account
  */
-export async function getPixels(adAccountId) {
+export async function getPixels(adAccountId, authFetch) {
     try {
         const response = await authFetch(`${API_BASE_URL}/pixels?ad_account_id=${adAccountId}`);
         if (!response.ok) {
@@ -118,7 +100,7 @@ export async function getPixels(adAccountId) {
 /**
  * Get all promotable pages for a specific ad account
  */
-export async function getPages(adAccountId) {
+export async function getPages(adAccountId, authFetch) {
     try {
         const query = adAccountId ? `?ad_account_id=${adAccountId}` : '';
         const response = await authFetch(`${API_BASE_URL}/pages${query}`);
@@ -140,7 +122,7 @@ export async function getPages(adAccountId) {
 }
 
 
-export const getAdSets = async (campaignId, adAccountId) => {
+export const getAdSets = async (campaignId, adAccountId, authFetch) => {
     try {
         let url = `${API_BASE_URL}/adsets?`;
         if (campaignId) {
@@ -162,7 +144,7 @@ export const getAdSets = async (campaignId, adAccountId) => {
     }
 };
 
-export const searchGeoLocations = async (query, adAccountId) => {
+export const searchGeoLocations = async (query, adAccountId, authFetch) => {
     try {
         // Default to 'city' type for now, or we could make it a parameter
         // The backend supports 'city', 'region', 'country', 'zip', etc.
@@ -171,7 +153,7 @@ export const searchGeoLocations = async (query, adAccountId) => {
         // Facebook API 'location_types' can take multiple.
 
         // Let's use the searchLocations function we just added
-        return await searchLocations(query, 'city', adAccountId);
+        return await searchLocations(query, 'city', adAccountId, authFetch);
     } catch (error) {
         console.error('Error searching geo locations:', error);
         return [];
@@ -187,7 +169,7 @@ export const searchGeoLocations = async (query, adAccountId) => {
  * @param {number} timeout - Max seconds to wait for processing (default 600)
  * @returns {Promise<{video_id: string, status: string, thumbnails: string[]}>}
  */
-export async function uploadVideoToFacebook(videoUrl, adAccountId, waitForReady = true, timeout = 600) {
+export async function uploadVideoToFacebook(videoUrl, adAccountId, authFetch, waitForReady = true, timeout = 600) {
     try {
         let finalVideoUrl = videoUrl;
 
@@ -242,7 +224,7 @@ export async function uploadVideoToFacebook(videoUrl, adAccountId, waitForReady 
  * @param {string} videoId - Facebook video ID
  * @returns {Promise<{status: string, video_id: string, length?: number}>}
  */
-export async function getVideoStatus(videoId) {
+export async function getVideoStatus(videoId, authFetch) {
     try {
         const response = await authFetch(`${API_BASE_URL}/video-status/${videoId}`);
         if (!response.ok) {
@@ -261,7 +243,7 @@ export async function getVideoStatus(videoId) {
  * @param {string} videoId - Facebook video ID
  * @returns {Promise<{thumbnails: string[]}>}
  */
-export async function getVideoThumbnails(videoId) {
+export async function getVideoThumbnails(videoId, authFetch) {
     try {
         const response = await authFetch(`${API_BASE_URL}/video-thumbnails/${videoId}`);
         if (!response.ok) {
@@ -281,7 +263,7 @@ export async function getVideoThumbnails(videoId) {
  * @param {string} [filename]
  * @returns {Promise<string>} public URL of the uploaded file
  */
-export async function uploadBlobToServer(fileOrBlobUrl, filename = 'upload.jpg') {
+export async function uploadBlobToServer(fileOrBlobUrl, authFetch, filename = 'upload.jpg') {
     let blob = fileOrBlobUrl;
     if (typeof fileOrBlobUrl === 'string') {
         const blobResponse = await fetch(fileOrBlobUrl);
@@ -307,13 +289,13 @@ export async function uploadBlobToServer(fileOrBlobUrl, filename = 'upload.jpg')
 /**
  * Upload image to Facebook
  */
-export async function uploadImageToFacebook(imageUrl, adAccountId) {
+export async function uploadImageToFacebook(imageUrl, adAccountId, authFetch) {
     try {
         let finalImageUrl = imageUrl;
 
         // If it's a blob URL, we need to upload it to our server first
         if (imageUrl.startsWith('blob:')) {
-            finalImageUrl = await uploadBlobToServer(imageUrl);
+            finalImageUrl = await uploadBlobToServer(imageUrl, authFetch);
         }
 
         const response = await authFetch(`${API_BASE_URL}/upload-image?ad_account_id=${adAccountId}`, {
@@ -340,7 +322,7 @@ export async function uploadImageToFacebook(imageUrl, adAccountId) {
 /**
  * Create Facebook Campaign
  */
-export async function createFacebookCampaign(campaignData, adAccountId) {
+export async function createFacebookCampaign(campaignData, adAccountId, authFetch) {
     try {
         const response = await authFetch(`${API_BASE_URL}/campaigns?ad_account_id=${adAccountId}`, {
             method: 'POST',
@@ -366,7 +348,7 @@ export async function createFacebookCampaign(campaignData, adAccountId) {
 /**
  * Create Facebook Ad Set
  */
-export async function createFacebookAdSet(adsetData, campaignId, adAccountId, budgetType) {
+export async function createFacebookAdSet(adsetData, campaignId, adAccountId, budgetType, authFetch) {
     try {
         // Prepare payload for backend
         const payload = {
@@ -410,7 +392,7 @@ export async function createFacebookAdSet(adsetData, campaignId, adAccountId, bu
  * @param {string} adAccountId - Facebook ad account ID
  * @param {Object|null} videoData - Video data: { video_id, thumbnail_url } for video ads
  */
-export async function createFacebookCreative(creativeData, imageHash, pageId, adAccountId, videoData = null) {
+export async function createFacebookCreative(creativeData, imageHash, pageId, adAccountId, authFetch, videoData = null) {
     try {
         const payload = {
             ...creativeData,
@@ -454,7 +436,7 @@ export async function createFacebookCreative(creativeData, imageHash, pageId, ad
 /**
  * Create Facebook Ad
  */
-export async function createFacebookAd(adData, adsetId, creativeId, adAccountId) {
+export async function createFacebookAd(adData, adsetId, creativeId, adAccountId, authFetch) {
     try {
         const payload = {
             ...adData,
@@ -486,7 +468,7 @@ export async function createFacebookAd(adData, adsetId, creativeId, adAccountId)
 /**
  * Search for locations
  */
-export async function searchLocations(query, type = 'city', adAccountId) {
+export async function searchLocations(query, type = 'city', adAccountId, authFetch) {
     try {
         const response = await authFetch(`${API_BASE_URL}/locations/search?q=${encodeURIComponent(query)}&type=${type}&ad_account_id=${adAccountId}`);
         if (!response.ok) {
@@ -504,7 +486,7 @@ export async function searchLocations(query, type = 'city', adAccountId) {
 /**
  * Campaign templates: reusable campaign+adset configs
  */
-export async function getCampaignTemplates() {
+export async function getCampaignTemplates(authFetch) {
     const response = await authFetch(`${API_BASE_URL}/campaign-templates`);
     if (!response.ok) {
         const error = await response.json();
@@ -513,7 +495,7 @@ export async function getCampaignTemplates() {
     return await response.json();
 }
 
-export async function saveCampaignTemplate(name, config) {
+export async function saveCampaignTemplate(name, config, authFetch) {
     const response = await authFetch(`${API_BASE_URL}/campaign-templates`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -526,7 +508,7 @@ export async function saveCampaignTemplate(name, config) {
     return await response.json();
 }
 
-export async function deleteCampaignTemplate(templateId) {
+export async function deleteCampaignTemplate(templateId, authFetch) {
     const response = await authFetch(`${API_BASE_URL}/campaign-templates/${templateId}`, { method: 'DELETE' });
     if (!response.ok) {
         const error = await response.json();
@@ -542,7 +524,7 @@ export async function deleteCampaignTemplate(templateId) {
 export function buildLaunchPayload({ campaignData, adsetData, creativeData, accounts, sourceAccountId, launchStatus, creatives }) {
     return {
         ad_account_ids: accounts,
-        launch_status: launchStatus,
+        launch_status: launchStatus || 'PAUSED',
         source_account_id: sourceAccountId,
         campaign: {
             ...campaignData,
@@ -571,10 +553,17 @@ export function buildLaunchPayload({ campaignData, adsetData, creativeData, acco
  * @param {Object} payload - Launch spec (ad_account_ids, campaign, adset, creatives, ...)
  * @returns {Promise<string>} job id
  */
-export async function createLaunch(payload) {
+export async function createLaunch(payload, authFetch) {
+    const preflight = await preflightLaunch(payload, authFetch);
+    const idempotencyKey = localStorage.getItem('launchIdempotencyKey') || crypto.randomUUID();
+    localStorage.setItem('launchIdempotencyKey', idempotencyKey);
     const response = await authFetch(`${API_BASE_URL}/launches`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Key': idempotencyKey,
+            'X-Preflight-Token': preflight.confirmation_token,
+        },
         body: JSON.stringify(payload)
     });
     if (!response.ok) {
@@ -582,7 +571,19 @@ export async function createLaunch(payload) {
         throw new Error(error.detail || 'Failed to queue launch');
     }
     const data = await response.json();
+    localStorage.removeItem('launchIdempotencyKey');
     return data.job_id;
+}
+
+export async function preflightLaunch(payload, authFetch) {
+    const response = await authFetch(`${API_BASE_URL}/launches/preflight`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'Launch preflight failed');
+    return data;
 }
 
 /**
@@ -590,11 +591,31 @@ export async function createLaunch(payload) {
  * @param {string} jobId
  * @returns {Promise<Object>} job status with progress counters and per-entity results
  */
-export async function getLaunch(jobId) {
+export async function getLaunch(jobId, authFetch) {
     const response = await authFetch(`${API_BASE_URL}/launches/${jobId}`);
     if (!response.ok) {
         const error = await response.json();
         throw new Error(error.detail || 'Failed to fetch launch status');
     }
     return await response.json();
+}
+
+export async function preflightActivation(jobId, authFetch) {
+    const response = await authFetch(`${API_BASE_URL}/launches/${jobId}/activation-preflight`, {
+        method: 'POST',
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'Activation preflight failed');
+    return data;
+}
+
+export async function activateLaunch(jobId, confirmationToken, authFetch) {
+    const response = await authFetch(`${API_BASE_URL}/launches/${jobId}/activate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmation_token: confirmationToken }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'Activation failed');
+    return data;
 }

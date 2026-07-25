@@ -1,117 +1,69 @@
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 import logging
 import os
 import uuid
-import mimetypes
 from typing import Dict
-from pathlib import Path
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+
 from app.core.api_errors import log_and_raise_http_error
-from app.core.config import settings
+from app.core.deps import require_permission
 from app.models import User
-from app.core.deps import get_current_active_user
+from app.services.storage import store_upload
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# Security: Define allowed file types and size limits
-ALLOWED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
-ALLOWED_VIDEO_EXTENSIONS = {'.mp4', '.mov', '.avi', '.webm'}
+ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".webm"}
 ALLOWED_EXTENSIONS = ALLOWED_IMAGE_EXTENSIONS | ALLOWED_VIDEO_EXTENSIONS
-MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB for images
-MAX_VIDEO_SIZE = 500 * 1024 * 1024  # 500MB for videos
-
-# Local upload dir for fallback
-UPLOAD_DIR = Path(__file__).parent.parent.parent.parent / "uploads"
-UPLOAD_DIR = UPLOAD_DIR.resolve()
-os.makedirs(UPLOAD_DIR, mode=0o755, exist_ok=True)
-
-# Initialize R2 client if configured
-_s3_client = None
-
-def get_s3_client():
-    global _s3_client
-    if _s3_client is None and settings.r2_enabled:
-        import boto3
-        _s3_client = boto3.client(
-            's3',
-            endpoint_url=settings.r2_endpoint_url,
-            aws_access_key_id=settings.R2_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
-            region_name='auto'
-        )
-    return _s3_client
+MAX_IMAGE_SIZE = 10 * 1024 * 1024
+MAX_VIDEO_SIZE = 500 * 1024 * 1024
 
 
-async def upload_to_r2(file_content: bytes, filename: str, content_type: str) -> str:
-    """Upload file to Cloudflare R2 and return public URL"""
-    client = get_s3_client()
-    if not client:
-        raise HTTPException(status_code=500, detail="R2 storage not configured")
-
-    try:
-        client.put_object(
-            Bucket=settings.R2_BUCKET_NAME,
-            Key=filename,
-            Body=file_content,
-            ContentType=content_type
-        )
-        return f"{settings.R2_PUBLIC_URL}/{filename}"
-    except Exception as e:
-        log_and_raise_http_error(logger, "Failed to upload file to R2", e, expose_detail=True)
-
-
-async def upload_to_local(file_content: bytes, filename: str) -> str:
-    """Upload file to local filesystem and return relative URL"""
-    file_path = UPLOAD_DIR / filename
-    with open(file_path, "wb") as buffer:
-        buffer.write(file_content)
-    return f"/uploads/{filename}"
+def valid_media_signature(extension: str, header: bytes) -> bool:
+    """Accept only the image/video container claimed by the filename."""
+    signatures = {
+        ".jpg": lambda value: value.startswith(b"\xff\xd8\xff"),
+        ".jpeg": lambda value: value.startswith(b"\xff\xd8\xff"),
+        ".png": lambda value: value.startswith(b"\x89PNG\r\n\x1a\n"),
+        ".gif": lambda value: value.startswith((b"GIF87a", b"GIF89a")),
+        ".webp": lambda value: value.startswith(b"RIFF") and value[8:12] == b"WEBP",
+        ".avi": lambda value: value.startswith(b"RIFF") and value[8:12] == b"AVI ",
+        ".webm": lambda value: value.startswith(b"\x1aE\xdf\xa3"),
+        ".mp4": lambda value: len(value) >= 8 and value[4:8] == b"ftyp",
+        ".mov": lambda value: len(value) >= 8 and value[4:8] == b"ftyp",
+    }
+    return signatures[extension](header)
 
 
 @router.post("/", response_model=Dict[str, str])
-async def upload_file(file: UploadFile = File(...), current_user: User = Depends(get_current_active_user)):
+async def upload_file(
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_permission("ads:write")),
+):
     try:
-        # Security: Sanitize filename to prevent path traversal
-        safe_filename = os.path.basename(file.filename)
+        safe_filename = os.path.basename(file.filename or "")
         file_extension = os.path.splitext(safe_filename)[1].lower()
-
-        # Security: Validate file extension
         if file_extension not in ALLOWED_EXTENSIONS:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid file type. Allowed types: {', '.join(ALLOWED_EXTENSIONS)}"
-            )
+            raise HTTPException(status_code=400, detail="Invalid file type")
 
-        # Determine if video or image
         is_video = file_extension in ALLOWED_VIDEO_EXTENSIONS
         max_size = MAX_VIDEO_SIZE if is_video else MAX_IMAGE_SIZE
-
-        # Read file content
-        file_content = await file.read()
-
-        # Security: Validate file size
-        if len(file_content) > max_size:
+        stream = file.file
+        stream.seek(0, os.SEEK_END)
+        if stream.tell() > max_size:
             raise HTTPException(
                 status_code=400,
-                detail=f"File too large. Maximum size: {max_size / (1024 * 1024)}MB"
+                detail=f"File too large. Maximum size: {max_size / (1024 * 1024)}MB",
             )
+        stream.seek(0)
+        if not valid_media_signature(file_extension, stream.read(32)):
+            raise HTTPException(status_code=400, detail="File content does not match its extension")
 
-        # Generate a unique filename
         filename = f"{uuid.uuid4()}{file_extension}"
-
-        # Derive content type from validated file extension instead of trusting client
-        content_type = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
-
-        # Upload to R2 if configured, otherwise local
-        if settings.r2_enabled:
-            url = await upload_to_r2(file_content, filename, content_type)
-        else:
-            url = await upload_to_local(file_content, filename)
-
-        # Return media type along with URL
-        media_type = 'video' if is_video else 'image'
-        return {"url": url, "media_type": media_type}
+        url = store_upload(stream, filename)
+        return {"url": url, "media_type": "video" if is_video else "image"}
     except HTTPException:
         raise
-    except Exception as e:
-        log_and_raise_http_error(logger, "File upload failed", e, expose_detail=True)
+    except Exception as exc:
+        log_and_raise_http_error(logger, "File upload failed", exc)

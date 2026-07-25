@@ -43,6 +43,7 @@ run_test "Login Page" "$SCRIPT_DIR/smoke-login.sh"
 if [[ -n "$TEST_EMAIL" && -n "$TEST_PASSWORD" ]]; then
   run_test "Authentication" "$SCRIPT_DIR/smoke-auth.sh"
   run_test "Brand Scrapes" "$SCRIPT_DIR/smoke-brand-scrapes.sh"
+  run_test "Reporting" "$SCRIPT_DIR/smoke-reporting.sh"
 else
   echo ""
   echo "Skipping auth tests (set TEST_EMAIL and TEST_PASSWORD)"

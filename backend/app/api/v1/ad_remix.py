@@ -10,7 +10,7 @@ import logging
 from app.core.api_errors import log_and_raise_http_error
 from app.database import get_db
 from app.models import WinningAd, Brand, Product, CustomerProfile, User
-from app.core.deps import get_current_active_user
+from app.core.deps import require_permission
 from app.core.rate_limit import limiter
 from app.schemas.ad_blueprint import (
     AdBlueprint,
@@ -32,7 +32,7 @@ async def deconstruct_ad_template(
     request: Request,
     body: DeconstructRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_permission("ads:write"))
 ):
     """
     Deconstruct a template into a structural blueprint
@@ -70,7 +70,7 @@ async def reconstruct_ad_from_blueprint(
     request: Request,
     body: ReconstructRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_permission("ads:write"))
 ):
     """
     Reconstruct an ad by applying brand data to a blueprint
@@ -97,10 +97,14 @@ async def reconstruct_ad_from_blueprint(
     product = db.query(Product).filter(Product.id == body.product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
+    if product.brand_id != brand.id:
+        raise HTTPException(status_code=400, detail="Product does not belong to the selected brand")
 
     profile = db.query(CustomerProfile).filter(CustomerProfile.id == body.profile_id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Customer profile not found")
+    if profile not in brand.profiles:
+        raise HTTPException(status_code=400, detail="Profile does not belong to the selected brand")
 
     # Build brand data
     brand_data = BrandData(
@@ -129,9 +133,9 @@ async def reconstruct_ad_from_blueprint(
 
 @router.get("/blueprints/{template_id}", response_model=AdBlueprint)
 async def get_template_blueprint(
-    template_id: int,
+    template_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_permission("templates:read"))
 ):
     """
     Get the blueprint for a specific template
@@ -152,7 +156,7 @@ async def get_template_blueprint(
 @router.get("/blueprints", response_model=List[dict])
 async def list_templates_with_blueprints(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(require_permission("templates:read"))
 ):
     """
     List all templates that have been deconstructed

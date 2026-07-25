@@ -2,19 +2,31 @@ import { useToast } from '../context/ToastContext';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader, Film, Image, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import { useCampaign } from '../context/CampaignContext';
-import { buildLaunchPayload, createLaunch, getLaunch, saveCampaignTemplate, uploadBlobToServer } from '../lib/facebookApi';
+import { useAuth } from '../context/AuthContext';
+import {
+    activateLaunch,
+    buildLaunchPayload,
+    createLaunch,
+    getLaunch,
+    preflightActivation,
+    saveCampaignTemplate,
+    uploadBlobToServer,
+} from '../lib/facebookApi';
 
 const POLL_INTERVAL_MS = 3000;
-const RUNNING_STATUSES = ['pending', 'running'];
+const RUNNING_STATUSES = ['queued', 'building', 'activation_queued', 'activating'];
 
 const BulkAdCreation = ({ onNext, onBack }) => {
     const { showWarning, showError, showSuccess } = useToast();
-    const { campaignData, adsetData, creativeData, adsData, setAdsData, selectedAdAccount, extraAdAccounts, launchStatus, setLaunchStatus } = useCampaign();
+    const { authFetch, hasPermission } = useAuth();
+    const { campaignData, adsetData, creativeData, adsData, setAdsData, selectedAdAccount, extraAdAccounts } = useCampaign();
     // If a launch was running when the user navigated away, resume in the loading state
     const [resumeJobId] = useState(() => localStorage.getItem('lastLaunchJobId'));
     const [loading, setLoading] = useState(!!resumeJobId);
     const [job, setJob] = useState(null);
     const [statusText, setStatusText] = useState(resumeJobId ? 'Resuming launch in progress...' : '');
+    const [activationPreview, setActivationPreview] = useState(null);
+    const [activating, setActivating] = useState(false);
     const pollRef = useRef(null);
 
     // Preview of the permutation matrix the server will create
@@ -56,16 +68,18 @@ const BulkAdCreation = ({ onNext, onBack }) => {
         stopPolling();
         const poll = async () => {
             try {
-                const jobStatus = await getLaunch(jobId);
+                const jobStatus = await getLaunch(jobId, authFetch);
                 setJob(jobStatus);
                 if (!RUNNING_STATUSES.includes(jobStatus.status)) {
                     stopPolling();
                     localStorage.removeItem('lastLaunchJobId');
                     setLoading(false);
-                    if (jobStatus.status === 'completed') {
-                        showSuccess(`Launch complete: ${jobStatus.completed_steps} ads created across ${jobStatus.ad_account_ids.length} account(s)`);
-                    } else if (jobStatus.status === 'completed_with_errors') {
-                        showWarning(`Launch finished with errors: ${jobStatus.completed_steps} created, ${jobStatus.failed_steps} failed`);
+                    if (jobStatus.status === 'ready') {
+                        showSuccess(`Created ${jobStatus.completed_steps} paused ads across ${jobStatus.ad_account_ids.length} account(s)`);
+                    } else if (jobStatus.status === 'active') {
+                        showSuccess('Verified launch activated successfully');
+                    } else if (jobStatus.status === 'reconciliation_required') {
+                        showWarning('Launch requires reconciliation before it can be activated');
                     } else {
                         showError(`Launch failed: ${jobStatus.error || 'see results below'}`);
                     }
@@ -76,7 +90,7 @@ const BulkAdCreation = ({ onNext, onBack }) => {
         };
         poll();
         pollRef.current = setInterval(poll, POLL_INTERVAL_MS);
-    }, [stopPolling, showSuccess, showWarning, showError]);
+    }, [authFetch, stopPolling, showSuccess, showWarning, showError]);
 
     // Resume polling if a launch was running when the user navigated away
     useEffect(() => {
@@ -108,7 +122,7 @@ const BulkAdCreation = ({ onNext, onBack }) => {
                 let videoUrl = creative.videoUrl;
                 if (creative.file) {
                     setStatusText(`Uploading ${creative.name}...`);
-                    const url = await uploadBlobToServer(creative.file, creative.name);
+                    const url = await uploadBlobToServer(creative.file, authFetch, creative.name);
                     if (isVideo) videoUrl = url;
                     else imageUrl = url;
                 } else if (!imageUrl && !videoUrl && creative.previewUrl && !creative.previewUrl.startsWith('blob:')) {
@@ -121,6 +135,7 @@ const BulkAdCreation = ({ onNext, onBack }) => {
                     thumbnail_url: creative.thumbnailUrl || null,
                     media_type: creative.mediaType || 'image',
                     name: creative.name || null,
+                    module_ids: creative.moduleIds || [],
                 });
             }
 
@@ -132,10 +147,10 @@ const BulkAdCreation = ({ onNext, onBack }) => {
                 creativeData,
                 accounts: [selectedAdAccount.accountId, ...extraAdAccounts.map(a => a.accountId)],
                 sourceAccountId: selectedAdAccount.accountId,
-                launchStatus,
+                launchStatus: 'PAUSED',
                 creatives,
             });
-            const jobId = await createLaunch(payload);
+            const jobId = await createLaunch(payload, authFetch);
             localStorage.setItem('lastLaunchJobId', jobId);
 
             // 3. Poll until done — the job keeps running even if this tab closes
@@ -145,6 +160,33 @@ const BulkAdCreation = ({ onNext, onBack }) => {
             console.error('Error queueing launch:', error);
             showError(`Error: ${error.message}`);
             setLoading(false);
+        }
+    };
+
+    const handleActivationReview = async () => {
+        try {
+            setActivating(true);
+            const preview = await preflightActivation(job.id, authFetch);
+            setActivationPreview(preview);
+        } catch (error) {
+            showError(error.message);
+        } finally {
+            setActivating(false);
+        }
+    };
+
+    const handleActivationConfirm = async () => {
+        try {
+            setActivating(true);
+            await activateLaunch(job.id, activationPreview.confirmation_token, authFetch);
+            setActivationPreview(null);
+            setLoading(true);
+            localStorage.setItem('lastLaunchJobId', job.id);
+            startPolling(job.id);
+        } catch (error) {
+            showError(error.message);
+        } finally {
+            setActivating(false);
         }
     };
 
@@ -165,7 +207,7 @@ const BulkAdCreation = ({ onNext, onBack }) => {
                 description: creativeData.description,
                 cta: creativeData.cta,
                 website_url: creativeData.websiteUrl,
-            });
+            }, authFetch);
             showSuccess(`Template "${templateName.trim()}" saved`);
             setShowTemplateInput(false);
             setTemplateName('');
@@ -255,37 +297,11 @@ const BulkAdCreation = ({ onNext, onBack }) => {
                         })}
                     </div>
 
-                    {/* Launch state toggle */}
-                    <div className={`rounded-lg border p-4 mb-6 ${launchStatus === 'ACTIVE' ? 'bg-red-50 border-red-300' : 'bg-secondary border-border'}`}>
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h3 className="font-semibold text-foreground text-sm">Launch state</h3>
-                                <p className="text-xs text-muted-foreground mt-0.5">
-                                    {launchStatus === 'ACTIVE'
-                                        ? 'Ads will start spending as soon as they are approved by Meta.'
-                                        : 'Ads will be created paused — activate them in Ads Manager when ready.'}
-                                </p>
-                            </div>
-                            <div className="flex rounded-lg overflow-hidden border border-border">
-                                <button
-                                    onClick={() => setLaunchStatus('PAUSED')}
-                                    className={`px-4 py-2 text-sm font-medium ${launchStatus === 'PAUSED' ? 'bg-amber-600 text-white' : 'bg-card text-muted-foreground hover:text-foreground'}`}
-                                >
-                                    Paused
-                                </button>
-                                <button
-                                    onClick={() => setLaunchStatus('ACTIVE')}
-                                    className={`px-4 py-2 text-sm font-medium ${launchStatus === 'ACTIVE' ? 'bg-red-600 text-white' : 'bg-card text-muted-foreground hover:text-foreground'}`}
-                                >
-                                    Active
-                                </button>
-                            </div>
-                        </div>
-                        {launchStatus === 'ACTIVE' && (
-                            <div className="flex items-center gap-2 mt-3 text-red-700 text-xs font-medium">
-                                <AlertTriangle size={14} /> Live launch: ads will spend real budget across {totalAccounts} account{totalAccounts !== 1 ? 's' : ''}.
-                            </div>
-                        )}
+                    <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 mb-6">
+                        <h3 className="font-semibold text-amber-900 text-sm">Safe launch state</h3>
+                        <p className="text-xs text-amber-800 mt-1">
+                            Every entity is created paused. A manager can review and activate the verified result after the build completes.
+                        </p>
                     </div>
 
                     {/* Save as template */}
@@ -334,9 +350,9 @@ const BulkAdCreation = ({ onNext, onBack }) => {
                         <button
                             onClick={handleSubmit}
                             disabled={adsData.length === 0}
-                            className={`flex items-center gap-2 px-6 py-3 text-white rounded-lg font-medium disabled:bg-gray-300 disabled:cursor-not-allowed ${launchStatus === 'ACTIVE' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}`}
+                            className="flex items-center gap-2 px-6 py-3 text-white rounded-lg font-medium disabled:bg-gray-300 disabled:cursor-not-allowed bg-green-600 hover:bg-green-700"
                         >
-                            Launch {adsData.length * totalAccounts} Ad{adsData.length * totalAccounts !== 1 ? 's' : ''} {launchStatus === 'ACTIVE' ? '(Active)' : '(Paused)'}
+                            Create {adsData.length * totalAccounts} Ad{adsData.length * totalAccounts !== 1 ? 's' : ''} Paused
                         </button>
                     </div>
                 </>
@@ -391,12 +407,57 @@ const BulkAdCreation = ({ onNext, onBack }) => {
                             <span className="text-red-600 truncate ml-auto">{result.error}</span>
                         </div>
                     ))}
+                    {job.status === 'ready' && hasPermission('campaigns:activate') && (
+                        <button
+                            onClick={handleActivationReview}
+                            disabled={activating}
+                            className="mt-4 mr-3 px-6 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 disabled:opacity-50"
+                        >
+                            {activating ? 'Verifying…' : 'Review Activation'}
+                        </button>
+                    )}
                     <button
                         onClick={onNext}
                         className="mt-4 px-6 py-3 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-700"
                     >
                         Done
                     </button>
+                </div>
+            )}
+
+            {activationPreview && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-lg rounded-2xl bg-card border border-red-200 shadow-xl p-6">
+                        <div className="flex items-center gap-3 text-red-700 mb-4">
+                            <AlertTriangle size={24} />
+                            <h3 className="text-xl font-bold">Activate verified Meta launch?</h3>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-4">
+                            This changes the verified paused entities to ACTIVE and may begin spending real budget.
+                        </p>
+                        <div className="rounded-lg bg-secondary p-4 text-sm space-y-1 mb-6">
+                            <div><strong>Campaign:</strong> {activationPreview.summary.campaign_name}</div>
+                            <div><strong>Accounts:</strong> {activationPreview.summary.ad_account_ids.length}</div>
+                            <div><strong>Ads:</strong> {activationPreview.summary.completed_steps}</div>
+                            <div><strong>Current status:</strong> {activationPreview.summary.status}</div>
+                        </div>
+                        <div className="flex justify-end gap-3">
+                            <button
+                                onClick={() => setActivationPreview(null)}
+                                disabled={activating}
+                                className="px-4 py-2 rounded-lg border border-border text-foreground"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleActivationConfirm}
+                                disabled={activating}
+                                className="px-4 py-2 rounded-lg bg-red-600 text-white font-semibold disabled:opacity-50"
+                            >
+                                {activating ? 'Activating…' : 'Activate in Meta'}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

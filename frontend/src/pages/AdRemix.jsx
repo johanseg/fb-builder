@@ -80,6 +80,25 @@ export default function AdRemix() {
         }
     };
 
+    const handleTemplateSelect = async (template) => {
+        setLoading(true);
+        try {
+            const response = await authFetch(`${API_URL}/ad-remix/deconstruct`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ template_id: template.id }),
+            });
+            if (!response.ok) throw new Error('Template analysis failed');
+            updateData('template', template);
+            setCurrentStep(2);
+        } catch (error) {
+            console.error('Template analysis error:', error);
+            showError('Failed to analyze the selected template. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="max-w-5xl mx-auto">
             {/* Header */}
@@ -138,10 +157,7 @@ export default function AdRemix() {
                         <h3 className="text-xl font-bold mb-4">Select a Winning Template to Remix</h3>
                         <p className="text-muted-foreground mb-6">Choose an ad template to deconstruct and use as your blueprint</p>
                         <ImageTemplateSelector
-                            onSelect={(template) => {
-                                updateData('template', template);
-                                setCurrentStep(2);
-                            }}
+                            onSelect={handleTemplateSelect}
                             onClose={() => { }}
                             embedded={true}
                         />

@@ -2,6 +2,7 @@ import { useToast } from '../context/ToastContext';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ChevronRight, Upload, X, Loader, Trash2, Film, Image, FolderOpen } from 'lucide-react';
 import { useCampaign } from '../context/CampaignContext';
+import { useAuth } from '../context/AuthContext';
 import { getPages } from '../lib/facebookApi';
 import CreativeLibraryModal from './CreativeLibraryModal';
 
@@ -22,6 +23,7 @@ const CTA_OPTIONS = [
 ];
 
 const AdCreativeStep = ({ onNext, onBack }) => {
+    const { authFetch } = useAuth();
     const { showWarning, showError } = useToast();
     const { creativeData, setCreativeData, selectedAdAccount, adsetData } = useCampaign();
     const [pages, setPages] = useState([]);
@@ -166,7 +168,7 @@ const AdCreativeStep = ({ onNext, onBack }) => {
 
         setLoadingPages(true);
         try {
-            const fetchedPages = await getPages(selectedAdAccount.id);
+            const fetchedPages = await getPages(selectedAdAccount.id, authFetch);
             setPages(fetchedPages);
 
             // If no page is selected and we have pages, select the first one (or the last used one if it exists in the list)
@@ -185,7 +187,7 @@ const AdCreativeStep = ({ onNext, onBack }) => {
         } finally {
             setLoadingPages(false);
         }
-    }, [creativeData.pageId, handlePageSelection, selectedAdAccount, showError]);
+    }, [authFetch, creativeData.pageId, handlePageSelection, selectedAdAccount, showError]);
 
     // Prepopulate Creative Name with Ad Set Name if empty
     useEffect(() => {

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from typing import Dict, Any, List, Optional
 import logging
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from app.core.api_errors import log_and_raise_http_error
 from app.database import get_db
 from app.core.utils import extract_markdown_list_items
@@ -19,14 +19,14 @@ logger = logging.getLogger(__name__)
 class ModularGenerationRequest(BaseModel):
     product_id: str
     module_type: str  # "intro", "bridge", "core", "cta", "micro_movie"
-    count: int = 5
+    count: int = Field(5, ge=1, le=10)
     base_intro: Optional[str] = ""
     base_bridge: Optional[str] = ""
     avatar_type: Optional[str] = ""
 
 class IterationRequest(BaseModel):
     module_id: str
-    count: int = 3
+    count: int = Field(3, ge=1, le=10)
 
 @router.post("/generate", response_model=List[AdModuleSchema])
 @limiter.limit("20/minute")

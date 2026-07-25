@@ -1,255 +1,163 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 const AuthContext = createContext();
-
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 export const useAuth = () => {
-    const context = useContext(AuthContext);
-    if (!context) {
-        throw new Error('useAuth must be used within AuthProvider');
-    }
-    return context;
+  const context = useContext(AuthContext);
+  if (!context) throw new Error('useAuth must be used within AuthProvider');
+  return context;
 };
 
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
-    const [accessToken, setAccessToken] = useState(localStorage.getItem('accessToken'));
-    const [refreshToken, setRefreshToken] = useState(localStorage.getItem('refreshToken'));
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+  const [user, setUser] = useState(null);
+  const [accessToken, setAccessToken] = useState(() => localStorage.getItem('accessToken'));
+  const [refreshToken, setRefreshToken] = useState(() => localStorage.getItem('refreshToken'));
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const refreshPromiseRef = useRef(null);
 
-    // Check if user is authenticated on mount
-    useEffect(() => {
-        const initAuth = async () => {
-            if (accessToken) {
-                try {
-                    await fetchUser();
-                } catch {
-                    // Token might be expired, try to refresh
-                    if (refreshToken) {
-                        try {
-                            await refreshAccessToken();
-                        } catch (refreshErr) {
-                            // Only logout if it's a definitive auth failure (401/403)
-                            // If it's a network error or 500, keep the tokens so we can try again later
-                            if (refreshErr.status === 401 || refreshErr.status === 403) {
-                                logout();
-                            }
-                        }
-                    } else {
-                        logout();
-                    }
-                }
-            }
-            setLoading(false);
-        };
-        initAuth();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+  const clearAuth = useCallback(() => {
+    setUser(null);
+    setAccessToken(null);
+    setRefreshToken(null);
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+  }, []);
 
-    // Auto-refresh token every 6 days to prevent expiration (tokens last 7 days)
-    useEffect(() => {
-        if (!refreshToken) return;
+  const persistTokens = useCallback((tokens) => {
+    setAccessToken(tokens.access_token);
+    localStorage.setItem('accessToken', tokens.access_token);
+    if (tokens.refresh_token) {
+      setRefreshToken(tokens.refresh_token);
+      localStorage.setItem('refreshToken', tokens.refresh_token);
+    }
+  }, []);
 
-        const refreshInterval = setInterval(async () => {
-            try {
-                await refreshAccessToken();
-            } catch {
-                // Silently retry on next interval or next API call
-            }
-        }, 6 * 24 * 60 * 60 * 1000); // 6 days in ms
+  const fetchUser = useCallback(async (token) => {
+    if (!token) throw new Error('No access token available');
+    const response = await fetch(`${API_URL}/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      const authError = new Error('Failed to fetch user');
+      authError.status = response.status;
+      throw authError;
+    }
+    const data = await response.json();
+    setUser(data);
+    return data;
+  }, []);
 
-        return () => clearInterval(refreshInterval);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [refreshToken]);
+  const refreshAccessToken = useCallback(async () => {
+    if (refreshPromiseRef.current) return refreshPromiseRef.current;
 
-    const fetchUser = async (tokenOverride = null) => {
-        const authToken = tokenOverride || localStorage.getItem('accessToken') || accessToken;
-        if (!authToken) {
-            throw new Error('No access token available');
-        }
+    const currentRefreshToken = localStorage.getItem('refreshToken') || refreshToken;
+    if (!currentRefreshToken) throw new Error('No refresh token');
 
-        const response = await fetch(`${API_URL}/auth/me`, {
-            headers: {
-                'Authorization': `Bearer ${authToken}`,
-            },
-        });
+    refreshPromiseRef.current = (async () => {
+      const response = await fetch(`${API_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: currentRefreshToken }),
+      });
+      if (!response.ok) {
+        const refreshError = new Error('Failed to refresh token');
+        refreshError.status = response.status;
+        if (response.status === 401 || response.status === 403) clearAuth();
+        throw refreshError;
+      }
+      const tokens = await response.json();
+      persistTokens(tokens);
+      await fetchUser(tokens.access_token);
+      return tokens.access_token;
+    })().finally(() => {
+      refreshPromiseRef.current = null;
+    });
 
-        if (!response.ok) {
-            throw new Error('Failed to fetch user');
-        }
+    return refreshPromiseRef.current;
+  }, [clearAuth, fetchUser, persistTokens, refreshToken]);
 
-        const userData = await response.json();
-        setUser(userData);
-        return userData;
-    };
-
-    const login = async (email, password) => {
-        setError(null);
+  useEffect(() => {
+    const initialise = async () => {
+      const token = localStorage.getItem('accessToken');
+      if (token) {
         try {
-            const response = await fetch(`${API_URL}/auth/login/json`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ email, password }),
-            });
-
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.detail || 'Login failed');
-            }
-
-            const data = await response.json();
-            setAccessToken(data.access_token);
-            setRefreshToken(data.refresh_token);
-            localStorage.setItem('accessToken', data.access_token);
-            localStorage.setItem('refreshToken', data.refresh_token);
-            await fetchUser(data.access_token);
-
-            return data;
-        } catch (err) {
-            setError(err.message);
-            throw err;
+          await fetchUser(token);
+        } catch {
+          try {
+            await refreshAccessToken();
+          } catch {
+            // Network and 5xx failures retain tokens for a later retry.
+          }
         }
+      }
+      setLoading(false);
     };
+    initialise();
+  }, [fetchUser, refreshAccessToken]);
 
-    const logout = useCallback(async () => {
-        // Optionally call the logout endpoint
-        if (accessToken && refreshToken) {
-            try {
-                await fetch(`${API_URL}/auth/logout`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${accessToken}`,
-                    },
-                    body: JSON.stringify({ refresh_token: refreshToken }),
-                });
-            } catch {
-                // Ignore errors during logout
-            }
-        }
+  const login = useCallback(async (email, password) => {
+    setError(null);
+    const response = await fetch(`${API_URL}/auth/login/json`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!response.ok) {
+      const data = await response.json();
+      const loginError = new Error(data.detail || 'Login failed');
+      setError(loginError.message);
+      throw loginError;
+    }
+    const tokens = await response.json();
+    persistTokens(tokens);
+    await fetchUser(tokens.access_token);
+    return tokens;
+  }, [fetchUser, persistTokens]);
 
-        setUser(null);
-        setAccessToken(null);
-        setRefreshToken(null);
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-    }, [accessToken, refreshToken]);
-
-    const refreshAccessToken = useCallback(async () => {
-        const currentRefreshToken = localStorage.getItem('refreshToken') || refreshToken;
-        if (!currentRefreshToken) {
-            throw new Error('No refresh token');
-        }
-
-        const response = await fetch(`${API_URL}/auth/refresh`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ refresh_token: currentRefreshToken }),
+  const logout = useCallback(async () => {
+    const currentAccessToken = localStorage.getItem('accessToken') || accessToken;
+    const currentRefreshToken = localStorage.getItem('refreshToken') || refreshToken;
+    try {
+      if (currentAccessToken && currentRefreshToken) {
+        await fetch(`${API_URL}/auth/logout`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${currentAccessToken}` },
+          body: JSON.stringify({ refresh_token: currentRefreshToken }),
         });
+      }
+    } finally {
+      clearAuth();
+    }
+  }, [accessToken, clearAuth, refreshToken]);
 
-        if (!response.ok) {
-            const error = new Error('Failed to refresh token');
-            error.status = response.status;
-            throw error;
-        }
+  const authFetch = useCallback(async (url, options = {}) => {
+    const makeRequest = (token) => fetch(url, {
+      ...options,
+      headers: { ...options.headers, Authorization: `Bearer ${token}` },
+    });
+    const token = localStorage.getItem('accessToken') || accessToken;
+    if (!token) throw new Error('No access token available');
+    let response = await makeRequest(token);
+    if (response.status === 401) {
+      const refreshedToken = await refreshAccessToken();
+      response = await makeRequest(refreshedToken);
+    }
+    return response;
+  }, [accessToken, refreshAccessToken]);
 
-        const data = await response.json();
-        setAccessToken(data.access_token);
-        localStorage.setItem('accessToken', data.access_token);
+  const hasRole = useCallback((roleName) => user?.is_superuser || user?.roles?.some((role) => role.name === roleName) || false, [user]);
+  const hasPermission = useCallback((permissionName) => user?.is_superuser || user?.roles?.some(
+    (role) => role.permissions?.some((permission) => permission.name === permissionName),
+  ) || false, [user]);
 
-        // Update refresh token if new one provided (rolling refresh)
-        if (data.refresh_token) {
-            setRefreshToken(data.refresh_token);
-            localStorage.setItem('refreshToken', data.refresh_token);
-        }
-
-        // Re-fetch user data with new token
-        await fetchUser(data.access_token);
-
-        return data.access_token;
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [refreshToken]);
-
-    // Helper to make authenticated API calls
-    const authFetch = useCallback(async (url, options = {}) => {
-        const currentToken = localStorage.getItem('accessToken');
-        const currentRefreshToken = localStorage.getItem('refreshToken');
-
-        if (!currentToken) {
-            throw new Error('No access token available');
-        }
-
-        const makeRequest = async (authToken) => {
-            const response = await fetch(url, {
-                ...options,
-                headers: {
-                    ...options.headers,
-                    'Authorization': `Bearer ${authToken}`,
-                },
-            });
-            return response;
-        };
-
-        let response = await makeRequest(currentToken);
-
-        // If unauthorized, try to refresh token
-        if (response.status === 401 && currentRefreshToken) {
-            try {
-                const newToken = await refreshAccessToken();
-                response = await makeRequest(newToken);
-            } catch (err) {
-                // Only logout if it's a definitive auth failure
-                if (err.status === 401 || err.status === 403) {
-                    logout();
-                    throw new Error('Session expired. Please login again.');
-                }
-                // For network errors, we throw but don't logout
-                throw err;
-            }
-        }
-
-        return response;
-    }, [refreshAccessToken, logout]);
-
-    // Check if user has a specific role
-    const hasRole = useCallback((roleName) => {
-        if (!user) return false;
-        if (user.is_superuser) return true;
-        return user.roles?.some(role => role.name === roleName) || false;
-    }, [user]);
-
-    // Check if user has a specific permission
-    const hasPermission = useCallback((permissionName) => {
-        if (!user) return false;
-        if (user.is_superuser) return true;
-        return user.roles?.some(role =>
-            role.permissions?.some(perm => perm.name === permissionName)
-        ) || false;
-    }, [user]);
-
-    const value = {
-        user,
-        accessToken,
-        loading,
-        error,
-        isAuthenticated: !!user,
-        login,
-        logout,
-        authFetch,
-        hasRole,
-        hasPermission,
-        refreshAccessToken,
-    };
-
-    return (
-        <AuthContext.Provider value={value}>
-            {children}
-        </AuthContext.Provider>
-    );
+  return (
+    <AuthContext.Provider value={{
+      user, accessToken, refreshToken, loading, error,
+      isAuthenticated: Boolean(user), login, logout, refreshAccessToken, authFetch, hasRole, hasPermission,
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
 };

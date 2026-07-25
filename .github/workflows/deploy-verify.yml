@@ -11,6 +11,10 @@ on:
         options:
           - production
           - staging
+      expected_sha:
+        description: 'Exact deployed commit SHA (required for manual verification)'
+        required: true
+        type: string
   push:
     branches: [main]
 
@@ -21,6 +25,7 @@ permissions:
 jobs:
   wait-for-deploy:
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'production' }}
     steps:
       - name: Wait for Railway deploy
         run: sleep 120  # Wait 2 min for Railway to rebuild
@@ -28,19 +33,32 @@ jobs:
   backend-health:
     needs: wait-for-deploy
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'production' }}
     steps:
       - name: Check backend health
         run: |
           BACKEND_URL="${{ vars.BACKEND_URL }}"
+          EXPECTED_SHA="${{ github.event_name == 'workflow_dispatch' && inputs.expected_sha || github.sha }}"
           if [ -z "$BACKEND_URL" ]; then
-            echo "::warning::BACKEND_URL variable is not set. Skipping health check."
-            exit 0
+            echo "::error::BACKEND_URL variable is required."
+            exit 1
+          fi
+          if [ -z "$EXPECTED_SHA" ]; then
+            echo "::error::Expected deployed SHA is required."
+            exit 1
           fi
           echo "Checking backend health at $BACKEND_URL..."
           for i in {1..10}; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BACKEND_URL/health" || echo "000")
+            RESPONSE=$(curl -sS -w '\n%{http_code}' "$BACKEND_URL/health" || true)
+            STATUS=$(printf '%s\n' "$RESPONSE" | tail -n 1)
+            BODY=$(printf '%s\n' "$RESPONSE" | sed '$d')
             if [ "$STATUS" = "200" ]; then
-              echo "Backend is healthy (HTTP 200)"
+              ACTUAL_SHA=$(printf '%s' "$BODY" | jq -r '.commit_sha // empty')
+              if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then
+                echo "::error::Runtime commit_sha '$ACTUAL_SHA' does not match expected '$EXPECTED_SHA'."
+                exit 1
+              fi
+              echo "Backend is healthy and running $ACTUAL_SHA"
               exit 0
             fi
             echo "Attempt $i: HTTP $STATUS - retrying in 10s..."
@@ -52,6 +70,7 @@ jobs:
   e2e-smoke-tests:
     needs: backend-health
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'production' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -61,15 +80,19 @@ jobs:
           node-version: '20'
 
       - name: Install agent-browser
-        if: vars.FRONTEND_URL != ''
         run: |
-          npm install -g agent-browser || true
-          agent-browser install || true
+          test -n "${{ vars.FRONTEND_URL }}" || { echo "::error::FRONTEND_URL variable is required."; exit 1; }
+          test -n "$TEST_EMAIL" || { echo "::error::TEST_EMAIL secret is required."; exit 1; }
+          test -n "$TEST_PASSWORD" || { echo "::error::TEST_PASSWORD secret is required."; exit 1; }
+          npm install -g agent-browser
+          agent-browser install
+        env:
+          TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
+          TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
 
       - name: Run smoke tests
-        if: vars.FRONTEND_URL != ''
         working-directory: frontend
-        run: bash tests/agent-browser/run-all.sh || true
+        run: bash tests/agent-browser/run-all.sh
         env:
           CI: true
           BASE_URL: ${{ vars.FRONTEND_URL }}

@@ -1,213 +1,94 @@
-"""Tests for file upload functionality including video support."""
-import pytest
+"""Upload endpoint tests at the shared storage boundary."""
+
 from io import BytesIO
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
+
+import pytest
+from fastapi import status
 
 
-class TestFileUploads:
-    """Tests for /api/v1/uploads endpoint."""
+JPEG = b"\xff\xd8\xff\xe0" + b"jpeg"
+PNG = b"\x89PNG\r\n\x1a\n" + b"png"
+GIF = b"GIF89a" + b"gif"
+WEBP = b"RIFF\x00\x00\x00\x00WEBP" + b"webp"
+MP4 = b"\x00\x00\x00\x18ftypisom" + b"mp4"
+AVI = b"RIFF\x00\x00\x00\x00AVI " + b"avi"
+WEBM = b"\x1aE\xdf\xa3" + b"webm"
 
-    def test_upload_image_success(self, client, auth_headers):
-        """Test successful image upload."""
-        # Create a fake image file
-        image_content = b"fake image content"
-        files = {"file": ("test.jpg", BytesIO(image_content), "image/jpeg")}
 
-        with patch('app.api.v1.uploads.settings') as mock_settings:
-            mock_settings.r2_enabled = False
+@pytest.fixture(autouse=True)
+def mock_storage(monkeypatch):
+    storage = MagicMock(side_effect=lambda _stream, filename: f"/uploads/{filename}")
+    monkeypatch.setattr("app.api.v1.uploads.store_upload", storage)
+    return storage
 
-            response = client.post(
-                "/api/v1/uploads/",
-                files=files,
-                headers=auth_headers
-            )
 
-        assert response.status_code == 200
-        data = response.json()
-        assert "url" in data
-        assert data["media_type"] == "image"
-        assert data["url"].endswith(".jpg")
+@pytest.mark.parametrize(
+    ("filename", "content", "media_type"),
+    [
+        ("test.jpg", JPEG, "image"),
+        ("test.jpeg", JPEG, "image"),
+        ("test.png", PNG, "image"),
+        ("test.gif", GIF, "image"),
+        ("test.webp", WEBP, "image"),
+        ("test.mp4", MP4, "video"),
+        ("test.mov", MP4, "video"),
+        ("test.avi", AVI, "video"),
+        ("test.webm", WEBM, "video"),
+    ],
+)
+def test_upload_valid_media(client, auth_headers, filename, content, media_type):
+    response = client.post(
+        "/api/v1/uploads/",
+        files={"file": (filename, BytesIO(content), "application/octet-stream")},
+        headers=auth_headers,
+    )
 
-    def test_upload_video_mp4_success(self, client, auth_headers):
-        """Test successful MP4 video upload."""
-        video_content = b"fake mp4 video content"
-        files = {"file": ("test.mp4", BytesIO(video_content), "video/mp4")}
+    assert response.status_code == status.HTTP_200_OK, response.text
+    body = response.json()
+    assert body["media_type"] == media_type
+    assert body["url"].endswith(filename.split(".")[-1])
 
-        with patch('app.api.v1.uploads.settings') as mock_settings:
-            mock_settings.r2_enabled = False
 
-            response = client.post(
-                "/api/v1/uploads/",
-                files=files,
-                headers=auth_headers
-            )
+def test_upload_rejects_invalid_extension(client, auth_headers):
+    response = client.post(
+        "/api/v1/uploads/",
+        files={"file": ("test.exe", BytesIO(b"MZ"), "application/octet-stream")},
+        headers=auth_headers,
+    )
 
-        assert response.status_code == 200
-        data = response.json()
-        assert data["media_type"] == "video"
-        assert data["url"].endswith(".mp4")
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    def test_upload_video_mov_success(self, client, auth_headers):
-        """Test successful MOV video upload."""
-        video_content = b"fake mov video content"
-        files = {"file": ("test.mov", BytesIO(video_content), "video/quicktime")}
 
-        with patch('app.api.v1.uploads.settings') as mock_settings:
-            mock_settings.r2_enabled = False
+def test_upload_rejects_mislabeled_signature(client, auth_headers):
+    response = client.post(
+        "/api/v1/uploads/",
+        files={"file": ("test.png", BytesIO(JPEG), "image/png")},
+        headers=auth_headers,
+    )
 
-            response = client.post(
-                "/api/v1/uploads/",
-                files=files,
-                headers=auth_headers
-            )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-        assert response.status_code == 200
-        data = response.json()
-        assert data["media_type"] == "video"
 
-    def test_upload_invalid_extension(self, client, auth_headers):
-        """Test upload with invalid file extension."""
-        file_content = b"some content"
-        files = {"file": ("test.exe", BytesIO(file_content), "application/octet-stream")}
+def test_upload_rejects_oversized_image(client, auth_headers):
+    response = client.post(
+        "/api/v1/uploads/",
+        files={"file": ("large.jpg", BytesIO(JPEG + b"x" * (11 * 1024 * 1024)), "image/jpeg")},
+        headers=auth_headers,
+    )
 
-        response = client.post(
-            "/api/v1/uploads/",
-            files=files,
-            headers=auth_headers
-        )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-        assert response.status_code == 400
-        assert "Invalid file type" in response.json()["detail"]
 
-    def test_upload_image_too_large(self, client, auth_headers):
-        """Test image upload exceeding size limit."""
-        # Create content larger than 10MB
-        large_content = b"x" * (11 * 1024 * 1024)
-        files = {"file": ("large.jpg", BytesIO(large_content), "image/jpeg")}
+def test_upload_uses_shared_storage_result(client, auth_headers, mock_storage):
+    mock_storage.side_effect = None
+    mock_storage.return_value = "https://r2.example.test/uploads/asset.png"
+    response = client.post(
+        "/api/v1/uploads/",
+        files={"file": ("asset.png", BytesIO(PNG), "image/png")},
+        headers=auth_headers,
+    )
 
-        with patch('app.api.v1.uploads.settings') as mock_settings:
-            mock_settings.r2_enabled = False
-
-            response = client.post(
-                "/api/v1/uploads/",
-                files=files,
-                headers=auth_headers
-            )
-
-        assert response.status_code == 400
-        assert "too large" in response.json()["detail"].lower()
-
-    def test_upload_video_size_limit_different_from_image(self, client, auth_headers):
-        """Test that video has different size limit than image."""
-        # Create content larger than 10MB but less than 500MB
-        # This should fail for images but pass for videos
-        content_15mb = b"x" * (15 * 1024 * 1024)
-
-        # Test as image - should fail
-        image_files = {"file": ("large.jpg", BytesIO(content_15mb), "image/jpeg")}
-        with patch('app.api.v1.uploads.settings') as mock_settings:
-            mock_settings.r2_enabled = False
-            response = client.post(
-                "/api/v1/uploads/",
-                files=image_files,
-                headers=auth_headers
-            )
-        assert response.status_code == 400
-
-        # Test as video - should succeed
-        video_files = {"file": ("large.mp4", BytesIO(content_15mb), "video/mp4")}
-        with patch('app.api.v1.uploads.settings') as mock_settings:
-            mock_settings.r2_enabled = False
-            response = client.post(
-                "/api/v1/uploads/",
-                files=video_files,
-                headers=auth_headers
-            )
-        assert response.status_code == 200
-
-    def test_upload_to_r2_when_enabled(self, client, auth_headers):
-        """Test upload goes to R2 when configured."""
-        image_content = b"fake image content"
-        files = {"file": ("test.png", BytesIO(image_content), "image/png")}
-
-        with patch('app.api.v1.uploads.settings') as mock_settings:
-            mock_settings.r2_enabled = True
-            mock_settings.R2_PUBLIC_URL = "https://r2.example.com"
-
-            with patch('app.api.v1.uploads.upload_to_r2') as mock_r2:
-                mock_r2.return_value = "https://r2.example.com/uuid.png"
-
-                response = client.post(
-                    "/api/v1/uploads/",
-                    files=files,
-                    headers=auth_headers
-                )
-
-        assert response.status_code == 200
-        assert "r2.example.com" in response.json()["url"]
-
-    def test_upload_video_webm(self, client, auth_headers):
-        """Test WebM video upload."""
-        video_content = b"fake webm content"
-        files = {"file": ("test.webm", BytesIO(video_content), "video/webm")}
-
-        with patch('app.api.v1.uploads.settings') as mock_settings:
-            mock_settings.r2_enabled = False
-
-            response = client.post(
-                "/api/v1/uploads/",
-                files=files,
-                headers=auth_headers
-            )
-
-        assert response.status_code == 200
-        assert response.json()["media_type"] == "video"
-
-    def test_upload_all_image_types(self, client, auth_headers):
-        """Test all supported image types."""
-        image_types = [
-            ("test.jpg", "image/jpeg"),
-            ("test.jpeg", "image/jpeg"),
-            ("test.png", "image/png"),
-            ("test.gif", "image/gif"),
-            ("test.webp", "image/webp"),
-        ]
-
-        for filename, content_type in image_types:
-            files = {"file": (filename, BytesIO(b"content"), content_type)}
-
-            with patch('app.api.v1.uploads.settings') as mock_settings:
-                mock_settings.r2_enabled = False
-
-                response = client.post(
-                    "/api/v1/uploads/",
-                    files=files,
-                    headers=auth_headers
-                )
-
-            assert response.status_code == 200, f"Failed for {filename}"
-            assert response.json()["media_type"] == "image"
-
-    def test_upload_all_video_types(self, client, auth_headers):
-        """Test all supported video types."""
-        video_types = [
-            ("test.mp4", "video/mp4"),
-            ("test.mov", "video/quicktime"),
-            ("test.avi", "video/x-msvideo"),
-            ("test.webm", "video/webm"),
-        ]
-
-        for filename, content_type in video_types:
-            files = {"file": (filename, BytesIO(b"content"), content_type)}
-
-            with patch('app.api.v1.uploads.settings') as mock_settings:
-                mock_settings.r2_enabled = False
-
-                response = client.post(
-                    "/api/v1/uploads/",
-                    files=files,
-                    headers=auth_headers
-                )
-
-            assert response.status_code == 200, f"Failed for {filename}"
-            assert response.json()["media_type"] == "video"
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["url"] == "https://r2.example.test/uploads/asset.png"
+    mock_storage.assert_called_once()

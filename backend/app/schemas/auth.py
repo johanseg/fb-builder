@@ -59,6 +59,7 @@ class RoleCreate(RoleBase):
 class RoleResponse(RoleBase):
     id: str
     created_at: datetime
+    permissions: List["PermissionResponse"] = []
 
     class Config:
         from_attributes = True
@@ -79,6 +80,9 @@ class PermissionResponse(PermissionBase):
 
     class Config:
         from_attributes = True
+
+
+RoleResponse.model_rebuild()
 
 
 class UserResponse(UserBase):

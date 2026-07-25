@@ -6,11 +6,18 @@ import logging
 from pathlib import Path
 from typing import Dict, Any
 
-import google.generativeai as genai
-import httpx
+from google import genai
+from google.genai import types
 
 from app.core.config import settings
-from app.core.utils import extract_json_from_text
+from app.core.utils import (
+    IMAGE_CONTENT_TYPES,
+    allowed_media_domains,
+    download_remote_media,
+    extract_json_from_text,
+    resolve_managed_upload_path,
+    validate_media_bytes,
+)
 from app.schemas.ad_blueprint import AdBlueprint, AdConcept, BrandData
 from app.prompts.ad_remix_prompts import build_deconstruction_prompt, build_reconstruction_prompt
 
@@ -28,18 +35,22 @@ _MIME_MAP = {
 
 async def _download_image(url_or_path: str) -> tuple[bytes, str]:
     """Download image from URL or read from local path. Returns (bytes, mime_type)."""
-    # Local file path
-    path = Path(url_or_path)
-    if path.is_file():
+    upload_dir = Path(__file__).resolve().parents[2] / "uploads"
+    path = resolve_managed_upload_path(url_or_path, upload_dir)
+    if path:
         mime = _MIME_MAP.get(path.suffix.lower(), 'image/jpeg')
-        return path.read_bytes(), mime
+        content = path.read_bytes()
+        validate_media_bytes(content, media_kind="image", max_bytes=10 * 1024 * 1024)
+        return content, mime
 
-    # Remote URL
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.get(url_or_path, follow_redirects=True)
-        resp.raise_for_status()
-        content_type = resp.headers.get('content-type', 'image/jpeg').split(';')[0].strip()
-        return resp.content, content_type
+    return await download_remote_media(
+        url_or_path,
+        media_kind="image",
+        allowed_mime_types=IMAGE_CONTENT_TYPES,
+        max_bytes=10 * 1024 * 1024,
+        allowed_domains=allowed_media_domains(),
+    )
+
 
 
 async def deconstruct_template(template_image_url: str) -> AdBlueprint:
@@ -54,7 +65,7 @@ async def deconstruct_template(template_image_url: str) -> AdBlueprint:
     """
     try:
         # Use Gemini Vision model
-        model = genai.GenerativeModel(settings.GEMINI_VISION_MODEL)
+        client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
         # Build the prompt
         prompt = build_deconstruction_prompt(template_image_url)
@@ -62,12 +73,9 @@ async def deconstruct_template(template_image_url: str) -> AdBlueprint:
         # Download the image so we can send actual bytes to Gemini
         image_data, mime_type = await _download_image(template_image_url)
 
-        response = model.generate_content([
+        response = client.models.generate_content(model=settings.GEMINI_VISION_MODEL, contents=[
             prompt,
-            {
-                'mime_type': mime_type,
-                'data': image_data,
-            }
+            types.Part.from_bytes(data=image_data, mime_type=mime_type),
         ])
 
         # Parse the JSON response (handles markdown code block wrapping)
@@ -98,7 +106,7 @@ async def reconstruct_ad(
     """
     try:
         # Use Gemini model
-        model = genai.GenerativeModel(settings.GEMINI_VISION_MODEL)
+        client = genai.Client(api_key=settings.GEMINI_API_KEY)
         
         # Convert blueprint to dict
         blueprint_dict = blueprint.model_dump()
@@ -119,7 +127,7 @@ async def reconstruct_ad(
         )
         
         # Generate the ad concept
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(model=settings.GEMINI_VISION_MODEL, contents=prompt)
         
         # Parse the JSON response (handles markdown code block wrapping)
         concept_data = extract_json_from_text(response.text)

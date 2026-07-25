@@ -1,195 +1,84 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { BarChart3, AlertTriangle, Loader } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useBrands } from '../context/BrandContext';
 import { useToast } from '../context/ToastContext';
-import { BarChart, Upload, ArrowUpRight, ArrowDownRight, AlertTriangle, Sparkles, Loader } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+const money = (value, currency) => new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'USD' }).format(Number(value || 0));
 
 export default function Reporting() {
-    const { authFetch } = useAuth();
-    const { showError, showSuccess } = useToast();
-    
-    const [uploading, setUploading] = useState(false);
-    const [flags, setFlags] = useState([]);
-    const [loadingFlags, setLoadingFlags] = useState(true);
-    const [iteratingId, setIteratingId] = useState(null);
+    const { authFetch, hasPermission } = useAuth();
+    const { activeBrand } = useBrands();
+    const { showError } = useToast();
+    const [report, setReport] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [syncing, setSyncing] = useState(false);
+    const canSync = hasPermission('reporting:sync');
 
-    const fetchKillRuleFlags = useCallback(async () => {
+    const loadReport = useCallback(async () => {
+        if (!activeBrand?.id) return;
+        setLoading(true);
         try {
-            const res = await authFetch(`${API_URL}/performance/kill-rule`);
-            if (!res.ok) throw new Error("Failed to fetch kill rule flags");
-            const data = await res.json();
-            setFlags(data);
-        } catch (err) {
-            showError(err.message);
+            const response = await authFetch(`${API_URL}/performance/meta/report?brand_id=${encodeURIComponent(activeBrand.id)}`);
+            const payload = await response.json();
+            if (!response.ok) throw new Error(payload.detail || 'Could not load Meta reporting');
+            setReport(payload);
+        } catch (error) {
+            setReport(null);
+            showError(error.message);
         } finally {
-            setLoadingFlags(false);
+            setLoading(false);
         }
-    }, [authFetch, showError]);
+    }, [activeBrand?.id, authFetch, showError]);
 
-    useEffect(() => {
-        fetchKillRuleFlags();
-    }, [fetchKillRuleFlags]);
+    useEffect(() => { loadReport(); }, [loadReport]);
 
-    const handleFileUpload = async (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        const formData = new FormData();
-        formData.append('file', file);
-
-        setUploading(true);
+    const syncReport = async () => {
+        if (!activeBrand?.id) return;
+        setSyncing(true);
         try {
-            const res = await authFetch(`${API_URL}/performance/import`, {
-                method: 'POST',
-                // Don't set Content-Type header manually when sending FormData
-                body: formData
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.detail || "Failed to import performance data");
-            
-            showSuccess(data.message);
-            fetchKillRuleFlags(); // Refresh the flags
-        } catch (err) {
-            showError("Upload failed: " + err.message);
+            const response = await authFetch(`${API_URL}/performance/meta/sync?brand_id=${encodeURIComponent(activeBrand.id)}`, { method: 'POST' });
+            const payload = await response.json();
+            if (!response.ok) throw new Error(payload.detail || 'Could not sync Meta reporting');
+            await loadReport();
+        } catch (error) {
+            showError(error.message);
         } finally {
-            setUploading(false);
-            e.target.value = null; // reset
+            setSyncing(false);
         }
     };
-
-    const handleIterate = async (moduleId) => {
-        setIteratingId(moduleId);
-        try {
-            const res = await authFetch(`${API_URL}/modular-generation/iterate`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ module_id: moduleId, count: 3 })
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.detail || "Iteration failed");
-            
-            showSuccess(`Successfully generated ${data.length} variations! View them on the Modular Board.`);
-        } catch (err) {
-            showError(err.message);
-        } finally {
-            setIteratingId(null);
-        }
-    };
-
-    const winners = flags.filter(f => f.status === 'SCALE');
-    const losers = flags.filter(f => f.status === 'KILL');
 
     return (
         <div className="max-w-7xl mx-auto space-y-8">
-            <div className="flex justify-between items-center bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-gray-200">
+            <header className="bg-card p-6 rounded-2xl shadow-sm border border-border flex justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
-                        <BarChart size={32} className="text-purple-600" />
-                        Performance Intelligence
-                    </h1>
-                    <p className="text-gray-600">Train the system on real results to identify winning variables.</p>
+                    <h1 className="text-3xl font-bold text-foreground flex items-center gap-3"><BarChart3 className="text-purple-600" /> Meta Reporting</h1>
+                    <p className="text-muted-foreground mt-2">Stored daily Meta Insights for {activeBrand?.name || 'the selected brand'}.</p>
                 </div>
-                
-                <div className="flex flex-col items-end">
-                    <label className={`cursor-pointer px-6 py-3 rounded-xl font-bold text-white transition-colors flex items-center gap-2 ${uploading ? 'bg-purple-400' : 'bg-purple-600 hover:bg-purple-700'}`}>
-                        {uploading ? <Loader className="animate-spin" size={20} /> : <Upload size={20} />}
-                        {uploading ? 'Processing File...' : 'Import Facebook CSV'}
-                        <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} disabled={uploading} />
-                    </label>
-                    <p className="text-xs text-gray-500 mt-2">Exports must contain `Ad Name`, `Amount spent (USD)`, and standard funnel events.</p>
+                <div className="flex gap-2">
+                    {canSync && <button onClick={syncReport} disabled={syncing || loading || !activeBrand} className="px-4 py-2 rounded-lg bg-amber-600 text-white disabled:opacity-50">{syncing ? 'Syncing…' : 'Sync Meta data'}</button>}
+                    <button onClick={loadReport} disabled={loading || !activeBrand} className="px-4 py-2 rounded-lg bg-purple-600 text-white disabled:opacity-50">Refresh view</button>
                 </div>
-            </div>
+            </header>
 
-            {loadingFlags ? (
-                <div className="py-20 flex justify-center"><Loader className="animate-spin text-purple-600" size={32} /></div>
-            ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    {/* SCALING WINS */}
-                    <div className="bg-emerald-50 rounded-2xl p-6 md:p-8 border border-emerald-100">
-                        <h2 className="text-2xl font-bold text-emerald-900 mb-6 flex items-center gap-2">
-                            <Sparkles className="text-emerald-600" />
-                            Winning Variables (<span className="text-xl">Fit Score 4-5</span>)
-                        </h2>
-                        
-                        {winners.length === 0 ? (
-                            <div className="text-center py-10 bg-white/50 rounded-xl border border-emerald-100 text-emerald-700">
-                                No scalable modules found yet. Keep testing!
-                            </div>
-                        ) : (
-                            <div className="space-y-4">
-                                {winners.map(flag => (
-                                    <div key={flag.module_id} className="bg-white rounded-xl p-5 shadow-sm border border-emerald-200">
-                                        <div className="flex justify-between items-start mb-3">
-                                            <div>
-                                                <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-1 rounded uppercase mr-2">{flag.module_type}</span>
-                                                <span className="text-sm font-mono text-gray-500">ID: {flag.module_id.substring(0,8)}</span>
-                                            </div>
-                                            <div className="text-right">
-                                                <div className="text-emerald-600 font-bold flex items-center justify-end gap-1"><ArrowUpRight size={16}/> Score: {flag.score}</div>
-                                                <div className="text-xs text-gray-500">Spend: ${flag.spend.toFixed(2)}</div>
-                                            </div>
-                                        </div>
-                                        <div className="text-gray-800 text-sm bg-gray-50 p-3 rounded border border-gray-100 mb-3 whitespace-pre-wrap">
-                                            {flag.content}
-                                        </div>
-                                        <div className="flex justify-between items-center text-sm">
-                                            <div className="text-emerald-700 font-medium">
-                                                💡 {flag.reason}
-                                            </div>
-                                            <button 
-                                                onClick={() => handleIterate(flag.module_id)}
-                                                disabled={iteratingId === flag.module_id}
-                                                className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs transition-colors flex items-center gap-1 disabled:opacity-50"
-                                            >
-                                                {iteratingId === flag.module_id ? <Loader className="animate-spin" size={14}/> : <Sparkles size={14}/>}
-                                                Iterate Winner
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* KILL RULE */}
-                    <div className="bg-red-50 rounded-2xl p-6 md:p-8 border border-red-100">
-                        <h2 className="text-2xl font-bold text-red-900 mb-6 flex items-center gap-2">
-                            <AlertTriangle className="text-red-500" />
-                            7-Day Kill Rule (<span className="text-xl">Fit Score 0-1</span>)
-                        </h2>
-                        
-                        {losers.length === 0 ? (
-                            <div className="text-center py-10 bg-white/50 rounded-xl border border-red-100 text-red-700">
-                                No underperforming modules flagged.
-                            </div>
-                        ) : (
-                            <div className="space-y-4">
-                                {losers.map(flag => (
-                                    <div key={flag.module_id} className="bg-white rounded-xl p-5 shadow-sm border border-red-200">
-                                        <div className="flex justify-between items-start mb-3">
-                                            <div>
-                                                <span className="bg-red-100 text-red-800 text-xs font-bold px-2 py-1 rounded uppercase mr-2">{flag.module_type}</span>
-                                                <span className="text-sm font-mono text-gray-500">ID: {flag.module_id.substring(0,8)}</span>
-                                            </div>
-                                            <div className="text-right">
-                                                <div className="text-red-600 font-bold flex items-center justify-end gap-1"><ArrowDownRight size={16}/> Score: {flag.score}</div>
-                                                <div className="text-xs text-gray-500">Spend: ${flag.spend.toFixed(2)}</div>
-                                            </div>
-                                        </div>
-                                        <div className="text-gray-800 text-sm bg-gray-50 p-3 rounded border border-gray-100 mb-3 whitespace-pre-wrap">
-                                            {flag.content}
-                                        </div>
-                                        <div className="flex justify-between items-center text-sm">
-                                            <div className="text-red-700 font-medium w-full">⚠️ {flag.reason}</div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
+            {loading ? <div className="py-20 flex justify-center"><Loader className="animate-spin text-purple-600" /></div> : !activeBrand ? (
+                <p className="text-muted-foreground">Select a brand to view its reporting.</p>
+            ) : !report ? null : <>
+                {report.partial && <div className="rounded-xl border border-amber-300 bg-amber-50 text-amber-900 p-4 flex gap-2"><AlertTriangle size={20} /> Partial sync coverage. Recommendations are suppressed until every mapped account reconciles.</div>}
+                <section className="grid md:grid-cols-3 gap-4">
+                    {report.summaries.map(summary => <div key={summary.currency} className="bg-card border border-border rounded-xl p-5">
+                        <p className="text-sm text-muted-foreground">{summary.currency} stored totals</p>
+                        <p className="text-2xl font-bold">{money(summary.spend, summary.currency)}</p>
+                        <p className="text-sm text-muted-foreground">{Number(summary.impressions).toLocaleString()} impressions · {Number(summary.clicks).toLocaleString()} clicks</p>
+                        <p className="text-sm text-muted-foreground">ROAS {summary.roas == null ? '—' : Number(summary.roas).toFixed(2)} · CTR {summary.ctr == null ? '—' : `${Number(summary.ctr).toFixed(2)}%`}</p>
+                    </div>)}
+                </section>
+                <section className="bg-card border border-border rounded-xl overflow-hidden">
+                    <div className="p-5 border-b border-border"><h2 className="font-bold text-lg">Read-only recommendations</h2><p className="text-sm text-muted-foreground">These never change delivery, budgets, or ad status.</p></div>
+                    {report.recommendations.length === 0 ? <p className="p-5 text-muted-foreground">No stored ad-day data for this range.</p> : <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-left border-b border-border"><th className="p-3">Ad</th><th className="p-3">Spend</th><th className="p-3">Purchases</th><th className="p-3">ROAS</th><th className="p-3">Recommendation</th></tr></thead><tbody>{report.recommendations.map(item => <tr key={item.meta_ad_id} className="border-b border-border/50"><td className="p-3"><div>{item.ad_name || item.meta_ad_id}</div><small className="text-muted-foreground">{item.campaign_name || 'Unknown campaign'}</small></td><td className="p-3">{money(item.spend, item.currency)}</td><td className="p-3">{item.purchases}</td><td className="p-3">{item.roas == null ? '—' : Number(item.roas).toFixed(2)}</td><td className="p-3"><strong>{item.status}</strong><div className="text-muted-foreground">{item.reason}</div></td></tr>)}</tbody></table></div>}
+                </section>
+            </>}
         </div>
     );
 }

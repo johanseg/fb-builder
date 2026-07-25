@@ -48,15 +48,15 @@ class AdConcept(BaseModel):
 
 class DeconstructRequest(BaseModel):
     """Request to deconstruct a template into a blueprint"""
-    template_id: int
+    template_id: str
 
 
 class ReconstructRequest(BaseModel):
     """Request to reconstruct an ad from blueprint + brand data"""
-    template_id: int  # Template with blueprint
-    brand_id: int
-    product_id: int
-    profile_id: int
+    template_id: str  # Template with blueprint
+    brand_id: str
+    product_id: str
+    profile_id: str
     campaign_offer: str
     campaign_urgency: Optional[str] = None
     campaign_messaging: str

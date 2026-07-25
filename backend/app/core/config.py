@@ -27,8 +27,24 @@ class Settings:
     R2_PUBLIC_URL: str = os.getenv("R2_PUBLIC_URL", "")
 
     @property
+    def r2_partially_configured(self) -> bool:
+        return any((
+            self.R2_ACCOUNT_ID,
+            self.R2_ACCESS_KEY_ID,
+            self.R2_SECRET_ACCESS_KEY,
+            self.R2_BUCKET_NAME,
+            self.R2_PUBLIC_URL,
+        ))
+
+    @property
     def r2_enabled(self) -> bool:
-        return bool(self.R2_ACCOUNT_ID and self.R2_ACCESS_KEY_ID and self.R2_SECRET_ACCESS_KEY)
+        return all((
+            self.R2_ACCOUNT_ID,
+            self.R2_ACCESS_KEY_ID,
+            self.R2_SECRET_ACCESS_KEY,
+            self.R2_BUCKET_NAME,
+            self.R2_PUBLIC_URL,
+        ))
 
     @property
     def r2_endpoint_url(self) -> str:

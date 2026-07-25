@@ -9,6 +9,11 @@ function RefreshHarness() {
   return <button onClick={() => refreshAccessToken()}>refresh</button>;
 }
 
+function ConcurrentRefreshHarness() {
+  const { refreshAccessToken } = useAuth();
+  return <button onClick={() => Promise.all([refreshAccessToken(), refreshAccessToken()])}>refresh twice</button>;
+}
+
 describe('AuthContext refresh flow', () => {
   test('refreshAccessToken fetches the user with the refreshed token', async () => {
     localStorage.getItem.mockImplementation((key) => {
@@ -54,5 +59,18 @@ describe('AuthContext refresh flow', () => {
         })
       );
     });
+  });
+
+  test('coalesces concurrent refreshes into one rolling request', async () => {
+    localStorage.getItem.mockImplementation((key) => (key === 'refreshToken' ? 'stale-refresh-token' : null));
+    fetch
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'fresh-access-token', refresh_token: 'fresh-refresh-token' }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ id: 'user-1', email: 'test@example.com', roles: [] }) });
+
+    render(<AuthProvider><ConcurrentRefreshHarness /></AuthProvider>);
+    fireEvent.click(screen.getByText('refresh twice'));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(fetch.mock.calls[0][0]).toContain('/auth/refresh');
   });
 });

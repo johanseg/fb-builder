@@ -1,33 +1,40 @@
 import os
 from unittest.mock import MagicMock
 
-from dotenv import load_dotenv
-load_dotenv()
-
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
-# Prefer an explicit test URL, then Railway's externally reachable Postgres URL,
-# then the app DATABASE_URL for in-platform test runs.
-TEST_DATABASE_URL = (
-    os.getenv("TEST_DATABASE_URL")
-    or os.getenv("DATABASE_PUBLIC_URL")
-    or os.getenv("DATABASE_URL")
-    or ""
-).strip()
+# Tests must never silently select an app, Railway, or production database.
+TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "").strip()
 if not TEST_DATABASE_URL:
-    raise ValueError("DATABASE_URL or TEST_DATABASE_URL environment variable required for tests")
+    raise ValueError("TEST_DATABASE_URL is required for tests")
 
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
-os.environ.setdefault("SECRET_KEY", "test-secret-key-change-in-production")
-os.environ.setdefault("GEMINI_API_KEY", "test-gemini-api-key")
+os.environ["ENVIRONMENT"] = "test"
+os.environ["SECRET_KEY"] = "test-secret-key-change-in-production"
+
+# Do not allow a developer's .env provider credentials into tests. config.py may
+# load that file during app import, but dotenv does not override explicit values.
+for _provider_var in (
+    "GEMINI_API_KEY",
+    "FAL_AI_API_KEY",
+    "KIE_AI_API_KEY",
+    "FACEBOOK_ACCESS_TOKEN",
+    "R2_ACCOUNT_ID",
+    "R2_ACCESS_KEY_ID",
+    "R2_SECRET_ACCESS_KEY",
+    "R2_BUCKET_NAME",
+    "R2_PUBLIC_URL",
+):
+    os.environ[_provider_var] = ""
 
 from app.main import app
-from app.database import Base, get_db
+from app.database import get_db
 from app.models import Role, User
 from app.core.security import get_password_hash
+from app.core.rate_limit import limiter
 
 engine = create_engine(TEST_DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -35,8 +42,11 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_db():
-    """Initialize database tables once for the entire test session."""
-    Base.metadata.create_all(bind=engine)
+    """Tests require a separately migrated database; never create schema implicitly."""
+    with engine.connect() as connection:
+        migrated = connection.execute(text("SELECT to_regclass('public.alembic_version')")).scalar()
+    if not migrated:
+        raise RuntimeError("Run `alembic upgrade head` against TEST_DATABASE_URL before pytest")
 
 
 @pytest.fixture(scope="function")
@@ -52,6 +62,19 @@ def db_session():
         if transaction.is_active:
             transaction.rollback()
         connection.close()
+
+
+@pytest.fixture(autouse=True)
+def disable_rate_limits():
+    """Keep ordinary tests isolated from SlowAPI's process-wide counters."""
+    was_enabled = limiter.enabled
+    limiter.enabled = False
+    limiter.reset()
+    try:
+        yield
+    finally:
+        limiter.reset()
+        limiter.enabled = was_enabled
 
 
 @pytest.fixture(scope="function")
@@ -84,15 +107,39 @@ def test_user(db_session):
 
     # Create all permissions needed for tests
     all_permissions = [
+        ("brands:read", "Read brands"),
         ("campaigns:write", "Write campaigns"),
+        ("campaigns:read", "Read campaigns"),
+        ("campaigns:activate", "Activate campaigns"),
+        ("campaigns:delete", "Delete campaigns"),
+        ("ads:read", "Read ads"),
         ("ads:write", "Write ads"),
         ("ads:delete", "Delete ads"),
         ("brands:write", "Write brands"),
         ("brands:delete", "Delete brands"),
+        ("products:read", "Read products"),
         ("products:write", "Write products"),
         ("products:delete", "Delete products"),
+        ("profiles:read", "Read profiles"),
         ("profiles:write", "Write profiles"),
         ("profiles:delete", "Delete profiles"),
+        ("templates:read", "Read templates"),
+        ("templates:write", "Write templates"),
+        ("templates:delete", "Delete templates"),
+        ("users:read", "Read users"),
+        ("users:write", "Write users"),
+        ("prompts:read", "Read prompts"),
+        ("prompts:write", "Write prompts"),
+        ("prompts:delete", "Delete prompts"),
+        ("ad_styles:read", "Read ad styles"),
+        ("ad_styles:write", "Write ad styles"),
+        ("ad_styles:delete", "Delete ad styles"),
+        ("research:read", "Read research"),
+        ("research:write", "Write research"),
+        ("research:admin", "Administer research"),
+        ("reporting:read", "Read reporting"),
+        ("reporting:write", "Write reporting"),
+        ("reporting:sync", "Sync reporting"),
     ]
 
     permissions = []

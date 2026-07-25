@@ -7,8 +7,7 @@ echo ""
 # Backend tests
 echo ">>> Backend Tests"
 cd backend
-source venv/bin/activate 2>/dev/null || true
-pytest tests/ -v --tb=short
+venv/bin/python -m pytest tests/ -v --tb=short
 cd ..
 
 echo ""

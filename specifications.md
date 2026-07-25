@@ -184,5 +184,5 @@ FACEBOOK_ACCESS_TOKEN=...
 **Frontend (.env)**
 ```bash
 VITE_API_URL=http://localhost:8000
-VITE_FACEBOOK_ACCESS_TOKEN=... # For client-side checks if needed
+# Facebook tokens are server-only; the frontend only needs VITE_API_URL.
 ```
